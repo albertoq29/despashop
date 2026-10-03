@@ -1,0 +1,1021 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Tokens de la plataforma
+   El tema claro y el oscuro comparten jerarquía: lo que resalta en uno
+   resalta en el otro. Ni negro puro ni blanco puro, para conservar
+   profundidad.
+--------------------------------------------------------------------------- */
+
+@layer base {
+    :root {
+        --ease-salida: cubic-bezier(0.23, 1, 0.32, 1);
+        --ease-suave: cubic-bezier(0.77, 0, 0.175, 1);
+
+        --dur-rapida: 150ms;
+        --dur-media: 220ms;
+        --dur-lenta: 320ms;
+    }
+
+    html {
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+        @apply bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100;
+    }
+
+    /* Anillo de foco visible y consistente en ambos temas */
+    :focus-visible {
+        @apply outline-none ring-2 ring-marca-600 ring-offset-2 ring-offset-stone-50 dark:ring-marca-400 dark:ring-offset-stone-950;
+    }
+
+    /* Los titulares usan la display; el cuerpo hereda la sans */
+    h1, h2, h3, h4 {
+        @apply font-display;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Clases propias, deliberadamente fuera de @layer.
+   Tailwind poda las reglas dentro de @layer cuyas clases no aparezcan
+   literalmente en las plantillas, y `visible` solo se añade desde
+   JavaScript. Declaradas aquí siempre llegan al CSS final.
+--------------------------------------------------------------------------- */
+
+/* Revelado al entrar en pantalla. Sin JavaScript el contenido nunca se
+   oculta, porque la regla de partida solo se activa con .revelar-listo,
+   que añade el propio hook al montarse. */
+.revelar-listo .revelar {
+    opacity: 0;
+    transform: translateY(16px);
+}
+
+.revelar {
+    transition:
+        opacity var(--dur-lenta) var(--ease-salida),
+        transform var(--dur-lenta) var(--ease-salida);
+    transition-delay: var(--retraso, 0ms);
+}
+
+.revelar-listo .revelar.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Un icono dentro de un botón o enlace nunca debe encogerse ni deformarse:
+   en un contenedor flex con poco espacio, el texto lo aplasta y el icono
+   se ve ovalado o cortado. */
+button svg,
+a svg,
+label svg,
+[role="button"] svg {
+    flex-shrink: 0;
+}
+
+/* Retroalimentación táctil del botón: hundirse al presionar */
+.pulsable {
+    transition:
+        transform var(--dur-rapida) var(--ease-salida),
+        background-color var(--dur-rapida) var(--ease-salida),
+        border-color var(--dur-rapida) var(--ease-salida),
+        color var(--dur-rapida) var(--ease-salida);
+}
+
+.pulsable:active {
+    transform: scale(0.97);
+}
+
+/* Botones principales: se levantan un poco al pasar el mouse y dejan una
+   sombra del mismo tono. Solo con puntero fino: en pantallas táctiles el
+   hover se queda pegado después de tocar. */
+.boton-elevado {
+    transition:
+        transform var(--dur-rapida) var(--ease-salida),
+        box-shadow var(--dur-media) var(--ease-salida),
+        background-color var(--dur-rapida) var(--ease-salida),
+        color var(--dur-rapida) var(--ease-salida);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .boton-elevado:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 8px 20px -10px rgb(4 120 87 / 0.55);
+    }
+
+    .boton-elevado:hover:active:not(:disabled) {
+        transform: translateY(0) scale(0.97);
+        box-shadow: none;
+    }
+}
+
+/* Guardar con cambios pendientes: al aparecer los cambios el halo late tres
+   veces y después queda fijo. Llama la atención sin parpadear para siempre,
+   y vuelve a latir cada vez que el borrador pasa de guardado a pendiente. */
+.guardar-pendiente {
+    box-shadow:
+        0 0 0 3px rgb(16 185 129 / 0.28),
+        0 10px 22px -10px rgb(4 120 87 / 0.7);
+    animation: guardar-llamado 1.4s var(--ease-salida) 3;
+}
+
+.dark .guardar-pendiente {
+    box-shadow:
+        0 0 0 3px rgb(52 211 153 / 0.3),
+        0 10px 22px -10px rgb(16 185 129 / 0.5);
+}
+
+@keyframes guardar-llamado {
+    0% {
+        box-shadow:
+            0 0 0 0 rgb(16 185 129 / 0.55),
+            0 10px 22px -10px rgb(4 120 87 / 0.7);
+    }
+    70% {
+        box-shadow:
+            0 0 0 12px rgb(16 185 129 / 0),
+            0 10px 22px -10px rgb(4 120 87 / 0.7);
+    }
+    100% {
+        box-shadow:
+            0 0 0 3px rgb(16 185 129 / 0.28),
+            0 10px 22px -10px rgb(4 120 87 / 0.7);
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Editor del catálogo
+--------------------------------------------------------------------------- */
+
+/* Lienzo punteado detrás de la vista previa, como la mesa de un editor */
+.lienzo-fondo {
+    background-image: radial-gradient(rgb(120 113 108 / 0.22) 1px, transparent 1px);
+    background-size: 18px 18px;
+}
+
+.dark .lienzo-fondo {
+    background-image: radial-gradient(rgb(168 162 158 / 0.12) 1px, transparent 1px);
+}
+
+/* Deslizador: riel con la parte recorrida en el color de la plataforma */
+.deslizador::-webkit-slider-runnable-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: linear-gradient(to right, #059669 var(--progreso), #e7e5e4 var(--progreso));
+}
+
+.dark .deslizador::-webkit-slider-runnable-track {
+    background: linear-gradient(to right, #34d399 var(--progreso), #44403c var(--progreso));
+}
+
+.deslizador::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 18px;
+    width: 18px;
+    margin-top: -6px;
+    border-radius: 9999px;
+    border: 2px solid #059669;
+    background: #ffffff;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+    transition: transform var(--dur-rapida) var(--ease-salida);
+}
+
+.deslizador:active::-webkit-slider-thumb {
+    transform: scale(1.15);
+}
+
+.deslizador::-moz-range-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: #e7e5e4;
+}
+
+.dark .deslizador::-moz-range-track {
+    background: #44403c;
+}
+
+.deslizador::-moz-range-progress {
+    height: 6px;
+    border-radius: 9999px;
+    background: #059669;
+}
+
+.deslizador::-moz-range-thumb {
+    height: 14px;
+    width: 14px;
+    border-radius: 9999px;
+    border: 2px solid #059669;
+    background: #ffffff;
+}
+
+/* Miniatura del nivel de animación: barras que saltan */
+.dibujo-animado {
+    animation: dibujo-salto ease-in-out infinite;
+}
+
+@keyframes dibujo-salto {
+    0%,
+    100% {
+        transform: translateY(0);
+    }
+    40% {
+        transform: translateY(var(--salto, -4px));
+    }
+}
+
+/* Miniatura de la animación de entrada: la pieza entra una y otra vez.
+   El estado de partida llega en variables, no en el estilo en línea: una
+   animación y un `transform` en línea se pelearían por la misma propiedad. */
+.dibujo-entra {
+    animation: dibujo-entra 2.6s var(--ease-salida) infinite;
+}
+
+@keyframes dibujo-entra {
+    0%,
+    12% {
+        transform: var(--desde-transform, none);
+        opacity: var(--desde-opacidad, 0.25);
+        filter: var(--desde-filtro, none);
+    }
+    58%,
+    100% {
+        transform: none;
+        opacity: 1;
+        filter: none;
+    }
+}
+
+/* Cinta continua de anuncios del catálogo público */
+.marquesina {
+    animation: marquesina var(--velocidad, 20s) linear infinite;
+}
+
+.marquesina-pausa:hover .marquesina {
+    animation-play-state: paused;
+}
+
+@keyframes marquesina {
+    from {
+        transform: translateX(0);
+    }
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Catálogo público
+   Todo cuelga de `data-animacion` en la raíz del catálogo, con tres niveles
+   que elige el comercio: none, subtle y lively. Los colores salen de las
+   variables --cat-*, nunca de la paleta de la plataforma.
+--------------------------------------------------------------------------- */
+
+.cat-raiz :focus-visible {
+    --tw-ring-color: var(--cat-primario);
+    --tw-ring-offset-color: var(--cat-fondo);
+}
+
+.cat-sin-barra {
+    scrollbar-width: none;
+}
+
+.cat-sin-barra::-webkit-scrollbar {
+    display: none;
+}
+
+/* ── Aparición al entrar en pantalla ────────────────────────────────────
+   Tres cosas la definen, y cada una es una opción del editor:
+   `data-animacion` cuánto se mueve, `data-entrada` hacia dónde y
+   `data-velocidad` cuánto tarda. El estado "ya apareció" se marca con
+   data-visible, que React no reescribe al cambiar las clases.
+   `data-cascada="no"` apaga el retraso en escalera de las rejillas. */
+
+.cat-raiz {
+    --cat-dur: 650ms;
+    --cat-desp: 18px;
+    --cat-escala: 0.97;
+    --cat-borroso: 5px;
+    --cat-giro: 7deg;
+}
+
+[data-animacion="lively"] {
+    --cat-desp: 40px;
+    --cat-escala: 0.93;
+    --cat-borroso: 10px;
+    --cat-giro: 14deg;
+}
+
+[data-velocidad="slow"] {
+    --cat-dur: 1000ms;
+}
+
+[data-velocidad="fast"] {
+    --cat-dur: 380ms;
+}
+
+[data-cascada="no"] .cat-aparecer {
+    --retraso: 0ms !important;
+}
+
+.cat-aparecer {
+    transition:
+        opacity var(--cat-dur) var(--ease-salida) var(--retraso, 0ms),
+        transform var(--cat-dur) var(--ease-salida) var(--retraso, 0ms),
+        filter var(--cat-dur) var(--ease-salida) var(--retraso, 0ms);
+}
+
+/* El estado de partida de cada entrada. Solo se aplica con el movimiento
+   encendido: con "none" el bloque nace visible y no hay nada que animar. */
+.cat-raiz:not([data-animacion="none"]) .cat-aparecer:not([data-visible]) {
+    opacity: 0;
+}
+
+[data-entrada="up"] .cat-aparecer:not([data-visible]) {
+    transform: translateY(var(--cat-desp));
+}
+
+[data-entrada="down"] .cat-aparecer:not([data-visible]) {
+    transform: translateY(calc(var(--cat-desp) * -1));
+}
+
+[data-entrada="left"] .cat-aparecer:not([data-visible]) {
+    transform: translateX(calc(var(--cat-desp) * -1));
+}
+
+[data-entrada="right"] .cat-aparecer:not([data-visible]) {
+    transform: translateX(var(--cat-desp));
+}
+
+[data-entrada="zoom"] .cat-aparecer:not([data-visible]) {
+    transform: scale(var(--cat-escala));
+}
+
+[data-entrada="blur"] .cat-aparecer:not([data-visible]) {
+    filter: blur(var(--cat-borroso));
+    transform: translateY(calc(var(--cat-desp) * 0.4));
+}
+
+/* El giro necesita perspectiva en el propio elemento: no hay un padre
+   común a todos los bloques donde ponerla. */
+[data-entrada="flip"] .cat-aparecer:not([data-visible]) {
+    transform: perspective(900px) rotateX(var(--cat-giro));
+    transform-origin: center top;
+}
+
+/* Entrada de la portada al cargar la página */
+[data-animacion="subtle"] .cat-entrada {
+    animation: cat-entrada calc(var(--cat-dur) + 50ms) var(--ease-salida) var(--retraso, 0ms) both;
+}
+
+[data-animacion="lively"] .cat-entrada {
+    animation: cat-entrada-viva calc(var(--cat-dur) + 250ms) var(--ease-salida) var(--retraso, 0ms) both;
+}
+
+@keyframes cat-entrada {
+    from {
+        opacity: 0;
+        transform: translateY(12px);
+    }
+}
+
+@keyframes cat-entrada-viva {
+    from {
+        opacity: 0;
+        transform: translateY(28px);
+        filter: blur(6px);
+    }
+}
+
+/* Botones: se hunden al presionar y responden al mouse según el nivel */
+.cat-boton {
+    transition:
+        transform 160ms var(--ease-salida),
+        box-shadow 220ms var(--ease-salida),
+        filter 220ms var(--ease-salida),
+        background-color 200ms ease,
+        color 200ms ease,
+        border-color 200ms ease,
+        opacity 200ms ease;
+}
+
+.cat-boton:active {
+    transform: scale(0.97);
+}
+
+[data-animacion="none"] .cat-boton:active {
+    transform: none;
+}
+
+.cat-flecha {
+    transition: transform 250ms var(--ease-salida);
+}
+
+.cat-brillo {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+/* Reflejo que cruza el botón, detrás del texto y encima del fondo */
+.cat-brillo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: linear-gradient(105deg, transparent 30%, rgb(255 255 255 / 0.3) 50%, transparent 70%);
+    transform: translateX(-120%);
+}
+
+.cat-enlace {
+    transition:
+        background-color 200ms ease,
+        color 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    [data-animacion="subtle"] .cat-boton:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.05);
+        box-shadow: 0 8px 18px -12px rgb(0 0 0 / 0.35);
+    }
+
+    [data-animacion="lively"] .cat-boton:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.08) saturate(1.05);
+        box-shadow: 0 14px 28px -14px rgb(0 0 0 / 0.45);
+    }
+
+    [data-animacion="subtle"] .cat-boton:hover:active,
+    [data-animacion="lively"] .cat-boton:hover:active {
+        transform: translateY(0) scale(0.97);
+        box-shadow: none;
+    }
+
+    [data-animacion="lively"] .cat-brillo:hover::after {
+        transform: translateX(120%);
+        transition: transform 750ms var(--ease-salida);
+    }
+
+    [data-animacion="subtle"] .cat-boton:hover .cat-flecha,
+    [data-animacion="lively"] .cat-boton:hover .cat-flecha,
+    [data-animacion="subtle"] .cat-enlace:hover .cat-flecha,
+    [data-animacion="lively"] .cat-enlace:hover .cat-flecha {
+        transform: translateX(3px);
+    }
+
+    .cat-enlace:hover {
+        background-color: color-mix(in srgb, currentColor 9%, transparent);
+    }
+}
+
+/* Imágenes: entran con un fundido cuando terminan de cargar */
+.cat-imagen {
+    opacity: 0;
+    transition: opacity 500ms var(--ease-salida);
+}
+
+.cat-imagen[data-cargada],
+[data-animacion="none"] .cat-imagen {
+    opacity: 1;
+}
+
+/* Tarjetas de producto */
+.cat-foto {
+    transition:
+        transform 700ms var(--ease-salida),
+        opacity 500ms var(--ease-salida);
+}
+
+.cat-tarjeta-eleva,
+.cat-tarjeta-acerca,
+.cat-tarjeta-borde {
+    transition:
+        transform 300ms var(--ease-salida),
+        box-shadow 300ms var(--ease-salida);
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .cat-tarjeta-eleva:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 20px 40px -20px rgb(0 0 0 / 0.35) !important;
+    }
+
+    .cat-tarjeta-acerca:hover .cat-foto {
+        transform: scale(1.06);
+    }
+
+    .cat-tarjeta-borde:hover {
+        box-shadow: 0 0 0 2px var(--cat-primario) !important;
+    }
+}
+
+/* Detalles vivos: degradados que respiran, formas que flotan, avisos que laten */
+[data-animacion="lively"] .cat-degradado-vivo {
+    background-size: 180% 180% !important;
+    animation: cat-degradado 12s ease-in-out infinite alternate;
+}
+
+@keyframes cat-degradado {
+    from {
+        background-position: 0% 40%;
+    }
+    to {
+        background-position: 100% 60%;
+    }
+}
+
+[data-animacion="lively"] .cat-flotar {
+    animation: cat-flotar 9s ease-in-out infinite alternate;
+}
+
+@keyframes cat-flotar {
+    to {
+        transform: translate3d(-24px, 18px, 0) scale(1.08);
+    }
+}
+
+.cat-latido {
+    animation: cat-latido 1.8s ease-in-out infinite;
+}
+
+[data-animacion="none"] .cat-latido {
+    animation: none;
+}
+
+@keyframes cat-latido {
+    50% {
+        opacity: 0.4;
+        transform: scale(0.75);
+    }
+}
+
+.cat-pulso::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: inherit;
+    opacity: 0;
+}
+
+[data-animacion="lively"] .cat-pulso::before {
+    animation: cat-pulso 2.6s var(--ease-salida) infinite;
+}
+
+@keyframes cat-pulso {
+    0% {
+        transform: scale(1);
+        opacity: 0.5;
+    }
+    80%,
+    100% {
+        transform: scale(1.7);
+        opacity: 0;
+    }
+}
+
+/* Cabecera: gana una sombra al desplazar */
+.cat-cabecera {
+    transition:
+        background-color 300ms ease,
+        box-shadow 300ms ease,
+        border-color 300ms ease;
+}
+
+.cat-cabecera[data-desplazado] {
+    box-shadow: 0 10px 30px -22px rgb(0 0 0 / 0.4);
+}
+
+.cat-campo {
+    transition: border-color 200ms ease;
+}
+
+.cat-campo:focus {
+    border-color: var(--cat-primario) !important;
+}
+
+/* Volver arriba */
+.cat-volver {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+    pointer-events: none;
+    transition:
+        opacity 250ms var(--ease-salida),
+        transform 250ms var(--ease-salida);
+}
+
+.cat-volver[data-visible] {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.cat-volver[data-visible]:active {
+    transform: scale(0.95);
+}
+
+/* Diálogos: vista rápida y modales del comercio */
+.cat-velo {
+    animation: cat-fundido-entra 220ms var(--ease-salida) both;
+}
+
+.cat-dialogo {
+    animation: cat-dialogo-entra 280ms var(--ease-salida) both;
+}
+
+.cat-modal-fade {
+    animation: cat-fundido-entra 260ms var(--ease-salida) both;
+}
+
+.cat-modal-zoom {
+    animation: cat-dialogo-entra 280ms var(--ease-salida) both;
+}
+
+.cat-modal-slide-up {
+    animation: cat-subir-entra 380ms var(--ease-salida) both;
+}
+
+.cat-modal-bounce {
+    animation: cat-rebote-entra 520ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.cat-saliendo .cat-velo {
+    animation: cat-fundido-sale 170ms ease both;
+}
+
+.cat-saliendo .cat-dialogo,
+.cat-saliendo [class*="cat-modal-"] {
+    animation: cat-dialogo-sale 170ms ease both;
+}
+
+/* En el teléfono la vista rápida sube desde abajo, como una hoja */
+@media (max-width: 639px) {
+    .cat-dialogo {
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+        animation: cat-hoja-entra 420ms cubic-bezier(0.32, 0.72, 0, 1) both;
+    }
+
+    .cat-saliendo .cat-dialogo {
+        animation: cat-hoja-sale 200ms ease both;
+    }
+}
+
+@keyframes cat-fundido-entra {
+    from {
+        opacity: 0;
+    }
+}
+
+@keyframes cat-fundido-sale {
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes cat-dialogo-entra {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.97);
+    }
+}
+
+@keyframes cat-dialogo-sale {
+    to {
+        opacity: 0;
+        transform: scale(0.97);
+    }
+}
+
+@keyframes cat-subir-entra {
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+}
+
+@keyframes cat-rebote-entra {
+    from {
+        opacity: 0;
+        transform: scale(0.88);
+    }
+}
+
+@keyframes cat-hoja-entra {
+    from {
+        transform: translateY(100%);
+    }
+}
+
+@keyframes cat-hoja-sale {
+    to {
+        transform: translateY(100%);
+    }
+}
+
+/* Vista previa del editor: contorno y barra de acciones de cada bloque,
+   como al seleccionar una capa en un lienzo. Colores fijos de la
+   plataforma para no confundirse con los del comercio. */
+.cat-editable:not(.sticky) {
+    position: relative;
+}
+
+.cat-editable::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 2px transparent;
+    transition: box-shadow 150ms ease;
+}
+
+.cat-editable:hover::after {
+    box-shadow: inset 0 0 0 2px rgb(16 185 129 / 0.5);
+}
+
+.cat-editable[data-seleccionado]::after {
+    box-shadow: inset 0 0 0 2px #10b981;
+}
+
+.cat-editable-barra {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    border-radius: 10px;
+    background: #1c1917;
+    color: #fafaf9;
+    font: 500 12px/1 "Inter Tight", system-ui, sans-serif;
+    box-shadow: 0 8px 24px -8px rgb(0 0 0 / 0.5);
+    opacity: 0;
+    transform: translateY(-4px);
+    pointer-events: none;
+    transition:
+        opacity 150ms ease,
+        transform 150ms var(--ease-salida);
+}
+
+.cat-editable:hover > .cat-editable-barra,
+.cat-editable[data-seleccionado] > .cat-editable-barra {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+}
+
+.cat-editable-barra button {
+    display: inline-flex;
+    height: 26px;
+    min-width: 26px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 6px;
+    border-radius: 7px;
+    transition: background-color 120ms ease;
+}
+
+.cat-editable-barra button:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.14);
+}
+
+.cat-editable-barra button:disabled {
+    opacity: 0.35;
+}
+
+.cat-editable-barra .cat-editable-nombre {
+    padding: 0 8px;
+    font-weight: 600;
+}
+
+.cat-editable-separador {
+    width: 1px;
+    height: 16px;
+    margin: 0 3px;
+    background: rgb(255 255 255 / 0.18);
+}
+
+@layer utilities {
+    /* Barra de scroll delgada para paneles internos */
+    .scrollbar-slim {
+        scrollbar-width: thin;
+        scrollbar-color: theme('colors.stone.300') transparent;
+    }
+
+    .dark .scrollbar-slim {
+        scrollbar-color: theme('colors.stone.700') transparent;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar-thumb {
+        @apply rounded-full bg-stone-300 dark:bg-stone-700;
+    }
+
+    .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+        @apply bg-stone-400 dark:bg-stone-600;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Movimiento reducido: se conservan las transiciones que ayudan a entender
+   el cambio (opacidad, color) y se elimina el desplazamiento.
+--------------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    .revelar-listo .revelar {
+        opacity: 1;
+        transform: none;
+    }
+
+    .marquesina {
+        animation: none;
+    }
+
+    .cat-aparecer {
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+
+    .cat-desplegable {
+        transition: none;
+    }
+
+    .cat-flotar,
+    .cat-degradado-vivo,
+    .cat-latido,
+    .cat-pulso::before {
+        animation: none !important;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+   Catálogo: piezas de diseño que elige el comercio
+--------------------------------------------------------------------------- */
+
+/* Dos efectos más al pasar el puntero por una tarjeta */
+.cat-tarjeta-brilla,
+.cat-tarjeta-inclina {
+    transition:
+        transform 320ms var(--ease-salida),
+        box-shadow 320ms var(--ease-salida);
+}
+
+@media (hover: hover) {
+    .cat-tarjeta-brilla:hover {
+        box-shadow:
+            0 0 0 1px color-mix(in srgb, var(--cat-primario) 45%, transparent),
+            0 10px 30px -6px color-mix(in srgb, var(--cat-primario) 40%, transparent) !important;
+    }
+
+    .cat-tarjeta-inclina:hover {
+        transform: perspective(900px) rotateX(3deg) rotateY(-3deg) translateY(-3px);
+    }
+
+    [data-animacion="none"] .cat-tarjeta-inclina:hover {
+        transform: none;
+    }
+}
+
+/* Títulos de sección. El degradado y el subrayado salen de la paleta del
+   comercio, así que el mismo marcado sirve para cualquier catálogo. */
+[data-titulos="upper"] .cat-titulo {
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+[data-titulos="gradient"] .cat-titulo {
+    background-image: linear-gradient(100deg, var(--cat-primario), var(--cat-acento) 70%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    /* Sin esto, las letras con descendente se recortan al pintar el fondo */
+    padding-bottom: 0.08em;
+}
+
+[data-titulos="underline"] .cat-titulo::after {
+    content: '';
+    display: block;
+    width: 3rem;
+    height: 3px;
+    margin-top: 0.7rem;
+    border-radius: 999px;
+    background: var(--cat-acento);
+}
+
+[data-titulos="underline"] .cat-titulo-centro::after {
+    margin-inline: auto;
+}
+
+/* El degradado no se puede pintar sobre un título dentro de una franja de
+   color: quedaría ilegible. Ahí manda el color de la franja. */
+[data-titulos="gradient"] .cat-sobre-marca .cat-titulo {
+    background-image: none;
+    color: inherit;
+    -webkit-text-fill-color: currentColor;
+}
+
+/* Preguntas frecuentes: el panel se abre midiendo su contenido */
+.cat-desplegable {
+    overflow: hidden;
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    /* `visibility` saca la respuesta cerrada del lector de pantalla y del
+       buscador de la página; se retrasa para no cortar el cierre. */
+    visibility: hidden;
+    transition:
+        grid-template-rows 320ms var(--ease-salida),
+        opacity 260ms ease,
+        visibility 0s linear 320ms;
+}
+
+.cat-desplegable[data-abierto] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+    visibility: visible;
+    transition-delay: 0s;
+}
+
+.cat-desplegable > div {
+    min-height: 0;
+}
+
+.cat-signo {
+    transition: transform 280ms var(--ease-salida);
+}
+
+[data-abierto] > .cat-signo,
+.cat-fila-abierta .cat-signo {
+    transform: rotate(180deg);
+}
+
+[data-animacion="none"] .cat-desplegable {
+    transition: none;
+}
+
+/* Barra de avance de lectura */
+.cat-progreso {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 3px;
+    z-index: 50;
+    transform-origin: left center;
+    background: linear-gradient(90deg, var(--cat-primario), var(--cat-acento));
+    transition: transform 120ms linear;
+}
+
+/* Separador decorativo entre bloques */
+.cat-separador {
+    display: block;
+    width: 100%;
+    height: 56px;
+    color: color-mix(in srgb, var(--cat-primario) 16%, transparent);
+}
+
+.cat-separador-linea {
+    height: 1px;
+    width: min(100%, 22rem);
+    margin-inline: auto;
+    border-radius: 999px;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cat-texto) 22%, transparent), transparent);
+}
+
+.cat-separador-puntos {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.cat-separador-puntos span {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--cat-primario) 55%, transparent);
+}

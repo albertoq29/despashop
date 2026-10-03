@@ -1,0 +1,7 @@
+# Lo que genera la app en tiempo de ejecución, no va al repositorio.
+# El resto de public/ —index.php, .htaccess, los iconos de marca y los
+# assets compilados— sí se versiona: sin index.php la app no arranca al
+# clonarla en el servidor.
+/storage
+/hot
+/products

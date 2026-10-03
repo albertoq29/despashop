@@ -1,0 +1,116 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
+use App\Models\Plan;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Inertia\Inertia;
+use Inertia\Response;
+
+/**
+ * Planes que se ofrecen en la página de bienvenida. El administrador
+ * define nombre, precio, límites y qué aparece en cada slot.
+ */
+class PlanController extends Controller
+{
+    public function index(): Response
+    {
+        return Inertia::render('Admin/Planes/Index', [
+            'planes' => Plan::withCount(['subscribers as suscriptores' => fn ($q) => $q->where('status', User::STATUS_APPROVED)])
+                ->orderBy('display_order')
+                ->get(),
+        ]);
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        $plan = Plan::create($this->validated($request));
+
+        ActivityLog::record('plan.creado', 'Creó el plan ' . $plan->name, [], $plan);
+
+        return back()->with('success', 'Plan creado.');
+    }
+
+    public function update(Request $request, Plan $plan): RedirectResponse
+    {
+        $anterior = (float) $plan->price_usd;
+        $plan->update($this->validated($request, $plan));
+
+        if ($anterior !== (float) $plan->price_usd) {
+            ActivityLog::record(
+                'plan.precio',
+                'Cambió el precio de ' . $plan->name . ' de $' . $anterior . ' a $' . $plan->price_usd,
+                ['antes' => $anterior, 'ahora' => (float) $plan->price_usd],
+                $plan
+            );
+        }
+
+        return back()->with('success', 'Plan actualizado.');
+    }
+
+    public function destroy(Plan $plan): RedirectResponse
+    {
+        if ($plan->subscribers()->exists()) {
+            return back()->with('error', 'No puedes eliminar un plan con comercios asignados. Desactívalo o muévelos a otro plan primero.');
+        }
+
+        $nombre = $plan->name;
+        $plan->delete();
+
+        ActivityLog::record('plan.eliminado', 'Eliminó el plan ' . $nombre);
+
+        return back()->with('success', 'Plan eliminado.');
+    }
+
+    public function reorder(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'orden' => ['required', 'array'],
+            'orden.*' => ['integer', 'exists:plans,id'],
+        ]);
+
+        foreach ($request->input('orden') as $position => $id) {
+            Plan::where('id', $id)->update(['display_order' => $position]);
+        }
+
+        return back();
+    }
+
+    private function validated(Request $request, ?Plan $plan = null): array
+    {
+        return $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+            'slug' => ['nullable', 'string', 'max:80', Rule::unique('plans', 'slug')->ignore($plan?->id)],
+            'tagline' => ['nullable', 'string', 'max:120'],
+            'description' => ['nullable', 'string', 'max:600'],
+
+            'price_usd' => ['required', 'numeric', 'min:0', 'max:100000'],
+            'price_bs' => ['nullable', 'numeric', 'min:0'],
+            'billing_period' => ['required', 'in:monthly,yearly,lifetime,free'],
+
+            'max_products' => ['nullable', 'integer', 'min:1'],
+            'max_images_per_product' => ['nullable', 'integer', 'min:1'],
+            'max_banners' => ['nullable', 'integer', 'min:1'],
+            'max_invoices_per_month' => ['nullable', 'integer', 'min:1'],
+            // La clave de IA es compartida: un tope razonable evita que un plan la agote
+            'ai_daily_limit' => ['required', 'integer', 'min:0', 'max:50'],
+            'allows_custom_domain' => ['boolean'],
+            'allows_invoice_branding' => ['boolean'],
+            'allows_catalog_branding' => ['boolean'],
+
+            'features' => ['nullable', 'array'],
+            'features.*' => ['string', 'max:160'],
+            'badge' => ['nullable', 'string', 'max:30'],
+            'color' => ['required', 'string', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'is_featured' => ['boolean'],
+            'is_active' => ['boolean'],
+            'is_public' => ['boolean'],
+            'display_order' => ['nullable', 'integer', 'min:0'],
+        ]);
+    }
+}
