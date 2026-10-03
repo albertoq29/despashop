@@ -138,6 +138,8 @@ class PublicCatalogController extends Controller
      */
     private function renderizar(Request $request, User $owner, CatalogTheme $theme, array $extra): Response
     {
+        $this->nivelDePreciosPorVolumen = (string) ($theme->wholesale_prices ?? 'off');
+
         $secciones = $theme->sections;
         $orden = $this->orden($request, $theme);
         $enElEditor = $extra['modoEditor'];
@@ -228,7 +230,7 @@ class PublicCatalogController extends Controller
     private function consultaBase(): Builder
     {
         return Product::query()
-            ->select(self::COLUMNAS)
+            ->select($this->columnas())
             ->with([
                 'images:id,product_id,image_path',
                 'variants:id,product_id,label,type,stock,image_path',
@@ -236,11 +238,41 @@ class PublicCatalogController extends Controller
             ->where('is_hidden', false);
     }
 
+    /**
+     * Columnas que se traen de cada producto.
+     *
+     * La lista base deja fuera el costo, la inversión y las notas internas.
+     * Los precios al mayor se suman solo si el comercio decidió enseñarlos:
+     * una columna que no se va a mostrar tampoco hace falta consultarla.
+     *
+     * @return list<string>
+     */
+    private function columnas(): array
+    {
+        return $this->mostrarPreciosPorVolumen()
+            ? [...self::COLUMNAS, 'price_mayor_usdt', 'price_distribuidor_usdt']
+            : self::COLUMNAS;
+    }
+
     /** @return callable(Product): array<string, mixed> */
     private function presentador(): callable
     {
         return fn (Product $producto) => $this->presentarProducto($producto);
     }
+
+    /**
+     * ¿Se enseñan los precios al mayor y de distribuidor?
+     *
+     * Se guarda al renderizar para que el presentador lo tenga: si están
+     * ocultos no viajan en la respuesta, igual que el costo. Un precio que
+     * no se muestra no tiene por qué estar en el código de la página.
+     */
+    private function mostrarPreciosPorVolumen(): bool
+    {
+        return in_array($this->nivelDePreciosPorVolumen, ['modal', 'card'], true);
+    }
+
+    private string $nivelDePreciosPorVolumen = 'off';
 
     /**
      * Solo lo que un visitante puede ver de un producto.
@@ -263,6 +295,10 @@ class PublicCatalogController extends Controller
             'esServicio' => $esServicio,
             'detalle' => $producto->detalleDelServicio(),
             'price_usdt' => $producto->price_usdt,
+            ...($this->mostrarPreciosPorVolumen() ? [
+                'price_mayor_usdt' => $producto->price_mayor_usdt,
+                'price_distribuidor_usdt' => $producto->price_distribuidor_usdt,
+            ] : []),
             'conditional_price' => $producto->conditional_price,
             'conditional_min_quantity' => $producto->conditional_min_quantity,
             // Un servicio no se agota: no tiene existencias que mostrar
@@ -298,6 +334,10 @@ class PublicCatalogController extends Controller
             'name' => $combo->name,
             'description' => $combo->description,
             'price_usdt' => $combo->price_usdt,
+            ...($this->mostrarPreciosPorVolumen() ? [
+                'price_mayor_usdt' => $combo->price_mayor_usdt,
+                'price_distribuidor_usdt' => $combo->price_distribuidor_usdt,
+            ] : []),
             'stock' => $combo->stock,
             'image_url' => $combo->image_url,
             'thumb_url' => $combo->thumb_url,

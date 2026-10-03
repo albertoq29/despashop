@@ -662,6 +662,23 @@ function EditorDeProductos({ editor, c, campo, propio }) {
                 />
                 <Interruptor etiqueta="Precios en dólares" valor={datos.show_prices} onCambiar={(v) => cambiar('show_prices', v)} />
                 <Interruptor etiqueta="Precios en bolívares" valor={datos.show_bs_prices} onCambiar={(v) => cambiar('show_bs_prices', v)} />
+
+                <Segmentado
+                    etiqueta="Precios al mayor y de distribuidor"
+                    {...campo('wholesale_prices')}
+                    opciones={[
+                        { valor: 'off', texto: 'Ocultos' },
+                        { valor: 'modal', texto: 'Al abrir' },
+                        { valor: 'card', texto: 'Siempre' },
+                    ]}
+                    ayuda={
+                        {
+                            off: 'Solo se ve el precio al detal. Es lo normal si vendes al público.',
+                            modal: 'Aparecen cuando el visitante abre el producto, no en la rejilla.',
+                            card: 'Aparecen también en cada tarjeta. Útil si vendes a revendedores.',
+                        }[datos.wholesale_prices ?? 'off']
+                    }
+                />
                 <Interruptor etiqueta="Aviso de últimas unidades" valor={datos.show_stock} onCambiar={(v) => cambiar('show_stock', v)} />
                 <Interruptor
                     etiqueta="Distintivos en las fotos"

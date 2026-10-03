@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
-import { BotonCatalogo, useVitrina } from './Comunes';
+import { BotonCatalogo, PreciosPorVolumen, useVitrina } from './Comunes';
 import { BORDE_SUAVE, enlaceWhatsapp, formatoBs, SOMBRAS } from './estilos';
 
 /**
@@ -186,6 +186,8 @@ export function VistaRapida({ articulo, onCerrar }) {
                                     Consultar precio
                                 </p>
                             )}
+
+                            <PreciosPorVolumen articulo={articulo} donde="modal" />
 
                             {articulo.conditional_price && articulo.conditional_min_quantity && (
                                 <p

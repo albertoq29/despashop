@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import { aire, estiloBoton } from './estilos';
+import { aire, BORDE_SUAVE, estiloBoton } from './estilos';
 import { alCargarImagen, marcarCargada, useAparecer } from './movimiento';
 
 /**
@@ -53,6 +53,66 @@ export function EncabezadoSeccion({ titulo, subtitulo, alineacion = 'left', acci
             </div>
 
             {accion && <div className="shrink-0">{accion}</div>}
+        </div>
+    );
+}
+
+/**
+ * Precios al mayor y de distribuidor.
+ *
+ * Qué tanto se enseñan lo decide el comercio: ocultos, solo al abrir el
+ * producto, o también en la rejilla. En la tarjeta van en una línea
+ * discreta —el precio al detal tiene que seguir mandando— y en la vista
+ * rápida, con sitio, se explican mejor.
+ *
+ * Si están ocultos, el servidor no los manda: aquí no llegan ni como dato.
+ */
+export function PreciosPorVolumen({ articulo, donde = 'tarjeta' }) {
+    const { theme } = useVitrina();
+    const nivel = theme.wholesale_prices ?? 'off';
+
+    if (nivel === 'off' || (donde === 'tarjeta' && nivel !== 'card')) {
+        return null;
+    }
+
+    const escalones = [
+        ['Por mayor', articulo.price_mayor_usdt],
+        ['Distribuidor', articulo.price_distribuidor_usdt],
+    ].filter(([, precio]) => precio && Number(precio) > 0);
+
+    if (escalones.length === 0) {
+        return null;
+    }
+
+    if (donde === 'tarjeta') {
+        return (
+            <p className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[11px] leading-tight" style={{ color: 'var(--cat-tenue)' }}>
+                {escalones.map(([etiqueta, precio]) => (
+                    <span key={etiqueta}>
+                        {etiqueta} <span className="font-semibold">${Number(precio).toFixed(2)}</span>
+                    </span>
+                ))}
+            </p>
+        );
+    }
+
+    return (
+        <div
+            className="mt-4 overflow-hidden rounded-xl"
+            style={{ background: 'color-mix(in srgb, var(--cat-primario) 7%, transparent)' }}
+        >
+            {escalones.map(([etiqueta, precio], indice) => (
+                <div
+                    key={etiqueta}
+                    className="flex items-baseline justify-between px-4 py-2.5"
+                    style={{ borderTop: indice > 0 ? `1px solid ${BORDE_SUAVE}` : 'none' }}
+                >
+                    <span className="text-sm" style={{ color: 'var(--cat-tenue)' }}>{etiqueta}</span>
+                    <span className="text-base font-bold" style={{ color: 'var(--cat-primario)' }}>
+                        ${Number(precio).toFixed(2)}
+                    </span>
+                </div>
+            ))}
         </div>
     );
 }

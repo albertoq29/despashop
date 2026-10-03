@@ -932,6 +932,7 @@ function datosIniciales(theme) {
         show_categories: theme.show_categories,
         show_search: theme.show_search,
         show_bs_prices: theme.show_bs_prices,
+        wholesale_prices: theme.wholesale_prices ?? 'off',
         hero_style: theme.hero_style,
         hero_layout: theme.hero_layout ?? 'centered',
         hero_height: theme.hero_height ?? 'md',

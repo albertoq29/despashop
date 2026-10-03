@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\CatalogTheme;
+use App\Models\Product;
 use App\Models\User;
 use App\Services\CatalogProvisioner;
+use App\Support\Tenancy;
 use App\Support\SeccionesDelCatalogo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia;
@@ -355,5 +357,98 @@ class DisenoDelCatalogoTest extends TestCase
                 $this->assertTrue($tipos->contains('faq'));
                 $this->assertTrue($tipos->contains('divider'));
             });
+    }
+
+    // ── Precios al mayor y de distribuidor ────────────────────────────────────
+
+    private function productoConEscalones(User $usuario): void
+    {
+        app(Tenancy::class)->forTenant($usuario->id, fn () => Product::create([
+            'name' => 'Audífonos TWS',
+            'price_usdt' => 18,
+            'price_mayor_usdt' => 15,
+            'price_distribuidor_usdt' => 12,
+            'cost_price' => 9,
+            'stock' => 10,
+        ]));
+    }
+
+    public function test_ocultos_no_viajan_al_catalogo_publico(): void
+    {
+        $usuario = $this->comercio();
+        $this->productoConEscalones($usuario);
+        $this->tema($usuario)->forceFill(['is_published' => true, 'wholesale_prices' => 'off'])->save();
+
+        $this->get('/' . $usuario->username)
+            ->assertOk()
+            ->assertInertia(function (AssertableInertia $pagina) {
+                $producto = $pagina->toArray()['props']['productos'][0];
+
+                // No basta con no pintarlos: no pueden estar en la respuesta
+                $this->assertArrayNotHasKey('price_mayor_usdt', $producto);
+                $this->assertArrayNotHasKey('price_distribuidor_usdt', $producto);
+            });
+    }
+
+    public function test_al_abrir_o_siempre_si_llegan(): void
+    {
+        foreach (['modal', 'card'] as $nivel) {
+            $usuario = $this->comercio();
+            $this->productoConEscalones($usuario);
+            $this->tema($usuario)->forceFill(['is_published' => true, 'wholesale_prices' => $nivel])->save();
+
+            $this->get('/' . $usuario->username)
+                ->assertOk()
+                ->assertInertia(function (AssertableInertia $pagina) use ($nivel) {
+                    $producto = $pagina->toArray()['props']['productos'][0];
+
+                    $this->assertEqualsWithDelta(15, (float) $producto['price_mayor_usdt'], 0.001, "nivel {$nivel}");
+                    $this->assertEqualsWithDelta(12, (float) $producto['price_distribuidor_usdt'], 0.001, "nivel {$nivel}");
+                    $this->assertSame($nivel, $pagina->toArray()['props']['theme']['wholesale_prices']);
+                });
+        }
+    }
+
+    public function test_el_costo_sigue_sin_salir_aunque_se_muestren_los_escalones(): void
+    {
+        $usuario = $this->comercio();
+        $this->productoConEscalones($usuario);
+        $this->tema($usuario)->forceFill(['is_published' => true, 'wholesale_prices' => 'card'])->save();
+
+        $this->get('/' . $usuario->username)
+            ->assertOk()
+            ->assertInertia(function (AssertableInertia $pagina) {
+                $producto = $pagina->toArray()['props']['productos'][0];
+
+                $this->assertArrayNotHasKey('cost_price', $producto);
+                $this->assertArrayNotHasKey('inversion_historica', $producto);
+                $this->assertArrayNotHasKey('notes', $producto);
+            });
+    }
+
+    public function test_un_valor_inventado_se_rechaza(): void
+    {
+        $usuario = $this->comercio();
+
+        $this->actingAs($usuario)
+            ->put(route('catalogo.personalizar.update'), $this->datosDelEditor($usuario, [
+                'wholesale_prices' => 'a-veces',
+            ]))
+            ->assertSessionHasErrors('wholesale_prices');
+
+        $this->assertSame('off', $this->tema($usuario)->fresh()->wholesale_prices);
+    }
+
+    public function test_el_comercio_elige_donde_se_ven(): void
+    {
+        $usuario = $this->comercio();
+
+        $this->actingAs($usuario)
+            ->put(route('catalogo.personalizar.update'), $this->datosDelEditor($usuario, [
+                'wholesale_prices' => 'card',
+            ]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('card', $this->tema($usuario)->fresh()->wholesale_prices);
     }
 }

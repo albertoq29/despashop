@@ -1,1 +1,0 @@
-import{j as o}from"./app-BBj3LFdO.js";function m({value:t,className:e="",children:s,...n}){return o.jsx("label",{...n,className:"block text-sm font-medium text-stone-700 dark:text-stone-300 "+e,children:t||s})}export{m as I};

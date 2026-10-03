@@ -116,6 +116,7 @@ class CatalogDesignController extends Controller
             'show_categories' => ['boolean'],
             'show_search' => ['boolean'],
             'show_bs_prices' => ['boolean'],
+            'wholesale_prices' => ['required', 'in:off,modal,card'],
 
             // La forma fina de cada bloque la asegura SeccionesDelCatalogo;
             // aquí solo se avisa de lo que el comercio puede corregir.

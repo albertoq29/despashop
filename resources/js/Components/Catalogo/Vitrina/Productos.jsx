@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { ArrowRight, ArrowUpDown, ChevronLeft, ChevronRight, Clock, MessageCircle, Plus, Search, X } from 'lucide-react';
-import { BotonCatalogo, EncabezadoSeccion, Imagen, irASeccion, SinContenido, useVitrina } from './Comunes';
+import { BotonCatalogo, EncabezadoSeccion, Imagen, irASeccion, PreciosPorVolumen, SinContenido, useVitrina } from './Comunes';
 import {
     aire,
     BORDE_SUAVE,
@@ -118,9 +118,12 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                             {articulo.name}
                         </h3>
                         {theme.show_prices && precio && (
-                            <p className={`mt-1 ${ESTILO_PRECIO[theme.price_style] ?? ESTILO_PRECIO.normal}`}>
-                                ${Number(precio).toFixed(2)}
-                            </p>
+                            <>
+                                <p className={`mt-1 ${ESTILO_PRECIO[theme.price_style] ?? ESTILO_PRECIO.normal}`}>
+                                    ${Number(precio).toFixed(2)}
+                                </p>
+                                <PreciosPorVolumen articulo={articulo} />
+                            </>
                         )}
                     </div>
 
@@ -194,6 +197,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                                             Bs. {formatoBs(Number(precio) * bcvRate)}
                                         </p>
                                     )}
+                                    <span className="w-full"><PreciosPorVolumen articulo={articulo} /></span>
                                 </div>
                             ) : (
                                 <p className="text-sm font-medium" style={{ color: 'var(--cat-tenue)' }}>
