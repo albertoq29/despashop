@@ -3,15 +3,19 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\NuevaSolicitud;
 use App\Models\ActivityLog;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Seguridad\RegistroDeSeguridad;
+use App\Support\Administradores;
 use App\Support\Terminos;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules;
 use Inertia\Inertia;
@@ -84,6 +88,8 @@ class RegisteredUserController extends Controller
         // Manda el correo de confirmación: la dirección tiene que existir
         event(new Registered($user));
 
+        $this->avisarALosAdministradores($user);
+
         $this->vigilarRafaga($request, $user);
 
         // Entra a su cuenta, pero el middleware `approved` la mantiene
@@ -98,6 +104,38 @@ class RegisteredUserController extends Controller
      * dueño con dos tiendas, o alguien llenando la cola de revisión. La
      * cuenta se crea igual: el admin decide, pero avisado.
      */
+    /**
+     * Avisa a los administradores de que hay una solicitud esperando.
+     *
+     * Las cuentas se aprueban a mano, así que sin este aviso la solicitud
+     * depende de que a alguien se le ocurra mirar el panel. Va después de
+     * responder y dentro de un try: un fallo de correo no puede impedir
+     * que alguien se registre.
+     */
+    private function avisarALosAdministradores(User $solicitante): void
+    {
+        $destinos = Administradores::correos();
+
+        if ($destinos === []) {
+            return;
+        }
+
+        $pendientes = User::where('role', User::ROLE_TENANT)
+            ->where('status', User::STATUS_PENDING)
+            ->count();
+
+        dispatch(function () use ($solicitante, $destinos, $pendientes) {
+            try {
+                Mail::to($destinos)->send(new NuevaSolicitud($solicitante, $pendientes));
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo avisar de la nueva solicitud', [
+                    'solicitante' => $solicitante->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        })->afterResponse();
+    }
+
     private function vigilarRafaga(Request $request, User $user): void
     {
         $desdeLaMismaIp = ActivityLog::where('action', 'registro.solicitado')

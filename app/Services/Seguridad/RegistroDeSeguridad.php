@@ -4,6 +4,7 @@ namespace App\Services\Seguridad;
 
 use App\Mail\AvisoDeSeguridad;
 use App\Models\SecurityEvent;
+use App\Support\Administradores;
 use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -171,15 +172,6 @@ class RegistroDeSeguridad
      */
     private function destinatarios(): array
     {
-        $configurado = (string) Setting::platform('security_email', '');
-
-        if (filter_var($configurado, FILTER_VALIDATE_EMAIL)) {
-            return [$configurado];
-        }
-
-        return User::where('role', User::ROLE_ADMIN)
-            ->whereNotNull('email')
-            ->pluck('email')
-            ->all();
+        return Administradores::correos('security_email');
     }
 }

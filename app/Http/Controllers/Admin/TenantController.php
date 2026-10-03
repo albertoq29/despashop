@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CuentaAprobada;
 use App\Models\ActivityLog;
 use App\Models\CatalogTheme;
 use App\Models\CatalogVisit;
@@ -16,6 +17,8 @@ use App\Support\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,7 +148,34 @@ class TenantController extends Controller
             $comercio
         );
 
+        $this->avisarAprobacion($comercio);
+
         return back()->with('success', 'Cuenta aprobada. Su catálogo ya está disponible en /' . $comercio->username);
+    }
+
+    /**
+     * Le manda al comercio su correo de bienvenida.
+     *
+     * Después de responder y dentro de un try: que el servidor de correo
+     * esté caído no puede impedir que una cuenta quede aprobada, ni dejar
+     * al administrador mirando un error cuando el trabajo ya se hizo.
+     */
+    private function avisarAprobacion(User $comercio): void
+    {
+        if (! filter_var($comercio->email, FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        dispatch(function () use ($comercio) {
+            try {
+                Mail::to($comercio->email)->send(new CuentaAprobada($comercio));
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo avisar de la aprobación', [
+                    'comercio' => $comercio->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        })->afterResponse();
     }
 
     public function reject(Request $request, User $comercio): RedirectResponse
