@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Mail\CuentaAprobada;
+use App\Mail\EstadoDeCuenta;
 use App\Models\ActivityLog;
 use App\Models\CatalogTheme;
 use App\Models\CatalogVisit;
@@ -18,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -162,16 +164,30 @@ class TenantController extends Controller
      */
     private function avisarAprobacion(User $comercio): void
     {
+        $this->enviar($comercio, new CuentaAprobada($comercio));
+    }
+
+    /**
+     * Le manda un correo al comercio sin que un fallo le afecte.
+     *
+     * Después de responder y dentro de un try: que el servidor de correo
+     * esté caído no puede impedir que una cuenta quede aprobada o
+     * suspendida, ni dejar al administrador mirando un error cuando el
+     * trabajo ya se hizo.
+     */
+    private function enviar(User $comercio, Mailable $correo): void
+    {
         if (! filter_var($comercio->email, FILTER_VALIDATE_EMAIL)) {
             return;
         }
 
-        dispatch(function () use ($comercio) {
+        dispatch(function () use ($comercio, $correo) {
             try {
-                Mail::to($comercio->email)->send(new CuentaAprobada($comercio));
+                Mail::to($comercio->email)->send($correo);
             } catch (\Throwable $e) {
-                Log::warning('No se pudo avisar de la aprobación', [
+                Log::warning('No se pudo avisar al comercio', [
                     'comercio' => $comercio->id,
+                    'correo' => $correo::class,
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -211,6 +227,8 @@ class TenantController extends Controller
             'status' => ['required', 'in:pending,approved,rejected,suspended'],
         ]);
 
+        $anterior = $comercio->status;
+
         // Activar una cuenta pendiente o rechazada también es aprobarla: abre
         // su mes de plan. Reactivar una suspendida conserva las fechas que tenía.
         $seAprueba = $validated['status'] === User::STATUS_APPROVED
@@ -234,7 +252,47 @@ class TenantController extends Controller
             $comercio
         );
 
+        $this->avisarCambioDeEstado($comercio, $anterior);
+
         return back()->with('success', 'Estado actualizado.');
+    }
+
+    /**
+     * Manda el correo que corresponda al cambio de estado.
+     *
+     * Terminar en `approved` significa dos cosas distintas según de dónde
+     * se venga: estrenar la cuenta o recuperarla. Y activar desde este
+     * desplegable tiene que avisar igual que el botón de aprobar, que
+     * antes era el único camino que mandaba la bienvenida.
+     *
+     * Volver a `rejected` no manda nada desde aquí: el rechazo tiene su
+     * propio flujo, con su motivo.
+     */
+    private function avisarCambioDeEstado(User $comercio, string $anterior): void
+    {
+        if ($comercio->status === $anterior) {
+            return;
+        }
+
+        $correo = match (true) {
+            $comercio->status === User::STATUS_APPROVED && $anterior === User::STATUS_SUSPENDED
+                => new EstadoDeCuenta($comercio, EstadoDeCuenta::REACTIVADA),
+
+            $comercio->status === User::STATUS_APPROVED
+                => new CuentaAprobada($comercio),
+
+            $comercio->status === User::STATUS_SUSPENDED
+                => new EstadoDeCuenta($comercio, EstadoDeCuenta::SUSPENDIDA),
+
+            $comercio->status === User::STATUS_PENDING
+                => new EstadoDeCuenta($comercio, EstadoDeCuenta::PENDIENTE),
+
+            default => null,
+        };
+
+        if ($correo) {
+            $this->enviar($comercio, $correo);
+        }
     }
 
     public function updatePlan(Request $request, User $comercio): RedirectResponse

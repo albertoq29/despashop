@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Mail\CuentaAprobada;
+use App\Mail\EstadoDeCuenta;
 use App\Mail\NuevaSolicitud;
 use App\Models\Plan;
 use App\Models\Setting;
@@ -201,5 +202,102 @@ class AvisosDeCuentaTest extends TestCase
         // a propósito: no es el mismo trabajo revisar altas que incidentes.
         $this->assertSame(['seguridad@ejemplo.test'], \App\Support\Administradores::correos('security_email'));
         $this->assertSame(['uno@ejemplo.test'], \App\Support\Administradores::correos());
+    }
+
+    // ── Cambios de estado ─────────────────────────────────────────────────────
+
+    /** @param  array<string, string>  $datos */
+    private function cambiarEstado(User $admin, User $comercio, string $nuevo)
+    {
+        return $this->actingAs($admin)->patch(route('admin.comercios.estado', $comercio), ['status' => $nuevo]);
+    }
+
+    public function test_al_suspender_se_le_avisa_al_comercio(): void
+    {
+        Mail::fake();
+
+        $admin = $this->admin();
+        $comercio = $this->solicitante(['status' => User::STATUS_APPROVED]);
+
+        $this->cambiarEstado($admin, $comercio, User::STATUS_SUSPENDED)->assertSessionHasNoErrors();
+
+        Mail::assertSent(EstadoDeCuenta::class, fn (EstadoDeCuenta $c) => $c->cambio === EstadoDeCuenta::SUSPENDIDA
+            && $c->hasTo($comercio->email));
+    }
+
+    public function test_al_volver_a_pendiente_se_le_avisa(): void
+    {
+        Mail::fake();
+
+        $admin = $this->admin();
+        $comercio = $this->solicitante(['status' => User::STATUS_APPROVED]);
+
+        $this->cambiarEstado($admin, $comercio, User::STATUS_PENDING)->assertSessionHasNoErrors();
+
+        Mail::assertSent(EstadoDeCuenta::class, fn (EstadoDeCuenta $c) => $c->cambio === EstadoDeCuenta::PENDIENTE);
+    }
+
+    public function test_reactivar_una_suspendida_manda_el_correo_de_vuelta_no_el_de_bienvenida(): void
+    {
+        Mail::fake();
+
+        $admin = $this->admin();
+        $comercio = $this->solicitante(['status' => User::STATUS_SUSPENDED]);
+
+        $this->cambiarEstado($admin, $comercio, User::STATUS_APPROVED)->assertSessionHasNoErrors();
+
+        Mail::assertSent(EstadoDeCuenta::class, fn (EstadoDeCuenta $c) => $c->cambio === EstadoDeCuenta::REACTIVADA);
+        Mail::assertNotSent(CuentaAprobada::class);
+    }
+
+    public function test_activar_una_pendiente_desde_el_estado_manda_la_bienvenida(): void
+    {
+        Mail::fake();
+
+        $admin = $this->admin();
+        $comercio = $this->solicitante(['status' => User::STATUS_PENDING]);
+
+        $this->cambiarEstado($admin, $comercio, User::STATUS_APPROVED)->assertSessionHasNoErrors();
+
+        // Antes este camino no avisaba nada: solo lo hacía el botón de aprobar
+        Mail::assertSent(CuentaAprobada::class);
+        Mail::assertNotSent(EstadoDeCuenta::class);
+    }
+
+    public function test_no_se_avisa_si_el_estado_no_cambia(): void
+    {
+        Mail::fake();
+
+        $admin = $this->admin();
+        $comercio = $this->solicitante(['status' => User::STATUS_SUSPENDED]);
+
+        $this->cambiarEstado($admin, $comercio, User::STATUS_SUSPENDED);
+
+        Mail::assertNothingSent();
+    }
+
+    public function test_los_tres_correos_dicen_que_no_se_pierde_nada(): void
+    {
+        $comercio = $this->solicitante();
+
+        foreach ([EstadoDeCuenta::SUSPENDIDA, EstadoDeCuenta::PENDIENTE, EstadoDeCuenta::REACTIVADA] as $cambio) {
+            $contenido = (new EstadoDeCuenta($comercio, $cambio))->render();
+
+            $this->assertStringContainsString('Dulces Mariana', $contenido);
+            $this->assertStringContainsString('/marca/logo-verde.svg', $contenido);
+            $this->assertStringContainsString($cambio === EstadoDeCuenta::REACTIVADA ? 'Nada de lo tuyo se perdió' : 'Tu información está intacta', $contenido);
+        }
+    }
+
+    public function test_suspender_funciona_aunque_el_correo_falle(): void
+    {
+        $admin = $this->admin();
+        $comercio = $this->solicitante(['status' => User::STATUS_APPROVED]);
+
+        config(['mail.default' => 'smtp', 'mail.mailers.smtp.host' => 'no-existe.invalid']);
+
+        $this->cambiarEstado($admin, $comercio, User::STATUS_SUSPENDED)->assertSessionHasNoErrors();
+
+        $this->assertSame(User::STATUS_SUSPENDED, $comercio->fresh()->status);
     }
 }
