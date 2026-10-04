@@ -26,19 +26,9 @@ export default function UpdateProfileInformation({
 
     return (
         <section className={className}>
-            <header>
-                <h2 className="text-lg font-medium text-stone-900 dark:text-stone-100">
-                    Profile Information
-                </h2>
-
-                <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">
-                    Update your account's profile information and email address.
-                </p>
-            </header>
-
-            <form onSubmit={submit} className="mt-6 space-y-6">
+            <form onSubmit={submit} className="space-y-5">
                 <div>
-                    <InputLabel htmlFor="name" value="Name" />
+                    <InputLabel htmlFor="name" value="Tu nombre" />
 
                     <TextInput
                         id="name"
@@ -54,7 +44,7 @@ export default function UpdateProfileInformation({
                 </div>
 
                 <div>
-                    <InputLabel htmlFor="email" value="Email" />
+                    <InputLabel htmlFor="email" value="Correo" />
 
                     <TextInput
                         id="email"
@@ -71,29 +61,32 @@ export default function UpdateProfileInformation({
 
                 {mustVerifyEmail && user.email_verified_at === null && (
                     <div>
-                        <p className="mt-2 text-sm text-stone-800 dark:text-stone-200">
-                            Your email address is unverified.
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+                            <p className="text-sm leading-relaxed text-amber-900 dark:text-amber-200">
+                                Tu correo todavía no está confirmado. Por ahí te avisamos de lo importante y por
+                                ahí recuperas la contraseña si la olvidas.
+                            </p>
+
                             <Link
                                 href={route('verification.send')}
                                 method="post"
                                 as="button"
-                                className="rounded-md text-sm text-stone-600 dark:text-stone-400 underline hover:text-stone-900 dark:hover:text-stone-100 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                className="pulsable mt-3 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-amber-700"
                             >
-                                Click here to re-send the verification email.
+                                Enviarme el enlace de nuevo
                             </Link>
-                        </p>
 
-                        {status === 'verification-link-sent' && (
-                            <div className="mt-2 text-sm font-medium text-green-600 dark:text-green-400">
-                                A new verification link has been sent to your
-                                email address.
-                            </div>
-                        )}
+                            {status === 'verification-link-sent' && (
+                                <p className="mt-3 text-sm font-medium text-amber-900 dark:text-amber-200">
+                                    Te enviamos un enlace nuevo.
+                                </p>
+                            )}
+                        </div>
                     </div>
                 )}
 
                 <div className="flex items-center gap-4">
-                    <PrimaryButton disabled={processing}>Save</PrimaryButton>
+                    <PrimaryButton disabled={processing}>{processing ? 'Guardando' : 'Guardar'}</PrimaryButton>
 
                     <Transition
                         show={recentlySuccessful}
@@ -103,7 +96,7 @@ export default function UpdateProfileInformation({
                         leaveTo="opacity-0"
                     >
                         <p className="text-sm text-stone-600 dark:text-stone-400">
-                            Saved.
+                            Guardado.
                         </p>
                     </Transition>
                 </div>
