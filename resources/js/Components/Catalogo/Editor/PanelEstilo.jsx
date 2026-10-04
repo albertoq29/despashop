@@ -6,6 +6,7 @@ import {
     Grupo,
     Interruptor,
     OpcionesVisuales,
+    ReversionDeColores,
     Segmentado,
     SelectorColor,
     SelectorFuente,
@@ -62,6 +63,15 @@ export default function PanelEstilo({ editor }) {
             </Grupo>
 
             <Grupo titulo="Colores">
+                {/* El botón de la paleta repinta igual que subir el logo, así
+                    que la salida tiene que estar también aquí */}
+                {editor.coloresPrevios && (
+                    <ReversionDeColores
+                        onRevertir={editor.revertirColores}
+                        onCerrar={editor.olvidarColoresPrevios}
+                    />
+                )}
+
                 {theme.logo_palette?.length > 0 && (
                     <div className="rounded-xl bg-stone-50 p-3 dark:bg-stone-950/60">
                         <p className="text-xs font-medium text-stone-600 dark:text-stone-400">Colores de tu logo</p>

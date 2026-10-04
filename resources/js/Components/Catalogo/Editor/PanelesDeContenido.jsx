@@ -3,7 +3,7 @@ import { router, useForm } from '@inertiajs/react';
 import { AnimatePresence, motion, Reorder, useDragControls } from 'motion/react';
 import { Eye, GripVertical, Image as ImagenIcono, Plus, Trash2, Upload, X } from 'lucide-react';
 import { IconoRed, NOMBRES_REDES } from '@/Components/Catalogo/Vitrina/Comunes';
-import { Deslizador, Desplegable, Grupo, Segmentado, SubidaImagen, Texto } from './Controles';
+import { Deslizador, Desplegable, Grupo, ReversionDeColores, Segmentado, SubidaImagen, Texto } from './Controles';
 
 const SALIDA = [0.23, 1, 0.32, 1];
 
@@ -21,6 +21,13 @@ export function PanelMarca({ editor }) {
                 titulo="Logo"
                 descripcion="Al subirlo, el catálogo toma sus colores dominantes. Después puedes ajustarlos en Estilo."
             >
+                {editor.coloresPrevios && (
+                    <ReversionDeColores
+                        onRevertir={editor.revertirColores}
+                        onCerrar={editor.olvidarColoresPrevios}
+                    />
+                )}
+
                 <SubidaImagen
                     actual={theme.logo_url}
                     ruta={route('catalogo.logo')}

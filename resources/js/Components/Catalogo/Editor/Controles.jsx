@@ -1,7 +1,7 @@
 import { createContext, useContext, useId, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { motion } from 'motion/react';
-import { Image as ImagenIcono, Loader2, Trash2, Upload } from 'lucide-react';
+import { Image as ImagenIcono, Loader2, Palette, Trash2, Undo2, Upload, X } from 'lucide-react';
 import { Interruptor as InterruptorBase } from '@/Components/UI';
 
 /**
@@ -39,6 +39,56 @@ export function useModoFacil() {
 /** Lo que solo tiene sentido con todas las opciones a la vista. */
 export function SoloCompleto({ children }) {
     return useModoFacil() ? null : <>{children}</>;
+}
+
+/* ── Volver atrás después del logo ──────────────────────────────────────── */
+
+/**
+ * Salida de emergencia después de que el logo repinta el catálogo entero.
+ *
+ * El cambio es grande y llega de golpe: fondo, botones, precios, todo. Sin
+ * un botón a la vista, quien no conoce Ctrl+Z ni las flechas de abajo se
+ * queda con un catálogo que no le gusta y sin saber cómo volver. Por eso va
+ * grande y donde está mirando: encima del logo que acaba de subir.
+ *
+ * Volver no borra el logo, solo los colores que trajo.
+ */
+export function ReversionDeColores({ onRevertir, onCerrar }) {
+    return (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/50">
+            <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-amber-700 dark:bg-stone-900 dark:text-amber-400">
+                    <Palette className="h-4 w-4" />
+                </span>
+
+                <p className="min-w-0 flex-1 text-sm leading-relaxed text-amber-900 dark:text-amber-200">
+                    <strong className="block font-semibold">Tomamos los colores de tu logo</strong>
+                    <span className="mt-0.5 block">
+                        Cambió el catálogo entero. Míralo en la vista previa; si no te convence, vuelve a los de
+                        antes sin perder el logo.
+                    </span>
+                </p>
+
+                <button
+                    type="button"
+                    onClick={onCerrar}
+                    aria-label="Quedarme con estos colores"
+                    className="pulsable -mr-1 -mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-amber-700/70 hover:bg-white/70 dark:text-amber-400 dark:hover:bg-stone-900/70"
+                >
+                    <X className="h-4 w-4" />
+                </button>
+            </div>
+
+            <button
+                type="button"
+                onClick={onRevertir}
+                className="pulsable boton-elevado mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-3 text-sm font-bold text-white hover:bg-amber-700 dark:bg-amber-500 dark:text-stone-950"
+            >
+                <Undo2 className="h-4 w-4" />
+                Volver a mis colores de antes
+            </button>
+        </div>
+    );
 }
 
 const BASE_CAMPO =

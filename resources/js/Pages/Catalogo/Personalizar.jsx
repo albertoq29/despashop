@@ -9,7 +9,6 @@ import {
     GalleryHorizontal,
     Layers,
     Loader2,
-    Maximize2,
     MessageSquare,
     Monitor,
     Palette,
@@ -95,6 +94,8 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
     // pantalla: es la respuesta a lo que acaba de pulsar.
     const [recordatorio, setRecordatorio] = useState(false);
     const [avisoPc, setAvisoPc] = useState(() => leerPreferencia('catalogo-aviso-pc', 'si') === 'si');
+    // Los colores de antes de que el logo repintara el catálogo
+    const [coloresPrevios, setColoresPrevios] = useState(null);
     // El pedido de llevar la vista previa a un bloque viaja junto con el
     // borrador: si llegara antes, se desplazaría sobre el orden viejo.
     const [enfoque, setEnfoque] = useState(null);
@@ -340,9 +341,31 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                 return;
             }
 
-            const colores = Object.fromEntries([...COLORES, 'palette_from_logo'].map((c) => [c, nuevo[c]]));
+            const claves = [...COLORES, 'palette_from_logo'];
+            const antes = Object.fromEntries(claves.map((c) => [c, formulario.current.data[c]]));
+            const colores = Object.fromEntries(claves.map((c) => [c, nuevo[c]]));
+
             cambiarVarios(colores);
             formulario.current.setDefaults(colores);
+
+            // Solo hay algo que revertir si la paleta de verdad se movió:
+            // cambiar el logo sin que los colores cambien no deja nada atrás.
+            setColoresPrevios(COLORES.some((c) => antes[c] !== colores[c]) ? antes : null);
+        },
+
+        coloresPrevios,
+        olvidarColoresPrevios: () => setColoresPrevios(null),
+        revertirColores: () => {
+            if (!coloresPrevios) {
+                return;
+            }
+
+            // `palette_from_logo` se apaga: acaban de decir que no quieren la
+            // paleta del logo, y dejarlo encendido la volvería a aplicar al
+            // subir el siguiente.
+            cambiarVarios({ ...coloresPrevios, palette_from_logo: false });
+            setColoresPrevios(null);
+            avisar('Volvimos a tus colores. Guarda para que quede así.');
         },
 
         mostrarModal: (modal) => {
@@ -536,11 +559,6 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
     const pestanaActiva = pestanas.some((p) => p.id === pestana) ? pestana : 'estilo';
     const Panel = PANELES[pestanaActiva];
 
-    // En el teléfono, el modo fácil deja la vista previa arriba y los
-    // controles debajo: así se ve el cambio sin saltar de pantalla. En
-    // computadora ya están lado a lado y esto no aplica.
-    const previaFijada = modoFacil && !esEscritorio && !verPrevia;
-
     const fuentesDelEditor = `https://fonts.bunny.net/css?family=${fuentes.map((f) => `${aFamilia(f)}:500`).join('|')}&display=swap`;
 
     return (
@@ -550,29 +568,16 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                 <link rel="stylesheet" href={fuentesDelEditor} />
             </Head>
 
-            <div
-                className={`lg:grid lg:h-[calc(100dvh-4rem)] lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)] ${
-                    previaFijada ? 'flex h-[calc(100dvh-4rem)] flex-col' : ''
-                }`}
-            >
+            <div className="lg:grid lg:h-[calc(100dvh-4rem)] lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
                 {/* ── Controles ── */}
-                <aside
-                    className={`flex flex-col bg-white dark:bg-stone-900 lg:min-h-0 lg:border-r lg:border-stone-200 lg:dark:border-stone-800 ${
-                        previaFijada ? 'min-h-0 flex-1' : 'min-h-[calc(100dvh-4rem)]'
-                    }`}
-                >
+                <aside className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white dark:bg-stone-900 lg:min-h-0 lg:border-r lg:border-stone-200 lg:dark:border-stone-800">
                     <BarraModoFacil activo={modoFacil} onCambiar={alternarModoFacil} />
 
                     {usoIa.disponible && <BotonIa uso={usoIa} onAbrir={() => setIaAbierta(true)} />}
 
                     <Pestanas opciones={pestanas} activa={pestanaActiva} onCambiar={setPestana} />
 
-                    <div
-                        ref={panel}
-                        className={`scrollbar-slim flex-1 pb-24 lg:min-h-0 lg:overflow-y-auto lg:pb-0 ${
-                            previaFijada ? 'min-h-0 overflow-y-auto' : ''
-                        }`}
-                    >
+                    <div ref={panel} className="scrollbar-slim flex-1 pb-24 lg:min-h-0 lg:overflow-y-auto lg:pb-0">
                         {/* Primero el recordatorio: es la respuesta a lo que
                             el comercio acaba de pulsar. El consejo de la
                             computadora lleva ahí desde que entró. */}
@@ -629,29 +634,22 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                     className={
                         verPrevia && !esEscritorio
                             ? 'fixed inset-0 z-50 flex flex-col bg-stone-100 dark:bg-stone-950'
-                            : previaFijada
-                              ? 'relative order-first flex h-[40dvh] shrink-0 flex-col border-b border-stone-200 bg-stone-100 dark:border-stone-800 dark:bg-stone-950 lg:order-none lg:h-auto lg:border-b-0'
-                              : 'hidden min-h-0 flex-col bg-stone-100 dark:bg-stone-950 lg:flex'
+                            : 'hidden min-h-0 flex-col bg-stone-100 dark:bg-stone-950 lg:flex'
                     }
                     aria-label="Vista previa del catálogo"
                 >
-                    {/* Fijada arriba el espacio es poco: la barra entera se
-                        cambia por el botón de ampliar, y guardar sigue en la
-                        barra de abajo, que en el teléfono está siempre fija. */}
-                    {!previaFijada && (
-                        <BarraVistaPrevia
-                            publicado={theme.is_published}
-                            catalogUrl={catalogUrl}
-                            dispositivo={dispositivo}
-                            onDispositivo={setDispositivo}
-                            onPublicar={alternarPublicacion}
-                            esEscritorio={esEscritorio}
-                            onCerrar={() => setVerPrevia(false)}
-                            sucio={form.isDirty && !form.processing}
-                            procesando={form.processing}
-                            onGuardar={guardar}
-                        />
-                    )}
+                    <BarraVistaPrevia
+                        publicado={theme.is_published}
+                        catalogUrl={catalogUrl}
+                        dispositivo={dispositivo}
+                        onDispositivo={setDispositivo}
+                        onPublicar={alternarPublicacion}
+                        esEscritorio={esEscritorio}
+                        onCerrar={() => setVerPrevia(false)}
+                        sucio={form.isDirty && !form.processing}
+                        procesando={form.processing}
+                        onGuardar={guardar}
+                    />
 
                     <Lienzo
                         url={vistaPreviaUrl}
@@ -660,21 +658,10 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                         dispositivo={esEscritorio ? dispositivo : 'movil'}
                         completo={!esEscritorio}
                     />
-
-                    {previaFijada && (
-                        <button
-                            type="button"
-                            onClick={() => setVerPrevia(true)}
-                            className="pulsable boton-elevado absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-full bg-stone-900/85 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm dark:bg-stone-100/90 dark:text-stone-900"
-                        >
-                            <Maximize2 className="h-3.5 w-3.5" />
-                            Ampliar
-                        </button>
-                    )}
                 </section>
             </div>
 
-            {!esEscritorio && !verPrevia && !previaFijada && (
+            {!esEscritorio && !verPrevia && (
                 <button
                     type="button"
                     onClick={() => setVerPrevia(true)}

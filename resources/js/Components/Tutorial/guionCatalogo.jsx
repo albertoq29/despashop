@@ -1,3 +1,4 @@
+import { Redo2, Undo2 } from 'lucide-react';
 import {
     BotonFalso,
     CampoFalso,
@@ -53,6 +54,18 @@ export const INICIAL = {
     faqAbierta: null,
     guardado: false,
     publicado: false,
+    logo: false,
+    revertible: false,
+};
+
+/** Lo que saldría de un logo cálido, para el paso del final. */
+const COLORES_DEL_LOGO = {
+    id: 'propio',
+    primario: '#9a3412',
+    acento: '#f59e0b',
+    fondo: '#fffbeb',
+    superficie: '#fef3c7',
+    texto: '#431407',
 };
 
 const TEMAS = {
@@ -322,6 +335,7 @@ function Marco({ children, estado, pestanas = true }) {
                             {[
                                 ['secciones', 'Secciones'],
                                 ['estilo', 'Estilo'],
+                                ['marca', 'Marca'],
                                 ['banners', 'Banners'],
                                 ['modales', 'Ventanas'],
                             ].map(([id, texto]) => (
@@ -589,6 +603,115 @@ function PanelGuardar({ estado }) {
     );
 }
 
+/**
+ * La barra de abajo del editor, con las flechas a la izquierda.
+ *
+ * Es la pieza del paso de deshacer: ahí vive lo que hay que mirar, y se
+ * pone tal cual está en el editor —esquina inferior izquierda— para que
+ * después se reconozca sin buscarla.
+ */
+function BarraDeAbajo({ estado }) {
+    const flecha = 'grid h-5 w-5 place-items-center rounded';
+
+    return (
+        <div
+            className={`flex items-center gap-1 rounded-md border px-1.5 py-1 ${
+                estado.guardado
+                    ? 'border-stone-200 bg-stone-50 dark:border-stone-800 dark:bg-stone-900'
+                    : 'border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/50'
+            }`}
+        >
+            <Objetivo nombre="deshacer" resaltar={false}>
+                <span className={`${flecha} text-stone-700 dark:text-stone-200`}>
+                    <Undo2 className="h-3 w-3" />
+                </span>
+            </Objetivo>
+
+            <Objetivo nombre="rehacer" resaltar={false}>
+                <span className={`${flecha} text-stone-400 dark:text-stone-500`}>
+                    <Redo2 className="h-3 w-3" />
+                </span>
+            </Objetivo>
+
+            <span
+                className={`ml-0.5 min-w-0 flex-1 truncate text-[9px] font-semibold ${
+                    estado.guardado ? 'text-stone-500 dark:text-stone-400' : 'text-amber-800 dark:text-amber-300'
+                }`}
+            >
+                {estado.guardado ? 'Todo guardado' : 'Sin guardar'}
+            </span>
+
+            <span className="rounded px-1.5 py-0.5 text-[9px] font-semibold text-stone-500 dark:text-stone-400">
+                Descartar
+            </span>
+            <span className="rounded bg-marca-700 px-1.5 py-0.5 text-[9px] font-bold text-white dark:bg-marca-500 dark:text-stone-950">
+                Guardar
+            </span>
+        </div>
+    );
+}
+
+function PanelDeshacer({ estado }) {
+    return (
+        <Marco estado={estado}>
+            <Encabezado>Colores</Encabezado>
+            <div className="flex flex-wrap gap-1.5">
+                {['#1d4ed8', '#be185d', '#0f766e', '#dc2626', '#7c3aed', '#ca8a04'].map((color) => (
+                    <Muestra key={color} nombre={`color-${color}`} color={color} elegida={estado.tema.primario === color} />
+                ))}
+            </div>
+
+            <BarraDeAbajo estado={estado} />
+        </Marco>
+    );
+}
+
+function PanelLogo({ estado }) {
+    return (
+        <Marco estado={estado}>
+            <Encabezado>Logo</Encabezado>
+
+            {estado.revertible && (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-1.5 dark:border-amber-800 dark:bg-amber-950/50">
+                    <p className="text-[9px] font-bold leading-snug text-amber-900 dark:text-amber-300">
+                        Tomamos los colores de tu logo
+                    </p>
+                    <Objetivo nombre="revertir-colores" resaltar={false} className="mt-1">
+                        <span className="block rounded bg-amber-600 px-2 py-1 text-center text-[9px] font-bold text-white">
+                            Volver a mis colores de antes
+                        </span>
+                    </Objetivo>
+                </div>
+            )}
+
+            <Objetivo nombre="subir-logo" resaltar={false}>
+                <span
+                    className={`flex h-12 items-center justify-center rounded-md border border-dashed text-[10px] font-semibold ${
+                        estado.logo
+                            ? 'border-marca-400 bg-marca-50 text-marca-700 dark:border-marca-700 dark:bg-marca-950/50 dark:text-marca-300'
+                            : 'border-stone-300 text-stone-500 dark:border-stone-700 dark:text-stone-400'
+                    }`}
+                >
+                    {estado.logo ? 'logo-mi-tienda.png' : 'Subir mi logo'}
+                </span>
+            </Objetivo>
+
+            {estado.logo && (
+                <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] text-stone-500 dark:text-stone-400">De tu logo</span>
+                    {[COLORES_DEL_LOGO.primario, COLORES_DEL_LOGO.acento, COLORES_DEL_LOGO.superficie].map((color) => (
+                        <span
+                            key={color}
+                            className="block h-4 w-4 rounded ring-1 ring-inset ring-black/10 dark:ring-white/10"
+                            style={{ background: color }}
+                        />
+                    ))}
+                </div>
+            )}
+        </Marco>
+    );
+}
+
 function PanelEntrada({ estado }) {
     return (
         <Ventana titulo="Despashop">
@@ -668,6 +791,26 @@ export const PASOS_CATALOGO = [
             { en: 'paleta-logo', clic: con({ primario: '#0f766e', acento: '#f59e0b' }), nota: 'O sacarlos del logo' },
             { en: 'fuente-Playfair Display', clic: con({ fuente: 'Playfair Display' }), nota: 'Cambiar la letra' },
             { en: 'titulos-gradient', clic: con({ titulos: 'gradient' }), nota: 'Títulos en degradado', espera: 1100 },
+        ],
+    },
+    {
+        titulo: 'Deshacer lo que no te gustó',
+        texto: 'Abajo a la izquierda hay dos flechas: la primera deshace el último cambio y la segunda lo vuelve a aplicar. Sirven para todo —colores, letras, bloques, textos— y también responden a Ctrl+Z y Ctrl+Shift+Z.',
+        consejo: 'Nada de lo que pruebes es definitivo: mientras no guardes, «Descartar» devuelve el catálogo a la última versión guardada.',
+        escena: PanelDeshacer,
+        acciones: [
+            {
+                en: 'color-#dc2626',
+                clic: (e) => ({ ...e, previo: e.tema.primario, tema: { ...e.tema, primario: '#dc2626', id: 'propio' }, guardado: false }),
+                nota: 'Un rojo que no convence',
+                espera: 1200,
+            },
+            {
+                en: 'deshacer',
+                clic: (e) => ({ ...e, tema: { ...e.tema, primario: e.previo ?? e.tema.primario } }),
+                nota: 'Y volver atrás',
+                espera: 1200,
+            },
         ],
     },
     {
@@ -766,6 +909,42 @@ export const PASOS_CATALOGO = [
         acciones: [
             { en: 'guardar', clic: (e) => ({ ...e, guardado: true }), nota: 'Guardar cambios', espera: 1000 },
             { en: 'publicar', clic: (e) => ({ ...e, publicado: true }), nota: 'Abrirlo al público', espera: 1200 },
+        ],
+    },
+    {
+        titulo: 'Sube tu logo y el catálogo se viste solo',
+        opcional: true,
+        texto: 'En la pestaña «Marca» subes tu logo. Al subirlo sacamos sus colores dominantes y los aplicamos a todo: fondo, botones, precios, tarjetas. Es la forma más rápida de que el catálogo se parezca a tu negocio sin elegir un color a mano.',
+        consejo: '¿No te convence cómo quedó? Encima del logo aparece «Volver a mis colores de antes». Un toque y vuelve todo como estaba, sin perder el logo.',
+        escena: PanelLogo,
+        acciones: [
+            {
+                en: 'pestana-marca',
+                clic: (e) => ({ ...e, pestana: 'marca' }),
+                nota: 'Pestaña Marca',
+            },
+            {
+                en: 'subir-logo',
+                clic: (e) => ({
+                    ...e,
+                    logo: true,
+                    revertible: true,
+                    temaPrevio: e.tema,
+                    tema: { ...e.tema, ...COLORES_DEL_LOGO },
+                    guardado: false,
+                }),
+                nota: 'Elegir el archivo',
+                espera: 1500,
+            },
+            {
+                // Solo se señala: el paso tiene que terminar con el catálogo
+                // vestido de su logo, que es lo que se está enseñando. Si el
+                // puntero lo pulsara, se vería igual que al empezar.
+                en: 'revertir-colores',
+                clic: (e) => e,
+                nota: 'Y aquí se vuelve atrás',
+                espera: 1600,
+            },
         ],
     },
 ];

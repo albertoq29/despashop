@@ -144,9 +144,19 @@ export default function Tutorial({ nombre, onCerrar }) {
                     </Escenario>
 
                     <div className="space-y-3">
-                        <h3 className="font-display text-base font-semibold text-stone-900 dark:text-stone-100">
-                            {paso.titulo}
-                        </h3>
+                        <div className="flex items-start justify-between gap-2">
+                            <h3 className="font-display text-base font-semibold text-stone-900 dark:text-stone-100">
+                                {paso.titulo}
+                            </h3>
+
+                            {/* Un paso que se puede saltar lo dice, para que
+                                nadie sienta que le falta hacer algo */}
+                            {paso.opcional && (
+                                <span className="mt-0.5 shrink-0 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-stone-500 dark:bg-stone-800 dark:text-stone-400">
+                                    Opcional
+                                </span>
+                            )}
+                        </div>
                         <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-300">{paso.texto}</p>
 
                         {paso.consejo && (
