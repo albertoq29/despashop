@@ -9,6 +9,8 @@ import {
     Segmentado,
     SelectorColor,
     SelectorFuente,
+    SoloCompleto,
+    useModoFacil,
 } from './Controles';
 import { DibujoAnimacion, DibujoBoton, DibujoEntrada, DibujoEsquinas, DibujoFondo, DibujoTitulo } from './Dibujos';
 import { coloresDeMuestra } from './PanelSecciones';
@@ -36,10 +38,19 @@ const COLORES = [
     ['color_muted', 'Texto tenue'],
 ];
 
+/**
+ * Los cuatro que cambian la cara del catálogo de verdad. Los otros tres son
+ * matices que, mal elegidos, dejan texto ilegible sobre las tarjetas; en
+ * modo fácil se quedan con el valor del tema.
+ */
+const COLORES_FACILES = ['color_primary', 'color_accent', 'color_bg', 'color_text'];
+
 export default function PanelEstilo({ editor }) {
     const { datos, cambiar, theme, fuentes } = editor;
     const campo = (clave) => ({ valor: datos[clave], onCambiar: (valor) => cambiar(clave, valor) });
     const c = coloresDeMuestra(datos);
+    const facil = useModoFacil();
+    const colores = facil ? COLORES.filter(([clave]) => COLORES_FACILES.includes(clave)) : COLORES;
 
     return (
         <>
@@ -84,7 +95,7 @@ export default function PanelEstilo({ editor }) {
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
-                    {COLORES.map(([clave, etiqueta]) => (
+                    {colores.map(([clave, etiqueta]) => (
                         <SelectorColor key={clave} etiqueta={etiqueta} {...campo(clave)} />
                     ))}
                 </div>
@@ -101,25 +112,27 @@ export default function PanelEstilo({ editor }) {
                 <SelectorFuente etiqueta="Títulos" {...campo('font_heading')} fuentes={fuentes} />
                 <SelectorFuente etiqueta="Texto" {...campo('font_body')} fuentes={fuentes} />
 
-                <OpcionesVisuales
-                    etiqueta="Cómo se ven los títulos de sección"
-                    columnas={4}
-                    {...campo('heading_style')}
-                    opciones={[
-                        ['normal', 'Normal'],
-                        ['upper', 'Mayúsculas'],
-                        ['gradient', 'Degradado'],
-                        ['underline', 'Subrayado'],
-                    ].map(([valor, texto]) => ({ valor, texto, dibujo: <DibujoTitulo estilo={valor} c={c} /> }))}
-                    ayuda={
-                        {
-                            normal: 'El título tal cual, con tu tipografía.',
-                            upper: 'Todo en mayúsculas y con las letras más separadas.',
-                            gradient: 'Las letras se pintan con tu color principal y tu acento.',
-                            underline: 'Una línea corta de acento debajo de cada título.',
-                        }[datos.heading_style]
-                    }
-                />
+                <SoloCompleto>
+                    <OpcionesVisuales
+                        etiqueta="Cómo se ven los títulos de sección"
+                        columnas={4}
+                        {...campo('heading_style')}
+                        opciones={[
+                            ['normal', 'Normal'],
+                            ['upper', 'Mayúsculas'],
+                            ['gradient', 'Degradado'],
+                            ['underline', 'Subrayado'],
+                        ].map(([valor, texto]) => ({ valor, texto, dibujo: <DibujoTitulo estilo={valor} c={c} /> }))}
+                        ayuda={
+                            {
+                                normal: 'El título tal cual, con tu tipografía.',
+                                upper: 'Todo en mayúsculas y con las letras más separadas.',
+                                gradient: 'Las letras se pintan con tu color principal y tu acento.',
+                                underline: 'Una línea corta de acento debajo de cada título.',
+                            }[datos.heading_style]
+                        }
+                    />
+                </SoloCompleto>
             </Grupo>
 
             <Grupo titulo="Formas">
@@ -148,73 +161,75 @@ export default function PanelEstilo({ editor }) {
                     ].map(([valor, texto]) => ({ valor, texto, dibujo: <DibujoBoton estilo={valor} c={c} /> }))}
                 />
 
-                <Segmentado
-                    etiqueta="Sombras"
-                    {...campo('shadow')}
-                    opciones={[
-                        { valor: 'none', texto: 'Ninguna' },
-                        { valor: 'sm', texto: 'Suave' },
-                        { valor: 'md', texto: 'Media' },
-                        { valor: 'lg', texto: 'Marcada' },
-                    ]}
-                />
+                <SoloCompleto>
+                    <Segmentado
+                        etiqueta="Sombras"
+                        {...campo('shadow')}
+                        opciones={[
+                            { valor: 'none', texto: 'Ninguna' },
+                            { valor: 'sm', texto: 'Suave' },
+                            { valor: 'md', texto: 'Media' },
+                            { valor: 'lg', texto: 'Marcada' },
+                        ]}
+                    />
 
-                <Desplegable
-                    etiqueta="Al pasar el mouse por un producto"
-                    {...campo('card_hover')}
-                    opciones={[
-                        ['none', 'Nada'],
-                        ['lift', 'Se eleva'],
-                        ['zoom', 'Acerca la foto'],
-                        ['border', 'Borde de color'],
-                        ['glow', 'Resplandor de marca'],
-                        ['tilt', 'Se inclina'],
-                    ]}
-                    ayuda="En el teléfono no hay puntero: este efecto solo se ve en computadora."
-                />
+                    <Desplegable
+                        etiqueta="Al pasar el mouse por un producto"
+                        {...campo('card_hover')}
+                        opciones={[
+                            ['none', 'Nada'],
+                            ['lift', 'Se eleva'],
+                            ['zoom', 'Acerca la foto'],
+                            ['border', 'Borde de color'],
+                            ['glow', 'Resplandor de marca'],
+                            ['tilt', 'Se inclina'],
+                        ]}
+                        ayuda="En el teléfono no hay puntero: este efecto solo se ve en computadora."
+                    />
 
-                <Segmentado
-                    etiqueta="Fotos de producto"
-                    {...campo('image_fit')}
-                    opciones={[
-                        { valor: 'cover', texto: 'Rellenar recuadro' },
-                        { valor: 'contain', texto: 'Foto completa' },
-                    ]}
-                />
+                    <Segmentado
+                        etiqueta="Fotos de producto"
+                        {...campo('image_fit')}
+                        opciones={[
+                            { valor: 'cover', texto: 'Rellenar recuadro' },
+                            { valor: 'contain', texto: 'Foto completa' },
+                        ]}
+                    />
 
-                <Segmentado
-                    etiqueta="Forma del recuadro de la foto"
-                    {...campo('image_ratio')}
-                    opciones={[
-                        { valor: 'square', texto: 'Cuadrado' },
-                        { valor: 'portrait', texto: 'Vertical' },
-                        { valor: 'landscape', texto: 'Horizontal' },
-                    ]}
-                    ayuda="Vertical le sienta bien a la ropa; horizontal, a la comida y los muebles."
-                />
+                    <Segmentado
+                        etiqueta="Forma del recuadro de la foto"
+                        {...campo('image_ratio')}
+                        opciones={[
+                            { valor: 'square', texto: 'Cuadrado' },
+                            { valor: 'portrait', texto: 'Vertical' },
+                            { valor: 'landscape', texto: 'Horizontal' },
+                        ]}
+                        ayuda="Vertical le sienta bien a la ropa; horizontal, a la comida y los muebles."
+                    />
 
-                <Segmentado
-                    etiqueta="Espacio entre elementos"
-                    {...campo('density')}
-                    opciones={[
-                        { valor: 'compact', texto: 'Compacto' },
-                        { valor: 'normal', texto: 'Normal' },
-                        { valor: 'airy', texto: 'Amplio' },
-                    ]}
-                />
+                    <Segmentado
+                        etiqueta="Espacio entre elementos"
+                        {...campo('density')}
+                        opciones={[
+                            { valor: 'compact', texto: 'Compacto' },
+                            { valor: 'normal', texto: 'Normal' },
+                            { valor: 'airy', texto: 'Amplio' },
+                        ]}
+                    />
 
-                <Segmentado
-                    etiqueta="Precio"
-                    {...campo('price_style')}
-                    opciones={[
-                        { valor: 'discreto', texto: 'Discreto' },
-                        { valor: 'normal', texto: 'Normal' },
-                        { valor: 'destacado', texto: 'Destacado' },
-                    ]}
-                />
+                    <Segmentado
+                        etiqueta="Precio"
+                        {...campo('price_style')}
+                        opciones={[
+                            { valor: 'discreto', texto: 'Discreto' },
+                            { valor: 'normal', texto: 'Normal' },
+                            { valor: 'destacado', texto: 'Destacado' },
+                        ]}
+                    />
+                </SoloCompleto>
             </Grupo>
 
-            <Grupo titulo="Fondo de la página">
+            <Grupo titulo="Fondo de la página" avanzado>
                 <OpcionesVisuales
                     columnas={3}
                     valor={datos.background_style === 'pattern' ? datos.background_pattern : datos.background_style}
@@ -254,6 +269,7 @@ export default function PanelEstilo({ editor }) {
             <Grupo
                 titulo="Movimiento"
                 descripcion="Cómo aparecen los bloques al bajar y cómo responden los botones."
+                avanzado
             >
                 <OpcionesVisuales
                     etiqueta="Cuánto se mueve"

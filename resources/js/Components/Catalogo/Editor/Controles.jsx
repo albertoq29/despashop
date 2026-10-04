@@ -1,4 +1,4 @@
-import { useId, useRef, useState } from 'react';
+import { createContext, useContext, useId, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { motion } from 'motion/react';
 import { Image as ImagenIcono, Loader2, Trash2, Upload } from 'lucide-react';
@@ -14,10 +14,41 @@ import { Interruptor as InterruptorBase } from '@/Components/UI';
 
 export const Interruptor = InterruptorBase;
 
+/* ── Modo fácil ─────────────────────────────────────────────────────────── */
+
+/**
+ * El editor tiene muchas más opciones de las que hacen falta para dejar un
+ * catálogo presentable, y en un teléfono todas juntas abruman. En modo
+ * fácil los grupos marcados como avanzados y lo que envuelve
+ * `SoloCompleto` dejan de dibujarse.
+ *
+ * Nada se borra ni se reinicia: lo que ya estaba configurado sigue
+ * aplicándose en el catálogo, solo deja de ocupar la pantalla. Así volver
+ * al modo completo no tiene costo ni sorpresas.
+ */
+const ModoFacil = createContext(false);
+
+export function ProveedorDeModoFacil({ activo, children }) {
+    return <ModoFacil.Provider value={activo}>{children}</ModoFacil.Provider>;
+}
+
+export function useModoFacil() {
+    return useContext(ModoFacil);
+}
+
+/** Lo que solo tiene sentido con todas las opciones a la vista. */
+export function SoloCompleto({ children }) {
+    return useModoFacil() ? null : <>{children}</>;
+}
+
 const BASE_CAMPO =
     'w-full rounded-lg border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 transition-colors duration-150 ease-salida placeholder:text-stone-400 focus:border-marca-600 focus:ring-marca-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-600 dark:focus:border-marca-400 dark:focus:ring-marca-400';
 
-export function Grupo({ titulo, descripcion, accion, children, className = '' }) {
+export function Grupo({ titulo, descripcion, accion, children, avanzado = false, className = '' }) {
+    if (useModoFacil() && avanzado) {
+        return null;
+    }
+
     return (
         <section className={`border-b border-stone-200 px-5 py-5 last:border-b-0 dark:border-stone-800 ${className}`}>
             {(titulo || accion) && (

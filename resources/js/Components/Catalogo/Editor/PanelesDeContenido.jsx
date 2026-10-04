@@ -31,7 +31,11 @@ export function PanelMarca({ editor }) {
                 />
             </Grupo>
 
-            <Grupo titulo="Imagen de portada" descripcion="Se usa en la portada cuando eliges fondo con imagen o el diseño dividido.">
+            <Grupo
+                titulo="Imagen de portada"
+                descripcion="Se usa en la portada cuando eliges fondo con imagen o el diseño dividido."
+                avanzado
+            >
                 <SubidaImagen
                     actual={theme.cover_url}
                     ruta={route('catalogo.imagen', 'cover')}
@@ -41,7 +45,11 @@ export function PanelMarca({ editor }) {
                 />
             </Grupo>
 
-            <Grupo titulo="Ícono de la pestaña" descripcion="El pequeño ícono que aparece en la pestaña del navegador.">
+            <Grupo
+                titulo="Ícono de la pestaña"
+                descripcion="El pequeño ícono que aparece en la pestaña del navegador."
+                avanzado
+            >
                 <SubidaImagen
                     compacta
                     actual={theme.favicon_url}
@@ -470,7 +478,11 @@ export function PanelCompartir({ editor }) {
                 ))}
             </Grupo>
 
-            <Grupo titulo="Al compartir el enlace" descripcion="Lo que se ve en buscadores y al pegar tu enlace en un chat.">
+            <Grupo
+                titulo="Al compartir el enlace"
+                descripcion="Lo que se ve en buscadores y al pegar tu enlace en un chat."
+                avanzado
+            >
                 <Texto etiqueta="Título" {...campo('seo_title')} maximo={120} />
                 <Texto etiqueta="Descripción" {...campo('seo_description')} maximo={300} filas={2} />
 

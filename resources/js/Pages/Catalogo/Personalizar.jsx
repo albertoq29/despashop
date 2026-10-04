@@ -9,16 +9,19 @@ import {
     GalleryHorizontal,
     Layers,
     Loader2,
+    Maximize2,
     MessageSquare,
     Monitor,
     Palette,
     Redo2,
     Save,
     Share2,
+    SlidersHorizontal,
     Sparkles,
     Smartphone,
     Store,
     Undo2,
+    Wand2,
     X,
 } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
@@ -27,6 +30,7 @@ import { Lienzo, useVistaPrevia } from '@/Components/Catalogo/Editor/Lienzo';
 import PanelEstilo from '@/Components/Catalogo/Editor/PanelEstilo';
 import PanelSecciones from '@/Components/Catalogo/Editor/PanelSecciones';
 import { PanelBanners, PanelCompartir, PanelMarca, PanelModales } from '@/Components/Catalogo/Editor/PanelesDeContenido';
+import { ProveedorDeModoFacil } from '@/Components/Catalogo/Editor/Controles';
 import { useHistorial } from '@/Components/Catalogo/Editor/useHistorial';
 import { nuevaSeccion } from '@/Components/Catalogo/secciones';
 import { MENSAJES } from '@/Components/Catalogo/Vitrina/Editable';
@@ -41,6 +45,19 @@ const PESTANAS = [
     { id: 'modales', etiqueta: 'Ventanas', Icono: MessageSquare },
     { id: 'compartir', etiqueta: 'Compartir', Icono: Share2 },
 ];
+
+/**
+ * Las pestañas del modo fácil.
+ *
+ * Fuera quedan los banners y las ventanas emergentes: son añadidos que no
+ * hacen falta para tener un catálogo presentable, y cada uno abre su propio
+ * formulario con subida de imágenes. Lo que ya esté creado sigue
+ * mostrándose en el catálogo.
+ */
+const PESTANAS_FACILES = ['secciones', 'estilo', 'marca', 'compartir'];
+
+// Tailwind lee las clases del código: `grid-cols-${n}` no existiría
+const COLUMNAS_PESTANAS = { 4: 'grid-cols-4', 6: 'grid-cols-6' };
 
 const PANELES = {
     secciones: PanelSecciones,
@@ -73,12 +90,19 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
     const [dispositivo, setDispositivo] = useState(() => leerPreferencia('catalogo-dispositivo', 'escritorio'));
     const [verPrevia, setVerPrevia] = useState(false);
     const [aviso, setAviso] = useState(null);
+    const [modoFacil, setModoFacil] = useState(() => leerPreferencia('catalogo-modo-facil', 'no') === 'si');
+    // El recordatorio sale al activar el modo fácil, no al entrar a la
+    // pantalla: es la respuesta a lo que acaba de pulsar.
+    const [recordatorio, setRecordatorio] = useState(false);
+    const [avisoPc, setAvisoPc] = useState(() => leerPreferencia('catalogo-aviso-pc', 'si') === 'si');
     // El pedido de llevar la vista previa a un bloque viaja junto con el
     // borrador: si llegara antes, se desplazaría sobre el orden viejo.
     const [enfoque, setEnfoque] = useState(null);
     const enfocar = (id) => setEnfoque({ id, n: Date.now() });
     const esEscritorio = useMediaQuery('(min-width: 1024px)');
     const panel = useRef(null);
+    const contenido = useRef(null);
+    const irAlPanel = useRef(false);
 
     // Asistente de IA. Se abre solo si se llega con ?ia=1 (desde el panel de inicio).
     const [usoIa, setUsoIa] = useState(ia);
@@ -114,6 +138,30 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
     const historial = useHistorial(form.data, reemplazar);
     const historialActual = useRef(historial);
     historialActual.current = historial;
+
+    // «Ver temas rápidos» tiene que dejar los temas en pantalla. Si ya se
+    // está en Estilo no hay cambio de pestaña que dispare nada, así que el
+    // desplazamiento se hace aquí mismo.
+    const verTemas = () => {
+        setRecordatorio(false);
+
+        if (pestana === 'estilo') {
+            contenido.current?.scrollIntoView({ block: 'start' });
+
+            return;
+        }
+
+        irAlPanel.current = true;
+        setPestana('estilo');
+    };
+
+    const alternarModoFacil = (activo) => {
+        setModoFacil(activo);
+        setRecordatorio(activo);
+        // El panel cambia de largo y puede esconder una pestaña: quedarse a
+        // media altura del panel anterior no dice nada
+        panel.current?.scrollTo({ top: 0 });
+    };
 
     const avisar = useCallback((texto, opciones = {}) => {
         setAviso({ id: Date.now(), texto, tono: opciones.tono ?? 'neutro', accion: opciones.accion ?? null });
@@ -467,10 +515,32 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
     }, [dispositivo]);
 
     useEffect(() => {
-        panel.current?.scrollTo({ top: 0 });
+        guardarPreferencia('catalogo-modo-facil', modoFacil ? 'si' : 'no');
+    }, [modoFacil]);
+
+    // Al cambiar de pestaña se vuelve arriba del todo, salvo cuando se llegó
+    // pidiendo algo concreto del panel: entonces la vista va al panel y no a
+    // los avisos que lo preceden.
+    useEffect(() => {
+        if (irAlPanel.current) {
+            irAlPanel.current = false;
+            contenido.current?.scrollIntoView({ block: 'start' });
+        } else {
+            panel.current?.scrollTo({ top: 0 });
+        }
     }, [pestana]);
 
-    const Panel = PANELES[pestana];
+    const pestanas = modoFacil ? PESTANAS.filter((p) => PESTANAS_FACILES.includes(p.id)) : PESTANAS;
+    // Si el modo fácil esconde la pestaña abierta, se cae a Estilo en vez de
+    // quedarse sin panel que dibujar.
+    const pestanaActiva = pestanas.some((p) => p.id === pestana) ? pestana : 'estilo';
+    const Panel = PANELES[pestanaActiva];
+
+    // En el teléfono, el modo fácil deja la vista previa arriba y los
+    // controles debajo: así se ve el cambio sin saltar de pantalla. En
+    // computadora ya están lado a lado y esto no aplica.
+    const previaFijada = modoFacil && !esEscritorio && !verPrevia;
+
     const fuentesDelEditor = `https://fonts.bunny.net/css?family=${fuentes.map((f) => `${aFamilia(f)}:500`).join('|')}&display=swap`;
 
     return (
@@ -480,24 +550,70 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                 <link rel="stylesheet" href={fuentesDelEditor} />
             </Head>
 
-            <div className="lg:grid lg:h-[calc(100dvh-4rem)] lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)]">
+            <div
+                className={`lg:grid lg:h-[calc(100dvh-4rem)] lg:grid-cols-[380px_minmax(0,1fr)] xl:grid-cols-[420px_minmax(0,1fr)] ${
+                    previaFijada ? 'flex h-[calc(100dvh-4rem)] flex-col' : ''
+                }`}
+            >
                 {/* ── Controles ── */}
-                <aside className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white dark:bg-stone-900 lg:min-h-0 lg:border-r lg:border-stone-200 lg:dark:border-stone-800">
+                <aside
+                    className={`flex flex-col bg-white dark:bg-stone-900 lg:min-h-0 lg:border-r lg:border-stone-200 lg:dark:border-stone-800 ${
+                        previaFijada ? 'min-h-0 flex-1' : 'min-h-[calc(100dvh-4rem)]'
+                    }`}
+                >
+                    <BarraModoFacil activo={modoFacil} onCambiar={alternarModoFacil} />
+
                     {usoIa.disponible && <BotonIa uso={usoIa} onAbrir={() => setIaAbierta(true)} />}
 
-                    <Pestanas activa={pestana} onCambiar={setPestana} />
+                    <Pestanas opciones={pestanas} activa={pestanaActiva} onCambiar={setPestana} />
 
-                    <div ref={panel} className="scrollbar-slim flex-1 pb-24 lg:min-h-0 lg:overflow-y-auto lg:pb-0">
+                    <div
+                        ref={panel}
+                        className={`scrollbar-slim flex-1 pb-24 lg:min-h-0 lg:overflow-y-auto lg:pb-0 ${
+                            previaFijada ? 'min-h-0 overflow-y-auto' : ''
+                        }`}
+                    >
+                        {/* Primero el recordatorio: es la respuesta a lo que
+                            el comercio acaba de pulsar. El consejo de la
+                            computadora lleva ahí desde que entró. */}
+                        {modoFacil && recordatorio && (
+                            <RecordatorioModoFacil
+                                conIa={usoIa.disponible}
+                                onTemas={verTemas}
+                                onIa={() => {
+                                    setIaAbierta(true);
+                                    setRecordatorio(false);
+                                }}
+                                onCerrar={() => setRecordatorio(false)}
+                            />
+                        )}
+
+                        {!esEscritorio && avisoPc && (
+                            <AvisoDeComputadora
+                                modoFacil={modoFacil}
+                                onModoFacil={() => alternarModoFacil(true)}
+                                onCerrar={() => {
+                                    setAvisoPc(false);
+                                    guardarPreferencia('catalogo-aviso-pc', 'no');
+                                }}
+                            />
+                        )}
+
                         <AccesoAlTutorial nombre="catalogo" className="border-b border-stone-200 p-4 dark:border-stone-800" />
 
                         <motion.div
-                            key={pestana}
+                            ref={contenido}
+                            key={pestanaActiva}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.22, ease: SALIDA }}
                         >
-                            <Panel editor={editor} />
+                            <ProveedorDeModoFacil activo={modoFacil}>
+                                <Panel editor={editor} />
+                            </ProveedorDeModoFacil>
                         </motion.div>
+
+                        {modoFacil && <NotaModoCompleto onCompleto={() => alternarModoFacil(false)} />}
                     </div>
 
                     <BarraGuardar
@@ -513,22 +629,29 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                     className={
                         verPrevia && !esEscritorio
                             ? 'fixed inset-0 z-50 flex flex-col bg-stone-100 dark:bg-stone-950'
-                            : 'hidden min-h-0 flex-col bg-stone-100 dark:bg-stone-950 lg:flex'
+                            : previaFijada
+                              ? 'relative order-first flex h-[40dvh] shrink-0 flex-col border-b border-stone-200 bg-stone-100 dark:border-stone-800 dark:bg-stone-950 lg:order-none lg:h-auto lg:border-b-0'
+                              : 'hidden min-h-0 flex-col bg-stone-100 dark:bg-stone-950 lg:flex'
                     }
                     aria-label="Vista previa del catálogo"
                 >
-                    <BarraVistaPrevia
-                        publicado={theme.is_published}
-                        catalogUrl={catalogUrl}
-                        dispositivo={dispositivo}
-                        onDispositivo={setDispositivo}
-                        onPublicar={alternarPublicacion}
-                        esEscritorio={esEscritorio}
-                        onCerrar={() => setVerPrevia(false)}
-                        sucio={form.isDirty && !form.processing}
-                        procesando={form.processing}
-                        onGuardar={guardar}
-                    />
+                    {/* Fijada arriba el espacio es poco: la barra entera se
+                        cambia por el botón de ampliar, y guardar sigue en la
+                        barra de abajo, que en el teléfono está siempre fija. */}
+                    {!previaFijada && (
+                        <BarraVistaPrevia
+                            publicado={theme.is_published}
+                            catalogUrl={catalogUrl}
+                            dispositivo={dispositivo}
+                            onDispositivo={setDispositivo}
+                            onPublicar={alternarPublicacion}
+                            esEscritorio={esEscritorio}
+                            onCerrar={() => setVerPrevia(false)}
+                            sucio={form.isDirty && !form.processing}
+                            procesando={form.processing}
+                            onGuardar={guardar}
+                        />
+                    )}
 
                     <Lienzo
                         url={vistaPreviaUrl}
@@ -537,10 +660,21 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                         dispositivo={esEscritorio ? dispositivo : 'movil'}
                         completo={!esEscritorio}
                     />
+
+                    {previaFijada && (
+                        <button
+                            type="button"
+                            onClick={() => setVerPrevia(true)}
+                            className="pulsable boton-elevado absolute bottom-2 right-2 z-10 inline-flex items-center gap-1.5 rounded-full bg-stone-900/85 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-sm dark:bg-stone-100/90 dark:text-stone-900"
+                        >
+                            <Maximize2 className="h-3.5 w-3.5" />
+                            Ampliar
+                        </button>
+                    )}
                 </section>
             </div>
 
-            {!esEscritorio && !verPrevia && (
+            {!esEscritorio && !verPrevia && !previaFijada && (
                 <button
                     type="button"
                     onClick={() => setVerPrevia(true)}
@@ -570,13 +704,15 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
 
 /* ── Piezas del editor ──────────────────────────────────────────────────── */
 
-function Pestanas({ activa, onCambiar }) {
+function Pestanas({ opciones, activa, onCambiar }) {
     return (
         <nav
             aria-label="Secciones del editor"
-            className="sticky top-16 z-20 grid grid-cols-6 border-b border-stone-200 bg-white/95 px-1.5 backdrop-blur-md dark:border-stone-800 dark:bg-stone-900/95 lg:static"
+            className={`sticky top-16 z-20 grid border-b border-stone-200 bg-white/95 px-1.5 backdrop-blur-md dark:border-stone-800 dark:bg-stone-900/95 lg:static ${
+                COLUMNAS_PESTANAS[opciones.length] ?? 'grid-cols-6'
+            }`}
         >
-            {PESTANAS.map(({ id, etiqueta, Icono }) => {
+            {opciones.map(({ id, etiqueta, Icono }) => {
                 const esActiva = activa === id;
 
                 return (
@@ -604,6 +740,185 @@ function Pestanas({ activa, onCambiar }) {
                 );
             })}
         </nav>
+    );
+}
+
+/**
+ * Interruptor del modo fácil, arriba de todo.
+ *
+ * Dice en qué modo está en vez de limitarse a una etiqueta: quien no sabe
+ * qué es «modo fácil» igual entiende que hay dos y en cuál se encuentra.
+ */
+function BarraModoFacil({ activo, onCambiar }) {
+    return (
+        <div className="flex items-center gap-2.5 border-b border-stone-200 px-3 py-2 dark:border-stone-800">
+            <span
+                className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${
+                    activo
+                        ? 'bg-marca-100 text-marca-700 dark:bg-marca-950 dark:text-marca-400'
+                        : 'bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400'
+                }`}
+            >
+                {activo ? <Wand2 className="h-3.5 w-3.5" /> : <SlidersHorizontal className="h-3.5 w-3.5" />}
+            </span>
+
+            <span className="min-w-0 flex-1">
+                <span className="block text-xs font-semibold text-stone-900 dark:text-stone-100">
+                    {activo ? 'Modo fácil' : 'Modo completo'}
+                </span>
+                <span className="block truncate text-[11px] text-stone-500 dark:text-stone-400">
+                    {activo ? 'Solo lo esencial, sin tantas opciones' : 'Todas las opciones del editor'}
+                </span>
+            </span>
+
+            <button
+                type="button"
+                role="switch"
+                aria-checked={activo}
+                aria-label="Modo fácil"
+                onClick={() => onCambiar(!activo)}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-150 ease-salida ${
+                    activo ? 'bg-marca-700 dark:bg-marca-500' : 'bg-stone-300 dark:bg-stone-700'
+                }`}
+            >
+                <span
+                    className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-150 ease-salida"
+                    style={{ transform: activo ? 'translateX(1.25rem)' : 'translateX(0)' }}
+                />
+            </button>
+        </div>
+    );
+}
+
+/**
+ * Recomendación de diseñar en computadora. Solo en pantallas de teléfono, y
+ * se puede quitar para siempre: es un consejo, no una advertencia.
+ */
+function AvisoDeComputadora({ modoFacil, onModoFacil, onCerrar }) {
+    return (
+        <div className="border-b border-stone-200 p-3 dark:border-stone-800">
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3.5 dark:border-sky-900 dark:bg-sky-950/40">
+                <div className="flex items-start gap-3">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-sky-700 dark:bg-stone-900 dark:text-sky-400">
+                        <Monitor className="h-4 w-4" />
+                    </span>
+
+                    <p className="min-w-0 flex-1 text-sm leading-relaxed text-sky-900 dark:text-sky-200">
+                        <strong className="block font-semibold">Se diseña mejor en computadora</strong>
+                        <span className="mt-0.5 block">
+                            Ahí caben los controles y la vista previa a la vez, y se trabaja más cómodo. Desde el
+                            teléfono también se puede: el modo fácil lo deja en lo justo y necesario.
+                        </span>
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={onCerrar}
+                        aria-label="No mostrar este aviso"
+                        className="pulsable -mr-1 -mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-sky-700/70 hover:bg-white/70 dark:text-sky-400 dark:hover:bg-stone-900/70"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                {!modoFacil && (
+                    <button
+                        type="button"
+                        onClick={onModoFacil}
+                        className="pulsable boton-elevado mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-sky-700 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-sky-600 dark:bg-sky-500 dark:text-stone-950"
+                    >
+                        <Wand2 className="h-3.5 w-3.5" />
+                        Activar el modo fácil
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Lo que se le recuerda al activar el modo fácil.
+ *
+ * Con menos controles delante, lo que conviene es no armar el diseño a
+ * mano: un tema rápido deja todo coherente de una vez, y la IA lo propone
+ * entero. Los dos atajos van aquí mismo.
+ */
+function RecordatorioModoFacil({ conIa, onTemas, onIa, onCerrar }) {
+    const boton =
+        'pulsable inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm font-semibold sm:w-auto';
+
+    return (
+        <div className="border-b border-stone-200 p-3 dark:border-stone-800">
+            <div className="rounded-xl border border-marca-200 bg-marca-50 p-3.5 dark:border-marca-900 dark:bg-marca-950/40">
+                <div className="flex items-start gap-3">
+                    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-marca-700 dark:bg-stone-900 dark:text-marca-400">
+                        <Wand2 className="h-4 w-4" />
+                    </span>
+
+                    <p className="min-w-0 flex-1 text-sm leading-relaxed text-marca-900 dark:text-marca-200">
+                        <strong className="block font-semibold">Modo fácil activado</strong>
+                        <span className="mt-0.5 block">
+                            Dejamos a la vista lo esencial. Si el diseño se te complica, no lo armes a mano: aplica
+                            un tema rápido
+                            {conIa ? ' o deja que nuestra IA te proponga uno completo' : ' y ajústale los colores'}.
+                        </span>
+                    </p>
+
+                    <button
+                        type="button"
+                        onClick={onCerrar}
+                        aria-label="Cerrar aviso"
+                        className="pulsable -mr-1 -mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-marca-700/70 hover:bg-white/70 dark:text-marca-400 dark:hover:bg-stone-900/70"
+                    >
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <button
+                        type="button"
+                        onClick={onTemas}
+                        className={`${boton} boton-elevado bg-marca-700 text-white hover:bg-marca-600 dark:bg-marca-500 dark:text-stone-950`}
+                    >
+                        <Palette className="h-4 w-4" />
+                        Ver temas rápidos
+                    </button>
+
+                    {conIa && (
+                        <button
+                            type="button"
+                            onClick={onIa}
+                            className={`${boton} border border-marca-300 text-marca-900 hover:bg-white/70 dark:border-marca-800 dark:text-marca-200 dark:hover:bg-stone-900/70`}
+                        >
+                            <Sparkles className="h-4 w-4" />
+                            Crear con IA
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/** Cierre del panel en modo fácil: qué quedó fuera y cómo recuperarlo. */
+function NotaModoCompleto({ onCompleto }) {
+    return (
+        <div className="border-t border-stone-200 px-5 py-5 dark:border-stone-800">
+            <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                El modo completo tiene además los banners, las ventanas emergentes, el fondo de la página, el
+                movimiento y el resto de los detalles. Lo que ya tenías configurado sigue aplicándose en tu
+                catálogo aunque aquí no se vea.
+            </p>
+
+            <button
+                type="button"
+                onClick={onCompleto}
+                className="pulsable mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-300 px-3.5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-800"
+            >
+                <SlidersHorizontal className="h-4 w-4" />
+                Ver todas las opciones
+            </button>
+        </div>
     );
 }
 

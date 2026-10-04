@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { usePage } from '@inertiajs/react';
 import { GraduationCap, Play, Receipt, Sparkles, X } from 'lucide-react';
 import Tutorial, { marcarVisto, TUTORIALES, yaLoVio } from './Tutorial';
 
@@ -20,6 +21,25 @@ export function useTutoriales() {
 }
 
 const ICONOS = { catalogo: Sparkles, facturas: Receipt };
+
+const UN_DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * Si la cuenta se abrio hace menos de un dia.
+ *
+ * El ofrecimiento grande es para quien acaba de llegar y todavia no sabe
+ * que los tutoriales existen. Pasado el primer dia ya recorrio la app: el
+ * tutorial sigue a un toque en el menu lateral y en el boton discreto,
+ * pero deja de ocupar sitio en la pantalla.
+ *
+ * Sin fecha no se ofrece: mejor quedarse corto que insistirle a alguien
+ * que lleva meses usando el sistema.
+ */
+function esCuentaNueva(usuario) {
+    const creada = Date.parse(usuario?.created_at ?? '');
+
+    return Number.isFinite(creada) && Date.now() - creada < UN_DIA;
+}
 
 export function ProveedorDeTutoriales({ children }) {
     const [abierto, setAbierto] = useState(null);
@@ -145,6 +165,7 @@ function Selector({ onElegir, onCerrar }) {
  * discreto que sigue estando ahí cuando haga falta.
  */
 export function AccesoAlTutorial({ nombre, className = '' }) {
+    const usuario = usePage().props.auth?.user;
     const [visto, setVisto] = useState(null);
 
     useEffect(() => setVisto(yaLoVio(nombre)), [nombre]);
@@ -153,9 +174,11 @@ export function AccesoAlTutorial({ nombre, className = '' }) {
         return null;
     }
 
+    const ofrecer = !visto && esCuentaNueva(usuario);
+
     return (
         <div className={className}>
-            {visto ? <BotonDeTutorial nombre={nombre} className="w-full" /> : <OfertaDeTutorial nombre={nombre} />}
+            {ofrecer ? <OfertaDeTutorial nombre={nombre} /> : <BotonDeTutorial nombre={nombre} className="w-full" />}
         </div>
     );
 }
@@ -182,14 +205,22 @@ export function BotonDeTutorial({ nombre, children = 'Ver tutorial', className =
  * Aparece una sola vez por tutorial: si el comercio lo vio o lo descartó,
  * no vuelve a salir. Se guarda en el navegador, así que el aviso es por
  * dispositivo, que es lo que corresponde a algo que solo estorba la vista.
+ *
+ * Y solo durante el primer día de la cuenta. Después el acceso queda en el
+ * botón discreto y en el menú lateral, sin un cartel de por medio.
+ *
+ * En el teléfono la caja se arma en vertical: el texto completo arriba y el
+ * botón a todo lo ancho abajo. Repartido en una sola fila, a 320 px el
+ * botón quedaba estrujado contra la equis.
  */
 export function OfertaDeTutorial({ nombre }) {
     const { abrir } = useTutoriales();
+    const usuario = usePage().props.auth?.user;
     const [mostrar, setMostrar] = useState(false);
 
     // Se decide después de montar: en el servidor no hay localStorage, y
     // leerlo durante el render dejaría el aviso parpadeando
-    useEffect(() => setMostrar(!yaLoVio(nombre)), [nombre]);
+    useEffect(() => setMostrar(!yaLoVio(nombre) && esCuentaNueva(usuario)), [nombre, usuario]);
 
     if (!mostrar) {
         return null;
@@ -198,35 +229,39 @@ export function OfertaDeTutorial({ nombre }) {
     const tutorial = TUTORIALES[nombre];
 
     return (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-marca-200 bg-marca-50 px-4 py-3 dark:border-marca-900 dark:bg-marca-950/40">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-marca-700 dark:bg-stone-900 dark:text-marca-400">
-                <GraduationCap className="h-4 w-4" />
-            </span>
+        <div className="rounded-xl border border-marca-200 bg-marca-50 p-3.5 dark:border-marca-900 dark:bg-marca-950/40 sm:p-4">
+            <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-white text-marca-700 dark:bg-stone-900 dark:text-marca-400">
+                    <GraduationCap className="h-4 w-4" />
+                </span>
 
-            <p className="min-w-0 flex-1 text-sm text-marca-900 dark:text-marca-200">
-                <strong className="font-semibold">¿Primera vez por aquí?</strong>{' '}
-                {tutorial.resumen} En {tutorial.pasos.length} pasos, con las acciones hechas en pantalla.
-            </p>
+                <p className="min-w-0 flex-1 text-sm leading-relaxed text-marca-900 dark:text-marca-200">
+                    <strong className="block font-semibold">¿Primera vez por aquí?</strong>
+                    <span className="mt-0.5 block">
+                        {tutorial.resumen} En {tutorial.pasos.length} pasos, con las acciones hechas en pantalla.
+                    </span>
+                </p>
+
+                <button
+                    type="button"
+                    onClick={() => {
+                        marcarVisto(nombre);
+                        setMostrar(false);
+                    }}
+                    aria-label="No mostrar este aviso"
+                    className="pulsable -mr-1 -mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-marca-700/70 hover:bg-white/70 dark:text-marca-400 dark:hover:bg-stone-900/70"
+                >
+                    <X className="h-4 w-4" />
+                </button>
+            </div>
 
             <button
                 type="button"
                 onClick={() => abrir(nombre)}
-                className="pulsable boton-elevado inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-marca-700 px-3.5 py-2 text-sm font-semibold text-white hover:bg-marca-600 dark:bg-marca-500 dark:text-stone-950"
+                className="pulsable boton-elevado mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-marca-700 px-3.5 py-2.5 text-sm font-semibold text-white hover:bg-marca-600 dark:bg-marca-500 dark:text-stone-950 sm:ml-12 sm:mt-2.5 sm:w-auto sm:py-2"
             >
                 <Play className="h-3.5 w-3.5" />
                 Ver el tutorial
-            </button>
-
-            <button
-                type="button"
-                onClick={() => {
-                    marcarVisto(nombre);
-                    setMostrar(false);
-                }}
-                aria-label="No mostrar este aviso"
-                className="pulsable grid h-8 w-8 shrink-0 place-items-center rounded-lg text-marca-700/70 hover:bg-white/70 dark:text-marca-400 dark:hover:bg-stone-900/70"
-            >
-                <X className="h-4 w-4" />
             </button>
         </div>
     );
