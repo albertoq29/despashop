@@ -8,12 +8,6 @@ import { Segmentado } from './Controles';
 
 const SALIDA = [0.23, 1, 0.32, 1];
 
-const IDEAS = [
-    'Cafetería artesanal en Mérida. Vendemos café de altura en grano y molido, postres caseros y tazas. Queremos un estilo cálido, con tonos tierra.',
-    'Ferretería de barrio en Valencia con herramientas, pinturas, electricidad y plomería. Algo claro, serio y fácil de recorrer desde el teléfono.',
-    'Tienda de ropa deportiva para mujeres en Caracas: licras, tops, zapatos y accesorios. Moderna, con energía y colores vivos.',
-];
-
 const QUE_PROPONER = [
     { clave: 'diseno', titulo: 'Diseño', texto: 'Colores, letras y estilo', Icono: Palette },
     { clave: 'textos', titulo: 'Textos y secciones', texto: 'Portada, beneficios, orden', Icono: PenLine },
@@ -353,22 +347,6 @@ function Escribir({ descripcion, onDescripcion, tono, onTono, incluir, onIncluir
                         Cuéntanos un poco más: qué vendes, dónde y qué estilo te gusta.
                     </p>
                 )}
-            </div>
-
-            <div>
-                <p className="mb-2 text-xs font-medium text-stone-500 dark:text-stone-400">Ideas para empezar</p>
-                <div className="flex flex-col gap-1.5">
-                    {IDEAS.map((idea) => (
-                        <button
-                            key={idea}
-                            type="button"
-                            onClick={() => onDescripcion(idea)}
-                            className="pulsable rounded-lg border border-stone-200 px-3 py-2 text-left text-xs leading-relaxed text-stone-600 hover:border-marca-500 hover:bg-marca-50/60 dark:border-stone-800 dark:text-stone-400 dark:hover:border-marca-500 dark:hover:bg-marca-950/30"
-                        >
-                            {idea}
-                        </button>
-                    ))}
-                </div>
             </div>
 
             <div>
