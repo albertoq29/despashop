@@ -22,6 +22,7 @@ class AccountStatusController extends Controller
                 'username' => $user->username,
                 'email' => $user->email,
                 'status' => $user->status,
+                'verificado' => $user->hasVerifiedEmail(),
                 'rejection_reason' => $user->rejection_reason,
                 'requested_plan' => $user->requestedPlan?->only(['id', 'name', 'price_usd']),
                 'created_at' => $user->created_at,

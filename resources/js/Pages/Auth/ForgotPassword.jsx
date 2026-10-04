@@ -1,55 +1,52 @@
-import InputError from '@/Components/InputError';
-import PrimaryButton from '@/Components/PrimaryButton';
-import TextInput from '@/Components/TextInput';
-import GuestLayout from '@/Layouts/GuestLayout';
-import { Head, useForm } from '@inertiajs/react';
+import { Link, useForm } from '@inertiajs/react';
+import { KeyRound } from 'lucide-react';
+import PantallaDeAcceso, { BotonDeAcceso, CampoDeAcceso, TarjetaDeAcceso } from '@/Layouts/PantallaDeAcceso';
 
 export default function ForgotPassword({ status }) {
-    const { data, setData, post, processing, errors } = useForm({
-        email: '',
-    });
+    const { data, setData, post, processing, errors } = useForm({ email: '' });
 
-    const submit = (e) => {
-        e.preventDefault();
-
+    const enviar = (evento) => {
+        evento.preventDefault();
         post(route('password.email'));
     };
 
     return (
-        <GuestLayout>
-            <Head title="Forgot Password" />
-
-            <div className="mb-4 text-sm text-stone-600 dark:text-stone-400">
-                Forgot your password? No problem. Just let us know your email
-                address and we will email you a password reset link that will
-                allow you to choose a new one.
-            </div>
-
-            {status && (
-                <div className="mb-4 text-sm font-medium text-green-600 dark:text-green-400">
-                    {status}
-                </div>
-            )}
-
-            <form onSubmit={submit}>
-                <TextInput
+        <PantallaDeAcceso
+            titulo="Recuperar contraseña"
+            encabezado="¿Olvidaste tu contraseña?"
+            descripcion="Escribe tu correo y te mandamos un enlace para poner una nueva."
+            Icono={KeyRound}
+            aviso={status}
+            pie={
+                <>
+                    ¿Ya la recordaste?{' '}
+                    <Link href={route('login')} className="font-medium text-marca-700 hover:underline dark:text-marca-400">
+                        Volver a entrar
+                    </Link>
+                </>
+            }
+        >
+            <TarjetaDeAcceso onSubmit={enviar}>
+                <CampoDeAcceso
                     id="email"
+                    etiqueta="Correo"
                     type="email"
-                    name="email"
                     value={data.email}
-                    className="mt-1 block w-full"
-                    isFocused={true}
                     onChange={(e) => setData('email', e.target.value)}
+                    autoComplete="username"
+                    autoFocus
+                    required
+                    error={errors.email}
                 />
 
-                <InputError message={errors.email} className="mt-2" />
+                <BotonDeAcceso procesando={processing}>
+                    {processing ? 'Enviando' : 'Enviarme el enlace'}
+                </BotonDeAcceso>
 
-                <div className="mt-4 flex items-center justify-end">
-                    <PrimaryButton className="ms-4" disabled={processing}>
-                        Email Password Reset Link
-                    </PrimaryButton>
-                </div>
-            </form>
-        </GuestLayout>
+                <p className="text-center text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                    El enlace vale por 60 minutos. Si no te llega, revisa la carpeta de spam.
+                </p>
+            </TarjetaDeAcceso>
+        </PantallaDeAcceso>
     );
 }

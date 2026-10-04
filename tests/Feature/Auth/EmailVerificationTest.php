@@ -38,7 +38,13 @@ class EmailVerificationTest extends TestCase
 
         Event::assertDispatched(Verified::class);
         $this->assertTrue($user->fresh()->hasVerifiedEmail());
-        $response->assertRedirect(route('dashboard', absolute: false).'?verified=1');
+
+        // El `?verified=1` de la plantilla se cambió por un aviso en sesión y
+        // un destino que depende del estado de la cuenta: mandar al panel a
+        // un comercio sin aprobar solo servía para que otro middleware lo
+        // rebotara. Lo cubre VerificacionDeCorreoTest.
+        $response->assertRedirect(route($user->fresh()->rutaDeInicio()));
+        $this->assertNotNull(session('success'));
     }
 
     public function test_email_is_not_verified_with_invalid_hash(): void

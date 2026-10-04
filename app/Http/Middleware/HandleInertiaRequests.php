@@ -56,6 +56,9 @@ class HandleInertiaRequests extends Middleware
                 'error'   => fn () => $request->session()->get('error'),
                 'warning' => fn () => $request->session()->get('warning'),
                 'info'    => fn () => $request->session()->get('info'),
+                // `status` lo usan los avisos de autenticación del framework
+                // (por ejemplo, «te reenviamos el enlace de verificación»)
+                'status'  => fn () => $request->session()->get('status'),
             ],
         ];
     }

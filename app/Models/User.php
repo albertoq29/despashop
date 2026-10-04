@@ -234,6 +234,22 @@ class User extends Authenticatable implements MustVerifyEmail
         return round((float) $precio * (100 - min(100, max(0, $descuento))) / 100, 2);
     }
 
+    /**
+     * A dónde mandar a este usuario después de entrar o de verificar.
+     *
+     * Existe porque tres controladores tomaban la misma decisión por su
+     * cuenta y uno de ellos la tomaba mal: mandar a un comercio pendiente
+     * al panel solo sirve para que otro middleware lo rebote.
+     */
+    public function rutaDeInicio(): string
+    {
+        if ($this->isAdmin()) {
+            return 'admin.dashboard';
+        }
+
+        return $this->isApproved() ? 'dashboard' : 'cuenta.estado';
+    }
+
     public function catalogUrl(): ?string
     {
         return $this->username ? url('/'.$this->username) : null;

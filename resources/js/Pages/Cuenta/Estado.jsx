@@ -1,5 +1,5 @@
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Clock, LogOut, Mail, MessageCircle, ShieldAlert, ShieldX } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Check, Clock, LogOut, Mail, MailWarning, MessageCircle, ShieldAlert, ShieldX } from 'lucide-react';
 import CambiarTema from '@/Components/CambiarTema';
 import Marca from '@/Components/Marca';
 
@@ -25,6 +25,14 @@ const ESTADOS = {
 };
 
 export default function Estado({ cuenta, catalogUrl, soporte }) {
+    const { flash } = usePage().props;
+    const reenvio = useForm({});
+
+    const reenviarVerificacion = (evento) => {
+        evento.preventDefault();
+        reenvio.post(route('verification.send'), { preserveScroll: true });
+    };
+
     const { plataforma } = usePage().props;
     const estado = ESTADOS[cuenta.status] ?? ESTADOS.pending;
     const { Icono } = estado;
@@ -64,6 +72,44 @@ export default function Estado({ cuenta, catalogUrl, soporte }) {
                         <p className="mt-3 max-w-[55ch] leading-relaxed text-stone-600 dark:text-stone-400">
                             {estado.texto}
                         </p>
+
+                        {cuenta.verificado === false && (
+                            <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+                                <p className="flex items-center gap-2 text-sm font-semibold text-amber-900 dark:text-amber-200">
+                                    <MailWarning className="h-4 w-4 shrink-0" />
+                                    Falta confirmar tu correo
+                                </p>
+                                <p className="mt-1.5 text-sm leading-relaxed text-amber-800 dark:text-amber-300">
+                                    Te enviamos un enlace a <strong>{cuenta.email}</strong>. Ábrelo para confirmar que
+                                    la dirección es tuya: por ahí te avisamos cuando aprobemos tu cuenta y por ahí
+                                    recuperas la contraseña si la olvidas. Si no lo ves, revisa el correo no deseado.
+                                </p>
+
+                                {flash?.status === 'verification-link-sent' ? (
+                                    <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-amber-900 dark:text-amber-200">
+                                        <Check className="h-4 w-4" />
+                                        Te enviamos un enlace nuevo.
+                                    </p>
+                                ) : (
+                                    <form onSubmit={reenviarVerificacion} className="mt-3">
+                                        <button
+                                            type="submit"
+                                            disabled={reenvio.processing}
+                                            className="pulsable rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-amber-700 disabled:opacity-60"
+                                        >
+                                            {reenvio.processing ? 'Enviando' : 'Enviar el enlace de nuevo'}
+                                        </button>
+                                    </form>
+                                )}
+                            </div>
+                        )}
+
+                        {cuenta.verificado && (
+                            <p className="mt-5 inline-flex items-center gap-1.5 text-sm text-marca-700 dark:text-marca-400">
+                                <Check className="h-4 w-4" />
+                                Tu correo está confirmado.
+                            </p>
+                        )}
 
                         {cuenta.rejection_reason && (
                             <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/40">

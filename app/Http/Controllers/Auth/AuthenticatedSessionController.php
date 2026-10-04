@@ -36,15 +36,10 @@ class AuthenticatedSessionController extends Controller
         $user = $request->user();
         $user->forceFill(['last_login_at' => now()])->saveQuietly();
 
-        if ($user->isAdmin()) {
-            return redirect()->intended(route('admin.dashboard', absolute: false));
-        }
-
-        if (! $user->isApproved()) {
-            return redirect()->route('cuenta.estado');
-        }
-
-        return redirect()->intended(route('dashboard', absolute: false));
+        // `intended()` también para las cuentas sin aprobar: quien abre el
+        // enlace de verificación sin sesión pasa por aquí, y descartar su
+        // destino dejaba el correo sin confirmar sin decir nada.
+        return redirect()->intended(route($user->rutaDeInicio(), absolute: false));
     }
 
     /**
