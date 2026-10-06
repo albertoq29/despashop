@@ -71,7 +71,10 @@ export default function AdminLayout({ header, children }) {
                         </div>
                     </header>
 
-                    <main className="flex-1">{children}</main>
+                    <main className="flex-1">
+                        <Flash />
+                        {children}
+                    </main>
                 </div>
             </div>
         </div>
@@ -181,5 +184,37 @@ function BarraLateral({ abierta, onCerrar, marca, seguridad, sugerencias, cambio
                 </nav>
             </aside>
         </>
+    );
+}
+
+/**
+ * Los avisos del servidor, en un solo sitio.
+ *
+ * Cada pantalla del panel los pintaba por su cuenta —o no los pintaba, que
+ * era lo más común—, así que un mensaje tras una redirección se perdía sin
+ * que nadie se enterara de por qué había terminado en otra página.
+ */
+function Flash() {
+    const { flash } = usePage().props;
+
+    const tonos = {
+        success: 'border-marca-200 bg-marca-50 text-marca-800 dark:border-marca-900 dark:bg-marca-950/50 dark:text-marca-300',
+        error: 'border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300',
+        warning: 'border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-300',
+        info: 'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-300',
+    };
+
+    const aviso = Object.keys(tonos).find((clave) => flash?.[clave]);
+
+    if (!aviso) {
+        return null;
+    }
+
+    return (
+        <div className="px-4 pt-4 sm:px-6">
+            <p className={`mx-auto max-w-5xl rounded-xl border px-4 py-3 text-sm ${tonos[aviso]}`}>
+                {flash[aviso]}
+            </p>
+        </div>
     );
 }
