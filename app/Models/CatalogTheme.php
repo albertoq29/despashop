@@ -44,6 +44,7 @@ class CatalogTheme extends Model
             'show_bs_prices' => 'boolean',
             'show_sort' => 'boolean',
             'quick_view' => 'boolean',
+            'multi_select' => 'boolean',
             'hero_enabled' => 'boolean',
             'banners_enabled' => 'boolean',
             'banners_autoplay' => 'boolean',

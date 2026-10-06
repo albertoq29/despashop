@@ -236,3 +236,10 @@ require __DIR__.'/auth.php';
 Route::get('/{username}', [PublicCatalogController::class, 'show'])
     ->where('username', '[a-z0-9][a-z0-9-]*')
     ->name('catalogo.publico');
+
+// Un producto con dirección propia, cuando el comercio elige esa manera de
+// abrirlos. Dos segmentos, así que nunca choca con el nombre de usuario.
+Route::get('/{username}/p/{producto}', [PublicCatalogController::class, 'producto'])
+    ->where('username', '[a-z0-9][a-z0-9-]*')
+    ->where('producto', '[0-9]+')
+    ->name('catalogo.producto');

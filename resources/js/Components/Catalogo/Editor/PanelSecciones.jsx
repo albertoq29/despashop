@@ -654,11 +654,29 @@ function EditorDeProductos({ editor, c, campo, propio }) {
                     valor={datos.show_sort}
                     onCambiar={(v) => cambiar('show_sort', v)}
                 />
+                <Segmentado
+                    etiqueta="Al tocar un producto"
+                    valor={datos.product_view ?? 'modal'}
+                    onCambiar={(v) => cambiar('product_view', v)}
+                    opciones={[
+                        { valor: 'modal', texto: 'Ventana' },
+                        { valor: 'pagina', texto: 'Página propia' },
+                        { valor: 'ninguna', texto: 'Nada' },
+                    ]}
+                    ayuda={
+                        {
+                            modal: 'Se abre encima del catálogo, sin salir de la página. Lo más rápido para ojear.',
+                            pagina: 'Cada producto tiene su propia dirección: se comparte por separado y la encuentra Google. Aquí al lado seguirás viendo la ventana; la página solo existe en tu catálogo de verdad.',
+                            ninguna: 'Las tarjetas no se abren: se ve lo que cabe en la rejilla.',
+                        }[datos.product_view ?? 'modal']
+                    }
+                />
+
                 <Interruptor
-                    etiqueta="Vista rápida al tocar un producto"
-                    ayuda="Fotos, descripción y variantes sin salir de la página."
-                    valor={datos.quick_view}
-                    onCambiar={(v) => cambiar('quick_view', v)}
+                    etiqueta="Elegir varios a la vez"
+                    ayuda="Agrega un botón para marcar productos y mandártelos todos juntos por WhatsApp."
+                    valor={datos.multi_select ?? true}
+                    onCambiar={(v) => cambiar('multi_select', v)}
                 />
                 <Interruptor etiqueta="Precios en dólares" valor={datos.show_prices} onCambiar={(v) => cambiar('show_prices', v)} />
                 <Interruptor etiqueta="Precios en bolívares" valor={datos.show_bs_prices} onCambiar={(v) => cambiar('show_bs_prices', v)} />

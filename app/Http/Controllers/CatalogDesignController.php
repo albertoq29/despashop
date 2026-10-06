@@ -111,6 +111,9 @@ class CatalogDesignController extends Controller
             'product_sort' => ['required', 'in:manual,newest,price_asc,price_desc,name'],
             'show_sort' => ['boolean'],
             'quick_view' => ['boolean'],
+            // Ventana flotante, página propia del producto, o nada
+            'product_view' => ['required', 'in:modal,pagina,ninguna'],
+            'multi_select' => ['boolean'],
             'show_prices' => ['boolean'],
             'show_stock' => ['boolean'],
             'show_categories' => ['boolean'],

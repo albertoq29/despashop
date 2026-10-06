@@ -1101,6 +1101,8 @@ function datosIniciales(theme) {
         product_sort: theme.product_sort ?? 'manual',
         show_sort: theme.show_sort ?? true,
         quick_view: theme.quick_view ?? true,
+        product_view: theme.product_view ?? 'modal',
+        multi_select: theme.multi_select ?? true,
         show_prices: theme.show_prices,
         show_stock: theme.show_stock,
         show_categories: theme.show_categories,

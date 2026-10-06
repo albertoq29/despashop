@@ -45,39 +45,11 @@ function useBloqueoDeScroll(cerrar) {
 /* ── Vista rápida de un producto ────────────────────────────────────────── */
 
 export function VistaRapida({ articulo, onCerrar }) {
-    const { theme, comercio, bcvRate } = useVitrina();
     const [saliendo, cerrar] = useCierreAnimado(onCerrar);
     const botonCerrar = useRef(null);
 
     useBloqueoDeScroll(cerrar);
     useEffect(() => botonCerrar.current?.focus({ preventScroll: true }), []);
-
-    // Aquí sí se muestra la foto completa; la liviana queda para los recuadros
-    const fotos = [
-        { full: articulo.image_url, mini: articulo.thumb_url },
-        ...(articulo.images ?? []).map((imagen) => ({ full: imagen.image_url, mini: imagen.thumb_url })),
-    ].filter((foto, indice, lista) => foto.full && lista.findIndex((otra) => otra.full === foto.full) === indice);
-    const [fotoActual, setFotoActual] = useState(0);
-
-    const precio = articulo.price_usdt;
-    const esServicio = Boolean(articulo.esServicio);
-    const agotado = !esServicio && articulo.stock !== null && Number(articulo.stock) <= 0 && !articulo.por_llegar;
-
-    const variantesPorTipo = (articulo.variants ?? []).reduce((grupos, variante) => {
-        (grupos[variante.type] ??= []).push(variante);
-
-        return grupos;
-    }, {});
-
-    const estado = esServicio
-        ? { texto: articulo.detalle ? `Servicio · ${articulo.detalle}` : 'Servicio', color: 'var(--cat-acento)' }
-        : articulo.por_llegar
-          ? { texto: 'Por llegar', color: 'var(--cat-acento)' }
-          : agotado
-            ? { texto: 'Agotado', color: 'var(--cat-tenue)' }
-            : articulo.last_units && theme.show_stock
-              ? { texto: 'Últimas unidades', color: 'var(--cat-acento)' }
-              : { texto: 'Disponible', color: '#16a34a' };
 
     return (
         <div
@@ -108,151 +80,195 @@ export function VistaRapida({ articulo, onCerrar }) {
                     <X className="h-5 w-5" />
                 </button>
 
-                {/* Galería */}
-                <div className="relative shrink-0 sm:w-1/2" style={{ background: 'color-mix(in srgb, var(--cat-primario) 8%, var(--cat-superficie))' }}>
-                    <div className="relative aspect-square max-h-[46dvh] w-full overflow-hidden sm:max-h-none">
-                        {fotos.length > 0 ? (
-                            fotos.map((foto, indice) => (
-                                <img
-                                    key={foto.full}
-                                    src={foto.full}
-                                    alt={indice === fotoActual ? articulo.name : ''}
-                                    className={`absolute inset-0 h-full w-full transition-[opacity,transform] duration-500 ease-salida ${
-                                        theme.image_fit === 'contain' ? 'object-contain' : 'object-cover'
-                                    }`}
-                                    style={{
-                                        opacity: indice === fotoActual ? 1 : 0,
-                                        transform: indice === fotoActual ? 'scale(1)' : 'scale(1.03)',
-                                    }}
-                                />
-                            ))
-                        ) : (
-                            <div className="grid h-full place-items-center">
-                                <span className="text-7xl font-semibold" style={{ color: 'var(--cat-primario)', fontFamily: 'var(--cat-titulo)' }}>
-                                    {articulo.name.charAt(0).toUpperCase()}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-
-                    {fotos.length > 1 && (
-                        <div className="cat-sin-barra absolute inset-x-0 bottom-0 flex gap-2 overflow-x-auto bg-gradient-to-t from-black/40 to-transparent p-3">
-                            {fotos.map((foto, indice) => (
-                                <button
-                                    key={foto.full}
-                                    type="button"
-                                    onClick={() => setFotoActual(indice)}
-                                    aria-label={`Foto ${indice + 1}`}
-                                    aria-current={indice === fotoActual}
-                                    className="cat-boton h-14 w-14 shrink-0 overflow-hidden rounded-lg transition-[outline-color] duration-200"
-                                    style={{
-                                        outline: `2px solid ${indice === fotoActual ? '#ffffff' : 'transparent'}`,
-                                        outlineOffset: '2px',
-                                    }}
-                                >
-                                    <img src={foto.mini ?? foto.full} alt="" loading="lazy" className="h-full w-full object-cover" />
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* Información */}
-                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 sm:p-8">
-                    <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style={{ color: estado.color }}>
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: estado.color }} />
-                        {articulo.esCombo ? `Combo · ${estado.texto}` : estado.texto}
-                    </span>
-
-                    <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl" style={{ fontFamily: 'var(--cat-titulo)' }}>
-                        {articulo.name}
-                    </h2>
-
-                    {theme.show_prices && (
-                        <div className="mt-4">
-                            {precio ? (
-                                <>
-                                    <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--cat-primario)' }}>
-                                        ${Number(precio).toFixed(2)}
-                                    </p>
-                                    {theme.show_bs_prices && bcvRate > 1 && (
-                                        <p className="mt-0.5 text-sm" style={{ color: 'var(--cat-tenue)' }}>
-                                            Bs. {formatoBs(Number(precio) * bcvRate)}
-                                        </p>
-                                    )}
-                                </>
-                            ) : (
-                                <p className="text-lg font-medium" style={{ color: 'var(--cat-tenue)' }}>
-                                    Consultar precio
-                                </p>
-                            )}
-
-                            <PreciosPorVolumen articulo={articulo} donde="modal" />
-
-                            {articulo.conditional_price && articulo.conditional_min_quantity && (
-                                <p
-                                    className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-medium"
-                                    style={{ background: 'color-mix(in srgb, var(--cat-acento) 14%, transparent)', color: 'var(--cat-texto)' }}
-                                >
-                                    Desde {articulo.conditional_min_quantity} unidades: ${Number(articulo.conditional_price).toFixed(2)} c/u
-                                </p>
-                            )}
-                        </div>
-                    )}
-
-                    {articulo.description && (
-                        <p className="mt-5 whitespace-pre-line text-sm leading-relaxed sm:text-base" style={{ color: 'var(--cat-tenue)' }}>
-                            {articulo.description}
-                        </p>
-                    )}
-
-                    {articulo.incluye?.length > 0 && (
-                        <div className="mt-5">
-                            <p className="text-sm font-semibold">Incluye</p>
-                            <ul className="mt-2 space-y-1.5 text-sm" style={{ color: 'var(--cat-tenue)' }}>
-                                {articulo.incluye.map((nombre) => (
-                                    <li key={nombre} className="flex items-center gap-2">
-                                        <span className="h-1 w-1 rounded-full" style={{ background: 'var(--cat-primario)' }} />
-                                        {nombre}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-
-                    {Object.entries(variantesPorTipo).map(([tipo, variantes]) => (
-                        <div key={tipo} className="mt-5">
-                            <p className="text-sm font-semibold capitalize">{tipo}</p>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                                {variantes.map((variante) => (
-                                    <span
-                                        key={variante.id}
-                                        className={`px-3 py-1.5 text-sm ${variante.agotada ? 'line-through opacity-50' : ''}`}
-                                        style={{ border: `1px solid ${BORDE_SUAVE}`, borderRadius: '9999px' }}
-                                    >
-                                        {variante.label}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                    ))}
-
-                    {comercio.whatsapp && (
-                        <div className="mt-auto pt-8">
-                            <BotonCatalogo
-                                href={enlaceWhatsapp(comercio, articulo)}
-                                externo
-                                brillo
-                                className="w-full py-3.5 text-base"
-                            >
-                                <MessageCircle className="h-5 w-5" />
-                                {esServicio ? 'Pedir este servicio' : agotado ? 'Preguntar disponibilidad' : 'Pedir por WhatsApp'}
-                            </BotonCatalogo>
-                        </div>
-                    )}
-                </div>
+                <DetalleDeProducto articulo={articulo} />
             </div>
         </div>
+    );
+}
+
+/**
+ * El producto por dentro: galería a un lado, todo lo demás al otro.
+ *
+ * Lo comparten la ventana flotante y la página propia del producto, que
+ * son dos maneras de enseñar exactamente lo mismo. Devuelve las dos
+ * columnas sueltas para que cada una las acomode a su manera.
+ */
+export function DetalleDeProducto({ articulo, enPagina = false }) {
+    const { theme, comercio, bcvRate } = useVitrina();
+
+    // Aquí sí se muestra la foto completa; la liviana queda para los recuadros
+    const fotos = [
+        { full: articulo.image_url, mini: articulo.thumb_url },
+        ...(articulo.images ?? []).map((imagen) => ({ full: imagen.image_url, mini: imagen.thumb_url })),
+    ].filter((foto, indice, lista) => foto.full && lista.findIndex((otra) => otra.full === foto.full) === indice);
+    const [fotoActual, setFotoActual] = useState(0);
+
+    const precio = articulo.price_usdt;
+    const esServicio = Boolean(articulo.esServicio);
+    const agotado = !esServicio && articulo.stock !== null && Number(articulo.stock) <= 0 && !articulo.por_llegar;
+
+    const variantesPorTipo = (articulo.variants ?? []).reduce((grupos, variante) => {
+        (grupos[variante.type] ??= []).push(variante);
+
+        return grupos;
+    }, {});
+
+    const estado = esServicio
+        ? { texto: articulo.detalle ? `Servicio · ${articulo.detalle}` : 'Servicio', color: 'var(--cat-acento)' }
+        : articulo.por_llegar
+          ? { texto: 'Por llegar', color: 'var(--cat-acento)' }
+          : agotado
+            ? { texto: 'Agotado', color: 'var(--cat-tenue)' }
+            : articulo.last_units && theme.show_stock
+              ? { texto: 'Últimas unidades', color: 'var(--cat-acento)' }
+              : { texto: 'Disponible', color: '#16a34a' };
+
+    return (
+        <>
+            {/* Galería */}
+            <div className="relative shrink-0 sm:w-1/2" style={{ background: 'color-mix(in srgb, var(--cat-primario) 8%, var(--cat-superficie))' }}>
+                <div className={`relative aspect-square w-full overflow-hidden sm:max-h-none ${enPagina ? '' : 'max-h-[46dvh]'}`}>
+                    {fotos.length > 0 ? (
+                        fotos.map((foto, indice) => (
+                            <img
+                                key={foto.full}
+                                src={foto.full}
+                                alt={indice === fotoActual ? articulo.name : ''}
+                                className={`absolute inset-0 h-full w-full transition-[opacity,transform] duration-500 ease-salida ${
+                                    theme.image_fit === 'contain' ? 'object-contain' : 'object-cover'
+                                }`}
+                                style={{
+                                    opacity: indice === fotoActual ? 1 : 0,
+                                    transform: indice === fotoActual ? 'scale(1)' : 'scale(1.03)',
+                                }}
+                            />
+                        ))
+                    ) : (
+                        <div className="grid h-full place-items-center">
+                            <span className="text-7xl font-semibold" style={{ color: 'var(--cat-primario)', fontFamily: 'var(--cat-titulo)' }}>
+                                {articulo.name.charAt(0).toUpperCase()}
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {fotos.length > 1 && (
+                    <div className="cat-sin-barra absolute inset-x-0 bottom-0 flex gap-2 overflow-x-auto bg-gradient-to-t from-black/40 to-transparent p-3">
+                        {fotos.map((foto, indice) => (
+                            <button
+                                key={foto.full}
+                                type="button"
+                                onClick={() => setFotoActual(indice)}
+                                aria-label={`Foto ${indice + 1}`}
+                                aria-current={indice === fotoActual}
+                                className="cat-boton h-14 w-14 shrink-0 overflow-hidden rounded-lg transition-[outline-color] duration-200"
+                                style={{
+                                    outline: `2px solid ${indice === fotoActual ? '#ffffff' : 'transparent'}`,
+                                    outlineOffset: '2px',
+                                }}
+                            >
+                                <img src={foto.mini ?? foto.full} alt="" loading="lazy" className="h-full w-full object-cover" />
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {/* Información */}
+            <div className={`flex flex-1 flex-col p-6 sm:p-8 ${enPagina ? '' : 'min-h-0 overflow-y-auto'}`}>
+                <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style={{ color: estado.color }}>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: estado.color }} />
+                    {articulo.esCombo ? `Combo · ${estado.texto}` : estado.texto}
+                </span>
+
+                <h2 className="mt-3 text-balance text-2xl font-semibold leading-tight tracking-tight sm:text-3xl" style={{ fontFamily: 'var(--cat-titulo)' }}>
+                    {articulo.name}
+                </h2>
+
+                {theme.show_prices && (
+                    <div className="mt-4">
+                        {precio ? (
+                            <>
+                                <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--cat-primario)' }}>
+                                    ${Number(precio).toFixed(2)}
+                                </p>
+                                {theme.show_bs_prices && bcvRate > 1 && (
+                                    <p className="mt-0.5 text-sm" style={{ color: 'var(--cat-tenue)' }}>
+                                        Bs. {formatoBs(Number(precio) * bcvRate)}
+                                    </p>
+                                )}
+                            </>
+                        ) : (
+                            <p className="text-lg font-medium" style={{ color: 'var(--cat-tenue)' }}>
+                                Consultar precio
+                            </p>
+                        )}
+
+                        <PreciosPorVolumen articulo={articulo} donde="modal" />
+
+                        {articulo.conditional_price && articulo.conditional_min_quantity && (
+                            <p
+                                className="mt-3 inline-flex rounded-full px-3 py-1.5 text-xs font-medium"
+                                style={{ background: 'color-mix(in srgb, var(--cat-acento) 14%, transparent)', color: 'var(--cat-texto)' }}
+                            >
+                                Desde {articulo.conditional_min_quantity} unidades: ${Number(articulo.conditional_price).toFixed(2)} c/u
+                            </p>
+                        )}
+                    </div>
+                )}
+
+                {articulo.description && (
+                    <p className="mt-5 whitespace-pre-line text-sm leading-relaxed sm:text-base" style={{ color: 'var(--cat-tenue)' }}>
+                        {articulo.description}
+                    </p>
+                )}
+
+                {articulo.incluye?.length > 0 && (
+                    <div className="mt-5">
+                        <p className="text-sm font-semibold">Incluye</p>
+                        <ul className="mt-2 space-y-1.5 text-sm" style={{ color: 'var(--cat-tenue)' }}>
+                            {articulo.incluye.map((nombre) => (
+                                <li key={nombre} className="flex items-center gap-2">
+                                    <span className="h-1 w-1 rounded-full" style={{ background: 'var(--cat-primario)' }} />
+                                    {nombre}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+
+                {Object.entries(variantesPorTipo).map(([tipo, variantes]) => (
+                    <div key={tipo} className="mt-5">
+                        <p className="text-sm font-semibold capitalize">{tipo}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {variantes.map((variante) => (
+                                <span
+                                    key={variante.id}
+                                    className={`px-3 py-1.5 text-sm ${variante.agotada ? 'line-through opacity-50' : ''}`}
+                                    style={{ border: `1px solid ${BORDE_SUAVE}`, borderRadius: '9999px' }}
+                                >
+                                    {variante.label}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                ))}
+
+                {comercio.whatsapp && (
+                    <div className="mt-auto pt-8">
+                        <BotonCatalogo
+                            href={enlaceWhatsapp(comercio, articulo)}
+                            externo
+                            brillo
+                            className="w-full py-3.5 text-base"
+                        >
+                            <MessageCircle className="h-5 w-5" />
+                            {esServicio ? 'Pedir este servicio' : agotado ? 'Preguntar disponibilidad' : 'Pedir por WhatsApp'}
+                        </BotonCatalogo>
+                    </div>
+                )}
+            </div>
+        </>
     );
 }
 

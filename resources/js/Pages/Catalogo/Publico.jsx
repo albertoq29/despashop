@@ -19,6 +19,7 @@ import { Modal, Modales, VistaRapida } from '@/Components/Catalogo/Vitrina/Dialo
 import { Bloque, useCanalDelEditor } from '@/Components/Catalogo/Vitrina/Editable';
 import { aFamilia, fondoDelCatalogo, variablesDelTema } from '@/Components/Catalogo/Vitrina/estilos';
 import { repetirApariciones } from '@/Components/Catalogo/Vitrina/movimiento';
+import { BarraDeSeleccion, useSeleccionMultiple } from '@/Components/Catalogo/Vitrina/Seleccion';
 import { Carrusel, Portada } from '@/Components/Catalogo/Vitrina/Portada';
 import {
     CategoriaDestacada,
@@ -136,6 +137,21 @@ export default function Publico({
     }, [theme.animation_level, theme.animation_entrance, theme.animation_speed, theme.animation_stagger]);
 
     const verArticulo = useCallback((articulo) => setArticuloAbierto(articulo), []);
+    const seleccionMultiple = useSeleccionMultiple(theme, comercio, rutaBase);
+
+    // El mensaje necesita los artículos completos, y uno marcado puede estar
+    // en cualquier bloque: se juntan todos los que la página llegó a pintar.
+    const articulosALaVista = useMemo(() => {
+        const todos = [
+            ...productos,
+            ...servicios,
+            ...novedades,
+            ...combos,
+            ...Object.values(porCategoria ?? {}).flat(),
+        ];
+
+        return todos.filter((articulo, i, lista) => lista.findIndex((otro) => otro.id === articulo.id) === i);
+    }, [productos, servicios, novedades, combos, porCategoria]);
 
     const contexto = useMemo(
         () => ({
@@ -145,11 +161,13 @@ export default function Publico({
             modoEditor,
             seleccion,
             verArticulo,
+            rutaBase,
+            seleccionMultiple,
             filtrar: crearFiltro({ rutaBase, filters, modoEditor }),
             datos: { banners, productos, productosTotal, servicios, novedades, porCategoria, combos, categories, filters },
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [theme, comercio, bcvRate, modoEditor, seleccion, verArticulo, rutaBase, filters, banners, productos, productosTotal, servicios, novedades, porCategoria, combos, categories],
+        [theme, comercio, bcvRate, modoEditor, seleccion, verArticulo, seleccionMultiple, rutaBase, filters, banners, productos, productosTotal, servicios, novedades, porCategoria, combos, categories],
     );
 
     const visibles = (theme.sections ?? []).filter((seccion) => seccion.visible && BLOQUES[seccion.type]);
@@ -211,6 +229,8 @@ export default function Publico({
                 {theme.scroll_progress && <BarraDeProgreso />}
                 {comercio.whatsapp && <BotonWhatsapp />}
                 <VolverArriba />
+
+                <BarraDeSeleccion seleccion={seleccionMultiple} articulos={articulosALaVista} />
 
                 {!modoEditor && <Modales modals={modals} />}
                 {modalDePrueba && <Modal key={modalDePrueba.id ?? 'borrador'} modal={modalDePrueba} onCerrar={() => setModalDePrueba(null)} />}

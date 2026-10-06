@@ -54,6 +54,30 @@ class PublicCatalogController extends Controller
 
     public function show(Request $request, string $username): Response
     {
+        [$owner, $theme, $viewerIsOwner] = $this->catalogoVisible($request, $username);
+
+        if (! $viewerIsOwner) {
+            CatalogVisit::hit($owner->id);
+        }
+
+        return $this->renderizar($request, $owner, $theme, [
+            'isPreview' => $viewerIsOwner && (! $theme->is_published || $owner->planExpired()),
+            'modoEditor' => false,
+            'rutaBase' => '/' . $owner->username,
+        ])->withViewData(['og' => $this->vistaPreviaDelEnlace($owner, $theme)]);
+    }
+
+    /**
+     * Quién puede ver este catálogo, y con qué tema.
+     *
+     * Las mismas puertas para la portada del catálogo y para la página de
+     * un producto: una cuenta sin aprobar, un catálogo sin publicar o un
+     * plan vencido solo los ve su dueño y el administrador.
+     *
+     * @return array{0: User, 1: CatalogTheme, 2: bool}
+     */
+    private function catalogoVisible(Request $request, string $username): array
+    {
         $owner = User::where('username', $username)
             ->where('role', User::ROLE_TENANT)
             ->first();
@@ -62,7 +86,6 @@ class PublicCatalogController extends Controller
 
         $viewerIsOwner = $request->user()?->id === $owner->id || $request->user()?->isAdmin();
 
-        // Una cuenta sin aprobar (o suspendida) solo es visible para su dueño y el admin
         abort_if(! $owner->isApproved() && ! $viewerIsOwner, 404, 'Este catálogo todavía no está disponible.');
 
         $theme = CatalogTheme::withoutGlobalScope('tenant')->where('user_id', $owner->id)->first()
@@ -74,15 +97,79 @@ class PublicCatalogController extends Controller
         // lo siguen viendo: así el comercio comprueba que sigue todo ahí.
         abort_if($owner->planExpired() && ! $viewerIsOwner, 404, 'Este catálogo no está disponible en este momento.');
 
+        return [$owner, $theme, $viewerIsOwner];
+    }
+
+    /**
+     * Un producto con su propia dirección.
+     *
+     * Solo existe si el comercio eligió «página propia»: con la ventana
+     * flotante no hay nada que enlazar, y dejar la dirección viva daría dos
+     * sitios distintos para lo mismo, que es lo que confunde a Google.
+     */
+    public function producto(Request $request, string $username, int $producto): Response
+    {
+        [$owner, $theme, $viewerIsOwner] = $this->catalogoVisible($request, $username);
+
+        abort_if($theme->product_view !== 'pagina', 404, 'Este catálogo no abre los productos en su propia página.');
+
+        $this->nivelDePreciosPorVolumen = (string) ($theme->wholesale_prices ?? 'off');
+
+        $datos = $this->tenancy->forTenant($owner->id, function () use ($producto) {
+            $articulo = $this->consultaBase()->find($producto);
+
+            abort_if($articulo === null, 404, 'Ese producto ya no está en el catálogo.');
+
+            return [
+                'modelo' => $articulo,
+                'articulo' => $this->presentarProducto($articulo),
+                // Para seguir mirando sin volver atrás
+                'relacionados' => $this->consultaBase()
+                    ->productos()
+                    ->where('id', '!=', $articulo->id)
+                    ->when($articulo->category_id, fn ($q) => $q->where('category_id', $articulo->category_id))
+                    ->inRandomOrder()
+                    ->limit(8)
+                    ->get()
+                    ->map($this->presentador()),
+                'rate' => ExchangeRate::current(),
+            ];
+        });
+
         if (! $viewerIsOwner) {
             CatalogVisit::hit($owner->id);
         }
 
-        return $this->renderizar($request, $owner, $theme, [
-            'isPreview' => $viewerIsOwner && (! $theme->is_published || $owner->planExpired()),
-            'modoEditor' => false,
+        return Inertia::render('Catalogo/Producto', [
+            'comercio' => [
+                'username' => $owner->username,
+                'name' => $owner->business_name ?: $owner->name,
+                'whatsapp' => $theme->whatsapp_number ?: $owner->whatsapp,
+            ],
+            'theme' => $theme,
+            'articulo' => $datos['articulo'],
+            'relacionados' => $datos['relacionados'],
+            'bcvRate' => $datos['rate']?->rate_bcv ?? 0,
             'rutaBase' => '/' . $owner->username,
-        ])->withViewData(['og' => $this->vistaPreviaDelEnlace($owner, $theme)]);
+        ])->withViewData(['og' => $this->vistaPreviaDelProducto($owner, $datos['modelo'])]);
+    }
+
+    /**
+     * Lo que se ve al pegar el enlace de un producto en WhatsApp.
+     *
+     * @return array<string, string>
+     */
+    private function vistaPreviaDelProducto(User $owner, Product $producto): array
+    {
+        $nombre = $owner->business_name ?: $owner->name;
+
+        return [
+            'titulo' => $producto->name . ' · ' . $nombre,
+            'descripcion' => $producto->description
+                ? str($producto->description)->stripTags()->limit(160)->toString()
+                : "Mira {$producto->name} en el catálogo de {$nombre}.",
+            'imagen' => $producto->image_url ?? url('/marca/enlace.png'),
+        ];
     }
 
     /**
