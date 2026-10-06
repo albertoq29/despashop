@@ -22,6 +22,11 @@ return [
     // El último debe dar margen suficiente para reaccionar.
     'avisos' => [0, 7, 12],
 
+    // Días ANTES de vencer en que se avisa. Llegar a tiempo es la
+    // diferencia entre renovar y enterarse por un cliente que no pudo
+    // entrar al catálogo.
+    'avisos_previos' => [7, 3, 1],
+
     // Días de una prueba gratis dada desde el panel de administración
     'dias_de_prueba' => (int) env('PLANES_DIAS_DE_PRUEBA', 30),
 

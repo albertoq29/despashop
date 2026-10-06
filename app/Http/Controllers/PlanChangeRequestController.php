@@ -6,9 +6,13 @@ use App\Models\ActivityLog;
 use App\Models\Plan;
 use App\Models\PlanChangeRequest;
 use App\Models\Setting;
+use App\Mail\SolicitudDeCambioDePlan;
 use App\Services\PlanDelComercio;
+use App\Support\Administradores;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -80,7 +84,40 @@ class PlanChangeRequestController extends Controller
             $solicitud
         );
 
+        $this->avisarALosAdministradores($solicitud);
+
         return back()->with('success', 'Solicitud enviada. Te responderemos antes de tu próxima renovación.');
+    }
+
+    /**
+     * Avisa a los administradores de que hay una solicitud esperando.
+     *
+     * Aquí el tiempo cuenta: el cambio entra en la próxima renovación, y
+     * una solicitud contestada tarde deja al comercio otro período entero
+     * en el plan que no quería. Va después de responder y dentro de un
+     * try: un fallo de correo no puede tumbar la solicitud.
+     */
+    private function avisarALosAdministradores(PlanChangeRequest $solicitud): void
+    {
+        $destinos = Administradores::correos();
+
+        if ($destinos === []) {
+            return;
+        }
+
+        $pendientes = PlanChangeRequest::pendientes()->count();
+        $solicitud->load(['comercio', 'planActual', 'planPedido']);
+
+        dispatch(function () use ($solicitud, $destinos, $pendientes) {
+            try {
+                Mail::to($destinos)->send(new SolicitudDeCambioDePlan($solicitud, $pendientes));
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo avisar del cambio de plan pedido', [
+                    'solicitud' => $solicitud->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        })->afterResponse();
     }
 
     /** Retirar una solicitud que todavía no respondieron. */

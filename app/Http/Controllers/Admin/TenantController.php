@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CambioDePlan;
 use App\Mail\CuentaAprobada;
 use App\Mail\EstadoDeCuenta;
 use App\Models\ActivityLog;
@@ -343,10 +344,22 @@ class TenantController extends Controller
         if ($cumpleLoPedido) {
             // Sin pasar por la relación: trae un `latest()` que convierte esto
             // en un UPDATE con ORDER BY, y SQLite no lo acepta.
-            PlanChangeRequest::where('user_id', $comercio->id)->enEspera()->update([
+            $solicitudes = PlanChangeRequest::where('user_id', $comercio->id)->enEspera()->get();
+
+            PlanChangeRequest::whereKey($solicitudes->modelKeys())->update([
                 'status' => PlanChangeRequest::APLICADA,
                 'applied_at' => now(),
             ]);
+
+            // El cambio que pidió hace semanas ya ocurrió: se lo contamos,
+            // que es el momento en el que de verdad le cambian los límites.
+            if ($cumplida = $solicitudes->first()) {
+                // Recién actualizada en bloque: hay que releerla para que el
+                // correo cuente el estado de ahora y no el de hace una línea.
+                $cumplida->refresh()->load(['comercio', 'planActual', 'planPedido']);
+
+                $this->enviar($comercio, new CambioDePlan($cumplida, CambioDePlan::APLICADO));
+            }
         }
 
         ActivityLog::record('comercio.plan', 'Cambió el plan de ' . ($comercio->business_name ?: $comercio->name), [

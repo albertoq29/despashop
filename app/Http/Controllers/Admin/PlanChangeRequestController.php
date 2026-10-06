@@ -3,11 +3,14 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Mail\CambioDePlan;
 use App\Models\ActivityLog;
 use App\Models\PlanChangeRequest;
 use App\Support\Tenancy;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -86,8 +89,42 @@ class PlanChangeRequestController extends Controller
             $comercio
         );
 
+        $this->avisarAlComercio(
+            $solicitud,
+            $validado['status'] === PlanChangeRequest::ACEPTADA ? CambioDePlan::ACEPTADO : CambioDePlan::RECHAZADO,
+        );
+
         return back()->with('success', $validado['status'] === PlanChangeRequest::ACEPTADA
             ? 'Aceptada. El cambio entra cuando renueves el plan de este comercio.'
             : 'Solicitud rechazada.');
+    }
+
+    /**
+     * Le cuenta al comercio en qué quedó su solicitud.
+     *
+     * También cuando es que no: enterarse enseguida le deja pedir otra
+     * cosa o escribirnos, en vez de esperar un mes a un cambio que no va
+     * a llegar.
+     */
+    private function avisarAlComercio(PlanChangeRequest $solicitud, string $momento): void
+    {
+        $solicitud->load(['comercio', 'planActual', 'planPedido']);
+        $correo = $solicitud->comercio?->email;
+
+        if (! $correo) {
+            return;
+        }
+
+        dispatch(function () use ($solicitud, $momento, $correo) {
+            try {
+                Mail::to($correo)->send(new CambioDePlan($solicitud, $momento));
+            } catch (\Throwable $e) {
+                Log::warning('No se pudo avisar del cambio de plan', [
+                    'solicitud' => $solicitud->id,
+                    'momento' => $momento,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        })->afterResponse();
     }
 }

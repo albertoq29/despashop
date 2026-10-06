@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Mail\AvisoDeVencimiento;
+use App\Mail\PlanPorVencer;
 use App\Mail\DatosEliminados;
 use App\Models\ActivityLog;
 use App\Models\Setting;
@@ -38,6 +39,8 @@ class RevisarPlanesVencidos extends Command
         $gracia = Setting::platformInt('grace_days', (int) config('planes.dias_de_gracia'));
         $avisos = (array) config('planes.avisos');
 
+        $porVencer = $this->avisarALosQueVanAVencer($tenancy, $simular);
+
         // El admin no tiene plan, y una cuenta suspendida a mano la maneja el
         // administrador: aquí solo entran comercios activos con fecha vencida.
         $comercios = $tenancy->withoutTenancy(fn () => User::tenants()
@@ -49,6 +52,7 @@ class RevisarPlanesVencidos extends Command
 
         if ($comercios->isEmpty()) {
             $this->info('No hay planes vencidos.');
+            $this->info(($simular ? '[simulación] ' : '') . "Avisos por vencer: {$porVencer}");
 
             return self::SUCCESS;
         }
@@ -72,10 +76,68 @@ class RevisarPlanesVencidos extends Command
         }
 
         $this->newLine();
+        $this->info(($simular ? '[simulación] ' : '') . "Avisos por vencer: {$porVencer}");
         $this->info(($simular ? '[simulación] ' : '') . "Avisos enviados: {$avisados}");
         $this->info(($simular ? '[simulación] ' : '') . "Cuentas eliminadas: {$eliminados}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Avisa a los que están por vencer, antes de que se les caiga nada.
+     *
+     * El resto del comando se ocupa de lo que ya venció; esto es lo que
+     * evita llegar a eso. Se marca con el mismo `expiry_notified_at` que
+     * los avisos de después: es «la última vez que se le escribió por su
+     * plan», y una renovación lo limpia.
+     */
+    private function avisarALosQueVanAVencer(Tenancy $tenancy, bool $simular): int
+    {
+        $dias = array_filter((array) config('planes.avisos_previos'), fn ($d) => (int) $d > 0);
+
+        if ($dias === []) {
+            return 0;
+        }
+
+        $comercios = $tenancy->withoutTenancy(fn () => User::tenants()
+            ->approved()
+            ->whereNotNull('plan_expires_at')
+            ->where('plan_expires_at', '>=', now())
+            ->whereDate('plan_expires_at', '<=', now()->addDays(max($dias)))
+            ->with('plan:id,name')
+            ->get());
+
+        $enviados = 0;
+
+        foreach ($comercios as $comercio) {
+            $faltan = $comercio->diasParaVencer();
+
+            if (! in_array($faltan, array_map('intval', $dias), true) || $this->yaAvisadoHoy($comercio)) {
+                continue;
+            }
+
+            $nombre = $comercio->business_name ?: $comercio->name;
+            $this->line("· Por vencer: {$nombre} ({$comercio->email}) en {$faltan} días");
+
+            if ($simular) {
+                $enviados++;
+
+                continue;
+            }
+
+            try {
+                Mail::to($comercio->email)->send(new PlanPorVencer($comercio, $faltan));
+                $comercio->forceFill(['expiry_notified_at' => now()])->save();
+                $enviados++;
+            } catch (Throwable $e) {
+                Log::warning('No se pudo avisar de un plan por vencer', [
+                    'comercio' => $comercio->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $enviados;
     }
 
     private function yaAvisadoHoy(User $comercio): bool
