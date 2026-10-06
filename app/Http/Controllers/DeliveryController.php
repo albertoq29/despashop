@@ -31,6 +31,8 @@ class DeliveryController extends Controller
                 'total_usd'     => (float)$del->factura->total_usd,
                 'delivery_date' => $del->delivery_date->toIso8601String(),
                 'status'        => $del->status,
+                'point_a'       => $del->point_a,
+                'point_b'       => $del->point_b,
                 'is_expired'    => $del->delivery_date->isPast(),
             ];
         });

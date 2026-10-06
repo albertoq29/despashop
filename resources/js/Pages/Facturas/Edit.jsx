@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useDeferredValue } from 'react';
+import PuntosDeEntrega from '@/Components/Facturas/PuntosDeEntrega';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
@@ -204,6 +205,12 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             return '';
         }
     });
+    // Si la factura ya traía puntos, el bloque llega abierto
+    const [registrarPuntos, setRegistrarPuntos] = useState(
+        Boolean(factura.delivery?.point_a || factura.delivery?.point_b)
+    );
+    const [puntoA, setPuntoA] = useState(factura.delivery?.point_a ?? '');
+    const [puntoB, setPuntoB] = useState(factura.delivery?.point_b ?? '');
     const [hasDeliveryFee, setHasDeliveryFee] = useState(factura.has_delivery_fee || false);
     const [deliveryBs, setDeliveryBs] = useState(factura.delivery_bs ? factura.delivery_bs.toString() : '');
     const [status, setStatus] = useState(factura.status || 'draft');
@@ -729,6 +736,9 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             total_bs:          totals.totalBs,
             has_delivery:      hasDelivery,
             delivery_date:     hasDelivery ? deliveryDate : null,
+            // Los puntos solo viajan si hay entrega y se pidieron
+            delivery_point_a:  hasDelivery && registrarPuntos ? puntoA : null,
+            delivery_point_b:  hasDelivery && registrarPuntos ? puntoB : null,
             has_delivery_fee:  hasDeliveryFee,
             delivery_bs:       hasDeliveryFee ? (parseFloat(deliveryBs) || 0) : 0,
             items: items.map(i => ({
@@ -1064,6 +1074,17 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                     required={hasDelivery}
                                                 />
                                             </div>
+                                        )}
+
+                                        {hasDelivery && (
+                                            <PuntosDeEntrega
+                                                activo={registrarPuntos}
+                                                onActivo={setRegistrarPuntos}
+                                                puntoA={puntoA}
+                                                onPuntoA={setPuntoA}
+                                                puntoB={puntoB}
+                                                onPuntoB={setPuntoB}
+                                            />
                                         )}
                                     </div>
                                 </div>

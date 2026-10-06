@@ -133,6 +133,10 @@ class FacturaController extends Controller
             'total_bs'                 => 'nullable|numeric|min:0',
             'has_delivery'             => 'nullable|boolean',
             'delivery_date'            => 'nullable|date',
+            // Texto libre: un punto de entrega aquí se dice «frente a la
+            // panadería», no con una dirección postal
+            'delivery_point_a'         => 'nullable|string|max:255',
+            'delivery_point_b'         => 'nullable|string|max:255',
             'has_delivery_fee'         => 'nullable|boolean',
             'delivery_bs'              => 'nullable|numeric|min:0',
             'status'                   => 'required|in:draft,pending_variants',
@@ -267,6 +271,8 @@ class FacturaController extends Controller
                     'factura_id'    => $factura->id,
                     'delivery_date' => $request->delivery_date,
                     'status'        => 'pending',
+                    'point_a'       => $request->input('delivery_point_a'),
+                    'point_b'       => $request->input('delivery_point_b'),
                 ]);
             }
 
@@ -543,6 +549,10 @@ class FacturaController extends Controller
             'total_bs'                 => 'nullable|numeric|min:0',
             'has_delivery'             => 'nullable|boolean',
             'delivery_date'            => 'nullable|date',
+            // Texto libre: un punto de entrega aquí se dice «frente a la
+            // panadería», no con una dirección postal
+            'delivery_point_a'         => 'nullable|string|max:255',
+            'delivery_point_b'         => 'nullable|string|max:255',
             'has_delivery_fee'         => 'nullable|boolean',
             'delivery_bs'              => 'nullable|numeric|min:0',
             'show_variants_in_receipt' => 'nullable|boolean',
@@ -624,6 +634,8 @@ class FacturaController extends Controller
                     [
                         'delivery_date' => $request->delivery_date,
                         'status'        => 'pending',
+                        'point_a'       => $request->input('delivery_point_a'),
+                        'point_b'       => $request->input('delivery_point_b'),
                     ]
                 );
             } else {

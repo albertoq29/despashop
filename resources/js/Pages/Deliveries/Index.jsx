@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarClock, CalendarPlus, MessageCircle, Phone, Receipt, Truck } from 'lucide-react';
+import { CalendarClock, CalendarPlus, MapPin, MessageCircle, Phone, Receipt, Truck } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Boton, Cabecera, Insignia, Metrica, Pagina, Tarjeta, Vacio } from '@/Components/UI';
 
@@ -112,6 +112,18 @@ function Entrega({ entrega, tono }) {
                         </span>
                     )}
                 </p>
+
+                {/* El recorrido, que es lo que se mira antes de salir */}
+                {(entrega.point_a || entrega.point_b) && (
+                    <p className="mt-1.5 flex items-start gap-1.5 text-sm text-stone-600 dark:text-stone-300">
+                        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-stone-400" />
+                        <span className="min-w-0">
+                            {entrega.point_a || 'Sin punto de salida'}
+                            <span className="mx-1.5 text-stone-400 dark:text-stone-500">→</span>
+                            {entrega.point_b || 'Sin punto de llegada'}
+                        </span>
+                    </p>
+                )}
             </div>
 
             <div className="flex shrink-0 flex-wrap gap-2">

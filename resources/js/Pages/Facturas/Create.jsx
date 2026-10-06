@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useDeferredValue } from 'react';
+import PuntosDeEntrega from '@/Components/Facturas/PuntosDeEntrega';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
@@ -111,6 +112,9 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
     const [manualTotalBs, setManualTotalBs] = useState('');
     const [hasDelivery, setHasDelivery] = useState(false);
     const [deliveryDate, setDeliveryDate] = useState('');
+    const [registrarPuntos, setRegistrarPuntos] = useState(false);
+    const [puntoA, setPuntoA] = useState('');
+    const [puntoB, setPuntoB] = useState('');
     const [hasDeliveryFee, setHasDeliveryFee] = useState(false);
     const [deliveryBs, setDeliveryBs] = useState('');
     const [status, setStatus] = useState('draft');
@@ -644,6 +648,9 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
             total_bs:          totals.totalBs,
             has_delivery:      hasDelivery,
             delivery_date:     hasDelivery ? deliveryDate : null,
+            // Los puntos solo viajan si hay entrega y se pidieron
+            delivery_point_a:  hasDelivery && registrarPuntos ? puntoA : null,
+            delivery_point_b:  hasDelivery && registrarPuntos ? puntoB : null,
             has_delivery_fee:  hasDeliveryFee,
             delivery_bs:       hasDeliveryFee ? (parseFloat(deliveryBs) || 0) : 0,
             items: items.map(i => ({
@@ -979,6 +986,17 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                     required={hasDelivery}
                                                 />
                                             </div>
+                                        )}
+
+                                        {hasDelivery && (
+                                            <PuntosDeEntrega
+                                                activo={registrarPuntos}
+                                                onActivo={setRegistrarPuntos}
+                                                puntoA={puntoA}
+                                                onPuntoA={setPuntoA}
+                                                puntoB={puntoB}
+                                                onPuntoB={setPuntoB}
+                                            />
                                         )}
                                     </div>
                                 </div>

@@ -320,6 +320,17 @@ export default function Show({ auth, factura, plantilla }) {
                                                 <span className="ml-1.5 text-stone-700 dark:text-stone-300">{factura.notes}</span>
                                             </div>
                                         )}
+                                        {/* Lo que necesita quien reparte, junto al resto de los datos */}
+                                        {(factura.delivery?.point_a || factura.delivery?.point_b) && (
+                                            <div className="sm:col-span-2">
+                                                <span className="text-stone-500 dark:text-stone-400">Entrega:</span>
+                                                <span className="ml-1.5 text-stone-700 dark:text-stone-300">
+                                                    {factura.delivery.point_a || 'Sin punto de salida'}
+                                                    <span className="mx-1.5 text-stone-400 dark:text-stone-500">→</span>
+                                                    {factura.delivery.point_b || 'Sin punto de llegada'}
+                                                </span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
