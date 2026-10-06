@@ -5,7 +5,7 @@ import { ArrowLeft, Check, ExternalLink, LogIn, Package, Receipt, X } from 'luci
 import { Insignia } from './Index';
 import ResumenDelPlan, { fechaLarga } from '@/Components/Plan/ResumenDelPlan';
 
-export default function Show({ comercio, theme, catalogUrl, metricas, planes, actividad, resumenPlan, venceSugerido }) {
+export default function Show({ comercio, theme, catalogUrl, metricas, planes, actividad, resumenPlan, venceSugerido, solicitudDePlan }) {
     const [rechazando, setRechazando] = useState(false);
 
     // Al aprobar, el plan dura un mes: la fecha llega rellenada y el admin
@@ -329,6 +329,14 @@ export default function Show({ comercio, theme, catalogUrl, metricas, planes, ac
                     <div className="space-y-6">
                         <Panel titulo="Plan y vigencia">
                             <div className="space-y-4">
+                                {solicitudDePlan && (
+                                    <CambioPedido
+                                        solicitud={solicitudDePlan}
+                                        elegido={String(plan.data.plan_id) === String(solicitudDePlan.to_plan_id)}
+                                        onElegir={() => plan.setData('plan_id', solicitudDePlan.to_plan_id)}
+                                    />
+                                )}
+
                                 <div>
                                     <label className="text-sm font-medium">Plan</label>
                                     <select
@@ -510,6 +518,64 @@ function Metrica({ etiqueta, valor, Icono }) {
             </span>
             <p className="mt-4 font-display text-2xl font-semibold tracking-tight">{valor}</p>
             <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">{etiqueta}</p>
+        </div>
+    );
+}
+
+
+/**
+ * El cambio de plan que pidió el comercio, en la ficha donde se resuelve.
+ *
+ * Aceptarlo en la otra pantalla solo lo deja apuntado: el cambio ocurre
+ * aquí, al guardar ese plan con su vencimiento nuevo. Por eso el botón
+ * rellena el selector en vez de guardar por su cuenta — la fecha la decide
+ * quien está mirando.
+ */
+function CambioPedido({ solicitud, elegido, onElegir }) {
+    const aceptada = solicitud.status === 'aceptada';
+
+    return (
+        <div
+            className={`rounded-xl border p-3.5 ${
+                aceptada
+                    ? 'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/40'
+                    : 'border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40'
+            }`}
+        >
+            <p className={`text-sm font-semibold ${aceptada ? 'text-sky-900 dark:text-sky-300' : 'text-amber-900 dark:text-amber-300'}`}>
+                {aceptada ? 'Cambio aceptado, falta aplicarlo' : 'Pidió cambiar de plan'}
+            </p>
+
+            <p className={`mt-1 text-sm ${aceptada ? 'text-sky-900/80 dark:text-sky-300/80' : 'text-amber-900/80 dark:text-amber-300/80'}`}>
+                {solicitud.plan_actual?.name ?? 'Sin plan'} → <strong>{solicitud.plan_pedido?.name}</strong>
+            </p>
+
+            {solicitud.message && (
+                <p className="mt-2 text-xs leading-relaxed text-stone-600 dark:text-stone-400">«{solicitud.message}»</p>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+                {elegido ? (
+                    <span className="text-xs font-medium text-stone-600 dark:text-stone-400">
+                        Elegido abajo. Guarda con el vencimiento nuevo para aplicarlo.
+                    </span>
+                ) : (
+                    <button
+                        type="button"
+                        onClick={onElegir}
+                        className="pulsable rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white dark:bg-stone-100 dark:text-stone-900"
+                    >
+                        Poner {solicitud.plan_pedido?.name} abajo
+                    </button>
+                )}
+
+                <Link
+                    href={route('admin.cambios-plan.index')}
+                    className="rounded-lg px-2 py-1.5 text-xs font-medium text-stone-600 underline hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100"
+                >
+                    Ver la solicitud
+                </Link>
+            </div>
         </div>
     );
 }

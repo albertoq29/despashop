@@ -29,7 +29,7 @@ class Terminos
     /** Días de gracia tras vencer el plan, tal como los aplica el sistema. */
     private static function diasDeGracia(): int
     {
-        return (int) config('planes.dias_de_gracia', 15);
+        return \App\Models\Setting::platformInt('grace_days', (int) config('planes.dias_de_gracia', 15));
     }
 
     /**

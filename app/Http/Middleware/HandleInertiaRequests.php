@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\PlanChangeRequest;
 use App\Models\Setting;
 use App\Models\Suggestion;
 use App\Models\User;
@@ -51,6 +52,8 @@ class HandleInertiaRequests extends Middleware
             'seguridad' => fn () => $this->seguridad($request),
             // Buzón de sugerencias: pendientes para el admin, respuestas para el comercio
             'sugerencias' => fn () => $this->sugerencias($request),
+            // Cambios de plan sin responder, solo para el admin
+            'cambiosDePlan' => fn () => $this->cambiosDePlan($request),
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),
@@ -136,6 +139,23 @@ class HandleInertiaRequests extends Middleware
         }
 
         return ['respuestas' => Suggestion::conRespuestaSinVer()->count()];
+    }
+
+    /**
+     * Cuántas solicitudes de cambio de plan esperan respuesta.
+     *
+     * Sin esto se quedan olvidadas: nadie entra a esa pantalla por gusto, y
+     * un cambio sin responder a tiempo se pierde la renovación.
+     */
+    private function cambiosDePlan(Request $request): ?array
+    {
+        if (! $request->user()?->isAdmin() || ! $request->routeIs('admin.*')) {
+            return null;
+        }
+
+        return app(Tenancy::class)->withoutTenancy(fn () => [
+            'pendientes' => PlanChangeRequest::pendientes()->count(),
+        ]);
     }
 
     private function inspeccion(Request $request): ?array

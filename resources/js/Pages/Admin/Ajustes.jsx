@@ -13,6 +13,14 @@ export default function Ajustes({ ajustes }) {
         plans_title: ajustes.plans_title ?? '',
         plans_subtitle: ajustes.plans_subtitle ?? '',
         registrations_open: ajustes.registrations_open ?? '1',
+        landing_announcement: ajustes.landing_announcement ?? '',
+        landing_announcement_link: ajustes.landing_announcement_link ?? '',
+        landing_meta_description: ajustes.landing_meta_description ?? '',
+        social_instagram: ajustes.social_instagram ?? '',
+        social_facebook: ajustes.social_facebook ?? '',
+        social_tiktok: ajustes.social_tiktok ?? '',
+        trial_days: ajustes.trial_days ?? '',
+        grace_days: ajustes.grace_days ?? '',
         support_email: ajustes.support_email ?? '',
         support_whatsapp: ajustes.support_whatsapp ?? '',
         security_email: ajustes.security_email ?? '',
@@ -62,6 +70,52 @@ export default function Ajustes({ ajustes }) {
                             <Campo etiqueta="Botón secundario" campo="landing_cta_secondary" form={form} />
                         </div>
                     </div>
+                </Panel>
+
+                <Panel
+                    titulo="Cinta de anuncio"
+                    descripcion="Una línea sobre la barra, en toda la portada. Déjala vacía para no mostrar ninguna."
+                >
+                    <div className="space-y-4">
+                        <Campo etiqueta="Texto" campo="landing_announcement" form={form} />
+                        <Campo etiqueta="A dónde lleva (opcional)" campo="landing_announcement_link" form={form} />
+                        <p className="text-xs text-stone-500 dark:text-stone-400">
+                            Para algo que deba detener al visitante están los{' '}
+                            <a href={route('admin.avisos.index')} className="underline">
+                                avisos flotantes
+                            </a>
+                            .
+                        </p>
+                    </div>
+                </Panel>
+
+                <Panel
+                    titulo="Cómo se ve al compartir"
+                    descripcion="La descripción que muestran Google y los chats al pegar el enlace de la plataforma."
+                >
+                    <Campo etiqueta="Descripción" campo="landing_meta_description" form={form} />
+                </Panel>
+
+                <Panel titulo="Redes sociales" descripcion="Aparecen en el pie de la portada. Pega la dirección completa.">
+                    <div className="space-y-4">
+                        <Campo etiqueta="Instagram" campo="social_instagram" form={form} />
+                        <Campo etiqueta="Facebook" campo="social_facebook" form={form} />
+                        <Campo etiqueta="TikTok" campo="social_tiktok" form={form} />
+                    </div>
+                </Panel>
+
+                <Panel
+                    titulo="Ciclo de los planes"
+                    descripcion="Déjalos vacíos para usar los valores por defecto del sistema."
+                >
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Campo etiqueta="Días de prueba gratis" campo="trial_days" form={form} tipo="number" />
+                        <Campo etiqueta="Días de gracia tras vencer" campo="grace_days" form={form} tipo="number" />
+                    </div>
+                    <p className="mt-3 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                        Los días de gracia son los que se conservan los datos de una cuenta vencida antes de
+                        borrarla. Es irreversible: cambiarlo mueve la fecha de borrado de todas las cuentas vencidas.
+                    </p>
                 </Panel>
 
                 <Panel titulo="Sección de planes">

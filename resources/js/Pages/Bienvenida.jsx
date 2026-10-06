@@ -8,19 +8,29 @@ import {
     Package,
     Palette,
 } from 'lucide-react';
+import AvisoFlotante from '@/Components/AvisoFlotante';
 import CambiarTema from '@/Components/CambiarTema';
 import Marca from '@/Components/Marca';
 import { useRevelar } from '@/hooks/useRevelar';
 
-export default function Bienvenida({ ajustes, planes, registroAbierto, catalogosDestacados, auth }) {
+export default function Bienvenida({ ajustes, planes, registroAbierto, catalogosDestacados, auth, aviso }) {
     const marca = ajustes.brand_name;
 
     return (
         <>
             {/* El nombre de la plataforma ya lo agrega la plantilla del título */}
-            <Head title="Catálogo, inventario y facturas para tu negocio" />
+            <Head title="Catálogo, inventario y facturas para tu negocio">
+                {ajustes.landing_meta_description && (
+                    <meta name="description" content={ajustes.landing_meta_description} />
+                )}
+            </Head>
 
             <div className="min-h-screen bg-stone-50 text-stone-900 dark:bg-stone-950 dark:text-stone-100">
+                <CintaDeAnuncio
+                    texto={ajustes.landing_announcement}
+                    enlace={ajustes.landing_announcement_link}
+                />
+
                 <BarraSuperior marca={marca} auth={auth} registroAbierto={registroAbierto} />
 
                 <main>
@@ -46,7 +56,41 @@ export default function Bienvenida({ ajustes, planes, registroAbierto, catalogos
 
                 <PieDePagina marca={marca} ajustes={ajustes} />
             </div>
+
+            <AvisoFlotante aviso={aviso} />
         </>
+    );
+}
+
+/**
+ * Cinta de anuncio sobre la barra.
+ *
+ * Es el sitio más barato para avisar de algo —una promoción, un feriado,
+ * un cambio de precios— porque no tapa nada ni hay que cerrarlo. Para algo
+ * que sí tiene que detener al visitante están los avisos flotantes.
+ */
+function CintaDeAnuncio({ texto, enlace }) {
+    if (!texto) {
+        return null;
+    }
+
+    const contenido = (
+        <span className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-5 py-2.5 text-center text-sm font-medium">
+            {texto}
+            {enlace && <ArrowRight className="h-4 w-4 shrink-0" />}
+        </span>
+    );
+
+    return (
+        <div className="bg-marca-700 text-white dark:bg-marca-500 dark:text-stone-950">
+            {enlace ? (
+                <a href={enlace} className="block transition-opacity duration-150 hover:opacity-90">
+                    {contenido}
+                </a>
+            ) : (
+                contenido
+            )}
+        </div>
     );
 }
 
@@ -469,10 +513,23 @@ function Planes({ planes, titulo, subtitulo, registroAbierto }) {
                                 <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{plan.tagline}</p>
                             )}
 
-                            <p className="mt-6 flex items-baseline gap-1.5">
+                            {plan.descuento_activo && (
+                                <p className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                                    {plan.discount_label || `${plan.discount_percent}% de descuento`}
+                                </p>
+                            )}
+
+                            <p className={`flex items-baseline gap-1.5 ${plan.descuento_activo ? 'mt-2' : 'mt-6'}`}>
                                 <span className="font-display text-4xl font-semibold tracking-tight">
-                                    ${Number(plan.price_usd).toFixed(0)}
+                                    ${precio(plan.descuento_activo ? plan.precio_final : plan.price_usd)}
                                 </span>
+
+                                {plan.descuento_activo && (
+                                    <span className="text-lg text-stone-400 line-through dark:text-stone-500">
+                                        ${precio(plan.price_usd)}
+                                    </span>
+                                )}
+
                                 <span className="text-sm text-stone-500">{periodo(plan.billing_period)}</span>
                             </p>
 
@@ -537,6 +594,12 @@ function LlamadaFinal({ ajustes, registroAbierto, auth }) {
     );
 }
 
+const REDES = [
+    ['social_instagram', 'Instagram'],
+    ['social_facebook', 'Facebook'],
+    ['social_tiktok', 'TikTok'],
+];
+
 function PieDePagina({ marca, ajustes }) {
     return (
         <footer>
@@ -546,6 +609,18 @@ function PieDePagina({ marca, ajustes }) {
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center gap-5">
+                    {REDES.filter(([clave]) => ajustes[clave]).map(([clave, nombre]) => (
+                        <a
+                            key={clave}
+                            href={ajustes[clave]}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="transition-colors duration-150 ease-salida hover:text-stone-900 dark:hover:text-stone-200"
+                        >
+                            {nombre}
+                        </a>
+                    ))}
+
                     {ajustes.support_email && (
                         <a
                             href={`mailto:${ajustes.support_email}`}
@@ -574,6 +649,19 @@ function PieDePagina({ marca, ajustes }) {
             </div>
         </footer>
     );
+}
+
+/**
+ * El precio sin centavos cuando son cero.
+ *
+ * Los planes suelen costar cifras redondas y «$12» se lee mejor que
+ * «$12.00»; pero un descuento del 15% sobre 12 da 10,20 y ahí el centavo
+ * sí importa, porque es el precio que se va a cobrar.
+ */
+function precio(valor) {
+    const numero = Number(valor) || 0;
+
+    return Number.isInteger(numero) ? numero.toFixed(0) : numero.toFixed(2);
 }
 
 function periodo(facturacion) {

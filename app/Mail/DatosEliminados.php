@@ -36,7 +36,7 @@ class DatosEliminados extends Mailable
             with: [
                 'nombre' => $this->nombreDelComercio,
                 'usuario' => $this->usuario,
-                'dias' => (int) config('planes.dias_de_gracia'),
+                'dias' => \App\Models\Setting::platformInt('grace_days', (int) config('planes.dias_de_gracia')),
                 'registro' => route('register'),
                 'contacto' => [
                     'whatsapp' => Setting::platform('support_whatsapp'),

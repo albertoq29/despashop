@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Mail\AvisoDeVencimiento;
 use App\Mail\DatosEliminados;
 use App\Models\ActivityLog;
+use App\Models\Setting;
 use App\Models\User;
 use App\Support\Tenancy;
 use Illuminate\Console\Command;
@@ -34,7 +35,7 @@ class RevisarPlanesVencidos extends Command
     public function handle(Tenancy $tenancy): int
     {
         $simular = (bool) $this->option('simular');
-        $gracia = (int) config('planes.dias_de_gracia');
+        $gracia = Setting::platformInt('grace_days', (int) config('planes.dias_de_gracia'));
         $avisos = (array) config('planes.avisos');
 
         // El admin no tiene plan, y una cuenta suspendida a mano la maneja el

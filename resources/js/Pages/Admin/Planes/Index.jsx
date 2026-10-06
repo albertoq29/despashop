@@ -146,6 +146,10 @@ function Formulario({ plan = null, onListo }) {
         price_usd: plan?.price_usd ?? 0,
         price_bs: plan?.price_bs ?? '',
         billing_period: plan?.billing_period ?? 'monthly',
+        discount_percent: plan?.discount_percent ?? '',
+        discount_label: plan?.discount_label ?? '',
+        discount_starts_at: soloFecha(plan?.discount_starts_at),
+        discount_ends_at: soloFecha(plan?.discount_ends_at),
         max_products: plan?.max_products ?? '',
         max_images_per_product: plan?.max_images_per_product ?? '',
         max_banners: plan?.max_banners ?? '',
@@ -210,6 +214,8 @@ function Formulario({ plan = null, onListo }) {
                 />
                 <Campo etiqueta="Etiqueta destacada" campo="badge" form={form} marcador="Más elegido" />
             </div>
+
+            <Descuento form={form} precio={form.data.price_usd} />
 
             <div>
                 <label className="text-sm font-medium">Descripción</label>
@@ -354,6 +360,54 @@ function Formulario({ plan = null, onListo }) {
             </div>
         </form>
     );
+}
+
+/**
+ * Descuento con fecha de inicio y de cierre.
+ *
+ * Se muestra el precio que va a ver el visitante mientras corra, porque el
+ * porcentaje solo no dice nada: lo que se decide es a cuánto queda.
+ */
+function Descuento({ form, precio }) {
+    const porcentaje = Number(form.data.discount_percent) || 0;
+    const base = Number(precio) || 0;
+    const rebajado = porcentaje > 0 ? base * (1 - porcentaje / 100) : base;
+
+    return (
+        <fieldset className="rounded-xl border border-stone-200 p-4 dark:border-stone-800">
+            <legend className="px-1.5 text-sm font-medium">Descuento programado</legend>
+
+            <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                El precio del plan no se toca. Mientras corra la promoción, la web muestra el precio rebajado y
+                tacha el de siempre; al terminar vuelve solo. Déjalo en blanco para no tener ninguna.
+            </p>
+
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <Campo etiqueta="Porcentaje" campo="discount_percent" form={form} tipo="number" marcador="20" />
+                <Campo etiqueta="Nombre de la promoción" campo="discount_label" form={form} marcador="Aniversario" />
+                <Campo etiqueta="Empieza" campo="discount_starts_at" form={form} tipo="date" />
+                <Campo etiqueta="Termina" campo="discount_ends_at" form={form} tipo="date" />
+            </div>
+
+            {porcentaje > 0 && (
+                <p className="mt-3 rounded-lg bg-stone-100 px-3 py-2 text-sm dark:bg-stone-800">
+                    Mientras corra se verá{' '}
+                    <strong className="font-semibold">${rebajado.toFixed(2)}</strong>{' '}
+                    <span className="text-stone-500 line-through dark:text-stone-400">${base.toFixed(2)}</span>
+                    {!form.data.discount_starts_at && !form.data.discount_ends_at && (
+                        <span className="block text-xs text-amber-700 dark:text-amber-400">
+                            Sin fechas, el descuento empieza en cuanto guardes y no termina nunca.
+                        </span>
+                    )}
+                </p>
+            )}
+        </fieldset>
+    );
+}
+
+/** Del timestamp que devuelve el servidor a lo que entiende un input date. */
+function soloFecha(valor) {
+    return valor ? String(valor).slice(0, 10) : '';
 }
 
 function Campo({ etiqueta, campo, form, tipo = 'text', paso, marcador, requerido = false }) {

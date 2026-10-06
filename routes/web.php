@@ -2,6 +2,8 @@
 
 use App\Http\Controllers\AccountStatusController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\LandingNoticeController;
+use App\Http\Controllers\Admin\PlanChangeRequestController as AdminPlanChangeRequestController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\PlatformSettingController;
 use App\Http\Controllers\Admin\SecurityEventController;
@@ -19,6 +21,7 @@ use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\InvoiceTemplateController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\LegalController;
+use App\Http\Controllers\PlanChangeRequestController;
 use App\Http\Controllers\PrivatePhotoController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProfileController;
@@ -86,6 +89,14 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         ->name('datos.descargar');
 
     // Respaldo del catálogo: se descarga y se puede volver a subir
+    // Mi plan: lo que tiene contratado y cómo pedir otra cosa
+    Route::get('/mi-plan', [PlanChangeRequestController::class, 'index'])->name('plan.index');
+    Route::post('/mi-plan/solicitudes', [PlanChangeRequestController::class, 'store'])
+        ->middleware('throttle:6,60')
+        ->name('plan.solicitudes.store');
+    Route::delete('/mi-plan/solicitudes/{solicitud}', [PlanChangeRequestController::class, 'destroy'])
+        ->name('plan.solicitudes.destroy');
+
     Route::get('/respaldo', [RespaldoController::class, 'index'])->name('respaldo.index');
     Route::get('/respaldo/descargar', [RespaldoController::class, 'descargar'])
         ->middleware('throttle:6,60')
@@ -180,6 +191,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/comercios/{comercio}/inspeccionar', [TenantController::class, 'inspect'])->name('comercios.inspeccionar');
     Route::post('/inspeccion/salir', [TenantController::class, 'stopInspecting'])->name('inspeccion.salir');
 
+    // Cambios de plan que piden los comercios
+    Route::get('/cambios-de-plan', [AdminPlanChangeRequestController::class, 'index'])->name('cambios-plan.index');
+    Route::patch('/cambios-de-plan/{solicitud}', [AdminPlanChangeRequestController::class, 'update'])->name('cambios-plan.update');
+
     Route::get('/planes', [AdminPlanController::class, 'index'])->name('planes.index');
     Route::post('/planes', [AdminPlanController::class, 'store'])->name('planes.store');
     Route::post('/planes/reordenar', [AdminPlanController::class, 'reorder'])->name('planes.reorder');
@@ -195,6 +210,14 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::get('/seguridad', [SecurityEventController::class, 'index'])->name('seguridad.index');
     Route::patch('/seguridad/{evento}/revisar', [SecurityEventController::class, 'review'])->name('seguridad.revisar');
     Route::post('/seguridad/revisar-todo', [SecurityEventController::class, 'reviewAll'])->name('seguridad.revisar-todo');
+
+    // Avisos flotantes de la portada
+    Route::get('/avisos', [LandingNoticeController::class, 'index'])->name('avisos.index');
+    Route::post('/avisos', [LandingNoticeController::class, 'store'])->name('avisos.store');
+    Route::post('/avisos/reordenar', [LandingNoticeController::class, 'reorder'])->name('avisos.reorder');
+    // POST y no PUT: el formulario lleva archivo y viaja como multipart
+    Route::post('/avisos/{aviso}', [LandingNoticeController::class, 'update'])->name('avisos.update');
+    Route::delete('/avisos/{aviso}', [LandingNoticeController::class, 'destroy'])->name('avisos.destroy');
 
     Route::get('/ajustes', [PlatformSettingController::class, 'edit'])->name('ajustes');
     Route::put('/ajustes', [PlatformSettingController::class, 'update'])->name('ajustes.update');

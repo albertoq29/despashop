@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\LandingNotice;
 use App\Models\Plan;
 use App\Models\Setting;
 use App\Models\User;
@@ -26,6 +27,12 @@ class LandingController extends Controller
             'plans_title' => 'Planes',
             'plans_subtitle' => 'Elige el que se ajuste a tu negocio.',
             'registrations_open' => '1',
+            'landing_announcement' => '',
+            'landing_announcement_link' => '',
+            'landing_meta_description' => '',
+            'social_instagram' => '',
+            'social_facebook' => '',
+            'social_tiktok' => '',
             'support_email' => '',
             'support_whatsapp' => '',
             'terms_url' => '',
@@ -35,6 +42,9 @@ class LandingController extends Controller
         return Inertia::render('Bienvenida', [
             'ajustes' => $ajustes,
             'planes' => Plan::public()->get(),
+            // Solo el primero vigente: varias ventanas al entrar no se leen,
+            // se cierran
+            'aviso' => LandingNotice::vigentes()->first(),
             'registroAbierto' => $ajustes['registrations_open'] === '1',
             'catalogosDestacados' => $this->featuredCatalogs(),
             'auth' => [

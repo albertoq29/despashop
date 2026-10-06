@@ -6,6 +6,7 @@ import {
     Boxes,
     ChevronDown,
     ExternalLink,
+    CreditCard,
     FileArchive,
     FileText,
     GraduationCap,
@@ -279,6 +280,9 @@ function BarraLateral({ abierta, onCerrar, user, marca, respuestas }) {
                     </Grupo>
 
                     <Grupo titulo="Mi cuenta">
+                        <Enlace href={route('plan.index')} activo={route().current('plan.*')} Icono={CreditCard}>
+                            Mi plan
+                        </Enlace>
                         <Enlace
                             href={route('respaldo.index')}
                             activo={route().current('respaldo.*')}

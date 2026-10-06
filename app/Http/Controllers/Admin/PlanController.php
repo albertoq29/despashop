@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -39,7 +40,24 @@ class PlanController extends Controller
     public function update(Request $request, Plan $plan): RedirectResponse
     {
         $anterior = (float) $plan->price_usd;
+        $descuentoAnterior = $plan->discount_percent;
+
         $plan->update($this->validated($request, $plan));
+
+        if ($descuentoAnterior !== $plan->discount_percent) {
+            ActivityLog::record(
+                'plan.descuento',
+                $plan->discount_percent
+                    ? 'Programó un ' . $plan->discount_percent . '% de descuento en ' . $plan->name
+                    : 'Quitó el descuento de ' . $plan->name,
+                [
+                    'porcentaje' => $plan->discount_percent,
+                    'desde' => $plan->discount_starts_at?->toDateString(),
+                    'hasta' => $plan->discount_ends_at?->toDateString(),
+                ],
+                $plan
+            );
+        }
 
         if ($anterior !== (float) $plan->price_usd) {
             ActivityLog::record(
@@ -83,7 +101,15 @@ class PlanController extends Controller
 
     private function validated(Request $request, ?Plan $plan = null): array
     {
-        return $request->validate([
+        // `after` contra un campo vacío no compara nada útil, así que la regla
+        // solo se agrega cuando hay fecha de inicio con la que comparar.
+        $finDelDescuento = ['nullable', 'date'];
+
+        if ($request->filled('discount_starts_at')) {
+            $finDelDescuento[] = 'after:discount_starts_at';
+        }
+
+        $datos = $request->validate([
             'name' => ['required', 'string', 'max:80'],
             'slug' => ['nullable', 'string', 'max:80', Rule::unique('plans', 'slug')->ignore($plan?->id)],
             'tagline' => ['nullable', 'string', 'max:120'],
@@ -92,6 +118,12 @@ class PlanController extends Controller
             'price_usd' => ['required', 'numeric', 'min:0', 'max:100000'],
             'price_bs' => ['nullable', 'numeric', 'min:0'],
             'billing_period' => ['required', 'in:monthly,yearly,lifetime,free'],
+
+            // Un descuento del 100% regalaría el plan sin querer; 90 ya es mucho
+            'discount_percent' => ['nullable', 'integer', 'min:0', 'max:90'],
+            'discount_label' => ['nullable', 'string', 'max:40'],
+            'discount_starts_at' => ['nullable', 'date'],
+            'discount_ends_at' => $finDelDescuento,
 
             'max_products' => ['nullable', 'integer', 'min:1'],
             'max_images_per_product' => ['nullable', 'integer', 'min:1'],
@@ -112,5 +144,17 @@ class PlanController extends Controller
             'is_public' => ['boolean'],
             'display_order' => ['nullable', 'integer', 'min:0'],
         ]);
+
+        // La promoción corre desde el primer minuto del día de inicio hasta el
+        // último del de cierre: nadie piensa una oferta en horas.
+        $datos['discount_percent'] = $datos['discount_percent'] ?: null;
+        $datos['discount_starts_at'] = filled($datos['discount_starts_at'] ?? null)
+            ? Carbon::parse($datos['discount_starts_at'])->startOfDay()
+            : null;
+        $datos['discount_ends_at'] = filled($datos['discount_ends_at'] ?? null)
+            ? Carbon::parse($datos['discount_ends_at'])->endOfDay()
+            : null;
+
+        return $datos;
     }
 }

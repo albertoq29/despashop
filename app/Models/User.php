@@ -57,6 +57,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'reviewed_by',
         'rejection_reason',
         'plan_id',
+        'pending_plan_id',
         'plan_started_at',
         'plan_expires_at',
         'plan_discount_percent',
@@ -207,7 +208,9 @@ class User extends Authenticatable implements MustVerifyEmail
             return null;
         }
 
-        return $this->plan_expires_at->copy()->addDays((int) config('planes.dias_de_gracia'))->endOfDay();
+        return $this->plan_expires_at->copy()
+            ->addDays(Setting::platformInt('grace_days', (int) config('planes.dias_de_gracia')))
+            ->endOfDay();
     }
 
     /** Días que faltan para que se borren los datos; negativo si ya tocaba. */
@@ -265,6 +268,17 @@ class User extends Authenticatable implements MustVerifyEmail
     public function requestedPlan(): BelongsTo
     {
         return $this->belongsTo(Plan::class, 'requested_plan_id');
+    }
+
+    /** El plan aceptado que entra en la próxima renovación. */
+    public function planPendiente(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'pending_plan_id');
+    }
+
+    public function solicitudesDePlan(): HasMany
+    {
+        return $this->hasMany(PlanChangeRequest::class)->latest();
     }
 
     public function reviewer(): BelongsTo

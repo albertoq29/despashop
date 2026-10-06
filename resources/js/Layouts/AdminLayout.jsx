@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
 import {
+    ArrowLeftRight,
     ChevronDown,
+    Megaphone,
     LayoutDashboard,
     LogOut,
     Menu,
@@ -21,7 +23,7 @@ import Marca from '@/Components/Marca';
  * el color del encabezado: al admin le conviene saber siempre dónde está.
  */
 export default function AdminLayout({ header, children }) {
-    const { auth, plataforma, seguridad, sugerencias } = usePage().props;
+    const { auth, plataforma, seguridad, sugerencias, cambiosDePlan } = usePage().props;
     const [menuAbierto, setMenuAbierto] = useState(false);
 
     return (
@@ -33,6 +35,7 @@ export default function AdminLayout({ header, children }) {
                     marca={plataforma?.marca}
                     seguridad={seguridad}
                     sugerencias={sugerencias}
+                    cambiosDePlan={cambiosDePlan}
                 />
 
                 <div className="flex min-h-screen min-w-0 flex-1 flex-col">
@@ -75,7 +78,7 @@ export default function AdminLayout({ header, children }) {
     );
 }
 
-function BarraLateral({ abierta, onCerrar, marca, seguridad, sugerencias }) {
+function BarraLateral({ abierta, onCerrar, marca, seguridad, sugerencias, cambiosDePlan }) {
     const enlaces = [
         { href: route('admin.dashboard'), etiqueta: 'Resumen', Icono: LayoutDashboard, patron: 'admin.dashboard' },
         { href: route('admin.comercios.index'), etiqueta: 'Comercios', Icono: Store, patron: 'admin.comercios.*' },
@@ -95,6 +98,14 @@ function BarraLateral({ abierta, onCerrar, marca, seguridad, sugerencias }) {
             urgente: (seguridad?.graves || 0) > 0,
         },
         { href: route('admin.planes.index'), etiqueta: 'Planes y precios', Icono: Tags, patron: 'admin.planes.*' },
+        {
+            href: route('admin.cambios-plan.index'),
+            etiqueta: 'Cambios de plan',
+            Icono: ArrowLeftRight,
+            patron: 'admin.cambios-plan.*',
+            insignia: cambiosDePlan?.pendientes || 0,
+        },
+        { href: route('admin.avisos.index'), etiqueta: 'Avisos de la portada', Icono: Megaphone, patron: 'admin.avisos.*' },
         { href: route('admin.ajustes'), etiqueta: 'Ajustes', Icono: Settings, patron: 'admin.ajustes*' },
     ];
 

@@ -10,7 +10,9 @@ use App\Models\CatalogTheme;
 use App\Models\CatalogVisit;
 use App\Models\Factura;
 use App\Models\Plan;
+use App\Models\PlanChangeRequest;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\CatalogProvisioner;
 use App\Services\PlanDelComercio;
@@ -103,7 +105,7 @@ class TenantController extends Controller
         $theme = CatalogTheme::withoutGlobalScope('tenant')->where('user_id', $comercio->id)->first();
 
         return Inertia::render('Admin/Comercios/Show', [
-            'comercio' => $comercio->load('plan', 'requestedPlan', 'reviewer:id,name'),
+            'comercio' => $comercio->load('plan', 'requestedPlan', 'planPendiente', 'reviewer:id,name'),
             'theme' => $theme,
             'catalogUrl' => $comercio->catalogUrl(),
             'metricas' => $detalle,
@@ -112,6 +114,11 @@ class TenantController extends Controller
             // El admin ve lo mismo que el comercio en su panel: vigencia y uso de límites
             'resumenPlan' => $planDelComercio->resumen($comercio),
             'venceSugerido' => now()->addMonthNoOverflow()->toDateString(),
+            // Lo que el comercio pidió y sigue abierto, para resolverlo aquí
+            'solicitudDePlan' => $comercio->solicitudesDePlan()
+                ->whereIn('status', [PlanChangeRequest::PENDIENTE, PlanChangeRequest::ACEPTADA])
+                ->with(['planActual:id,name', 'planPedido:id,name'])
+                ->first(),
         ]);
     }
 
@@ -309,8 +316,18 @@ class TenantController extends Controller
             'plan_note' => ['nullable', 'string', 'max:160'],
         ]);
 
+        // `validated()` solo devuelve lo que vino en la petición, así que un
+        // campo que el formulario no mandó no existe como clave.
+        $validated += ['plan_id' => null, 'plan_discount_percent' => null];
+
+        // Guardar el plan que estaba pedido cuenta como cumplir la solicitud:
+        // es el momento en que el cambio ocurre de verdad.
+        $cumpleLoPedido = $comercio->pending_plan_id
+            && (int) $validated['plan_id'] === (int) $comercio->pending_plan_id;
+
         $comercio->update([
             'plan_id' => $validated['plan_id'],
+            'pending_plan_id' => $cumpleLoPedido ? null : $comercio->pending_plan_id,
             'plan_started_at' => $comercio->plan_started_at ?? now(),
             // Vence al final del día elegido; vacío es "sin vencimiento"
             'plan_expires_at' => isset($validated['plan_expires_at'])
@@ -322,6 +339,15 @@ class TenantController extends Controller
             // Se le dio aire: los avisos de vencimiento empiezan de cero
             'expiry_notified_at' => null,
         ]);
+
+        if ($cumpleLoPedido) {
+            // Sin pasar por la relación: trae un `latest()` que convierte esto
+            // en un UPDATE con ORDER BY, y SQLite no lo acepta.
+            PlanChangeRequest::where('user_id', $comercio->id)->enEspera()->update([
+                'status' => PlanChangeRequest::APLICADA,
+                'applied_at' => now(),
+            ]);
+        }
 
         ActivityLog::record('comercio.plan', 'Cambió el plan de ' . ($comercio->business_name ?: $comercio->name), [
             'vence' => $comercio->plan_expires_at?->toDateString(),
@@ -374,7 +400,7 @@ class TenantController extends Controller
             'dias' => ['nullable', 'integer', 'min:1', 'max:365'],
         ]);
 
-        $dias = $validated['dias'] ?? (int) config('planes.dias_de_prueba');
+        $dias = $validated['dias'] ?? Setting::platformInt('trial_days', (int) config('planes.dias_de_prueba'));
 
         $comercio->update([
             'plan_id' => $validated['plan_id'] ?? $comercio->plan_id ?? $comercio->requested_plan_id,

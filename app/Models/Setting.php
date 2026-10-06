@@ -56,6 +56,19 @@ class Setting extends Model
         return $setting ? $setting->value : $default;
     }
 
+    /**
+     * Un ajuste numérico de la plataforma, con su valor de respaldo.
+     *
+     * Lo que el admin deja en blanco vale lo que diga la configuración del
+     * archivo: así el panel manda, pero nunca deja el sistema sin número.
+     */
+    public static function platformInt(string $key, int $porDefecto): int
+    {
+        $valor = self::platform($key);
+
+        return is_numeric($valor) && (int) $valor > 0 ? (int) $valor : $porDefecto;
+    }
+
     public static function putPlatform($key, $value): self
     {
         return self::updateOrCreate(
