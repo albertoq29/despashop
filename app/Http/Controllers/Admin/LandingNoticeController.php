@@ -109,7 +109,7 @@ class LandingNoticeController extends Controller
             'is_active' => ['boolean'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => $fin,
-            'image' => ['nullable', 'image', 'max:4096'],
+            'image' => ['nullable', 'image', 'mimes:' . Archivos::FORMATOS, 'max:4096'],
         ]);
 
         unset($datos['image']);

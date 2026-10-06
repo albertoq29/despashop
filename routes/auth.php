@@ -15,7 +15,10 @@ Route::middleware('guest')->group(function () {
     Route::get('register', [RegisteredUserController::class, 'create'])
         ->name('register');
 
-    Route::post('register', [RegisteredUserController::class, 'store']);
+    // Sin límite, un script crea cuentas en masa: llena la cola de revisión
+    // y dispara un correo al administrador por cada una.
+    Route::post('register', [RegisteredUserController::class, 'store'])
+        ->middleware('throttle:5,60');
 
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
@@ -25,13 +28,17 @@ Route::middleware('guest')->group(function () {
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
+    // El freno propio de Laravel es por correo; este es por procedencia, que
+    // es lo que hace falta para no poder inundar buzones ajenos.
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:5,60')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:6,60')
         ->name('password.store');
 });
 

@@ -628,7 +628,8 @@ class RespaldoDelComercio
 
         $extension = strtolower(pathinfo($ruta, PATHINFO_EXTENSION));
 
-        if (! in_array($extension, ['jpg', 'jpeg', 'png', 'webp', 'gif', 'ico', 'svg'], true)) {
+        // `ico` se queda: no ejecuta nada y es el ícono de pestaña de siempre
+        if (! in_array($extension, [...explode(',', Archivos::FORMATOS), 'ico'], true)) {
             return null;
         }
 

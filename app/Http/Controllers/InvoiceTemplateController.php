@@ -83,7 +83,7 @@ class InvoiceTemplateController extends Controller
         abort_unless(in_array($tipo, ['logo', 'signature'], true), 404);
 
         $request->validate([
-            'imagen' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,svg', 'max:4096'],
+            'imagen' => ['required', 'image', 'mimes:' . Archivos::FORMATOS, 'max:4096'],
         ]);
 
         $template = $this->template($request);

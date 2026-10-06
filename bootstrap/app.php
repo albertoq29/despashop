@@ -17,6 +17,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->append(\App\Http\Middleware\VigilarPeticiones::class);
 
         $middleware->web(append: [
+            // Ata la sesión a la contraseña con la que se abrió: al cambiarla,
+            // las sesiones abiertas en otros navegadores dejan de valer. Va
+            // primero para que una sesión caducada no llegue a fijar tenant.
+            \Illuminate\Session\Middleware\AuthenticateSession::class,
             \App\Http\Middleware\SetTenantContext::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,

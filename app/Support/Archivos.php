@@ -81,6 +81,16 @@ class Archivos
 
     // ── Imágenes livianas ──────────────────────────────────────────────────────
 
+    /**
+     * Formatos de imagen que se aceptan al subir.
+     *
+     * Sin SVG a propósito: es un documento XML que puede traer scripts, y
+     * se sirve desde nuestro propio dominio, así que abrir uno subido por
+     * otro ejecutaría su código con la sesión de quien lo abre. Lo que se
+     * gana —un logo que escala— no paga eso.
+     */
+    public const FORMATOS = 'jpg,jpeg,png,webp,gif';
+
     /** Carpeta hermana donde vive la versión liviana de cada imagen. */
     public const CARPETA_MINIATURAS = 'mini';
 

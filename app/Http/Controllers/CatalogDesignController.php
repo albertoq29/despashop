@@ -200,7 +200,7 @@ class CatalogDesignController extends Controller
     public function uploadLogo(Request $request): RedirectResponse
     {
         $request->validate([
-            'logo' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:4096'],
+            'logo' => ['required', 'image', 'mimes:' . Archivos::FORMATOS, 'max:4096'],
             'apply_palette' => ['boolean'],
         ]);
 
@@ -271,7 +271,7 @@ class CatalogDesignController extends Controller
         abort_unless(in_array($tipo, ['cover', 'favicon'], true), 404);
 
         $request->validate([
-            'imagen' => ['required', 'image', 'mimes:jpg,jpeg,png,webp,gif,svg', 'max:6144'],
+            'imagen' => ['required', 'image', 'mimes:' . Archivos::FORMATOS, 'max:6144'],
         ]);
 
         $theme = $this->theme($request);
@@ -431,8 +431,8 @@ class CatalogDesignController extends Controller
     private function validateBanner(Request $request, bool $imageRequired): array
     {
         return $request->validate([
-            'image' => [$imageRequired ? 'required' : 'nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:6144'],
-            'image_mobile' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:6144'],
+            'image' => [$imageRequired ? 'required' : 'nullable', 'image', 'mimes:' . Archivos::FORMATOS, 'max:6144'],
+            'image_mobile' => ['nullable', 'image', 'mimes:' . Archivos::FORMATOS, 'max:6144'],
             'title' => ['nullable', 'string', 'max:120'],
             'subtitle' => ['nullable', 'string', 'max:200'],
             'cta_text' => ['nullable', 'string', 'max:40'],
@@ -449,7 +449,7 @@ class CatalogDesignController extends Controller
     private function validateModal(Request $request): array
     {
         return $request->validate([
-            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp,gif', 'max:6144'],
+            'image' => ['nullable', 'image', 'mimes:' . Archivos::FORMATOS, 'max:6144'],
             'title' => ['nullable', 'string', 'max:120'],
             'body' => ['nullable', 'string', 'max:1500'],
             'cta_text' => ['nullable', 'string', 'max:40'],
