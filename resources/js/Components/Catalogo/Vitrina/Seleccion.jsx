@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Check, MessageCircle, X } from 'lucide-react';
+import { Check, MessageCircle, Plus, Trash2 } from 'lucide-react';
 import { SOMBRAS } from './estilos';
 
 const TOPE = 20;
@@ -10,14 +10,13 @@ const TOPE = 20;
  * Un cliente que quiere cinco cosas no debería escribir cinco veces. Se
  * marcan y sale un solo mensaje de WhatsApp con la lista.
  *
- * Qué lleva cada línea depende de cómo el comercio abre sus productos: con
- * página propia va el enlace del producto, que es una dirección que el
- * comercio puede abrir y ver todo; con ventana flotante no hay página que
- * enlazar, así que va la foto, que al menos deja claro cuál es.
+ * No hay un «modo selección» que haya que encender: el botón de agregar
+ * está siempre en la tarjeta, y lo que ya está elegido lleva su marca
+ * puesta. Así se ve de un vistazo qué llevas sin pasar el mouse por encima
+ * ni acordarte de haber pulsado nada antes.
  */
-export function useSeleccionMultiple(theme, comercio, rutaBase) {
+export function useSeleccionMultiple(theme, comercio) {
     const [ids, setIds] = useState([]);
-    const [activa, setActiva] = useState(false);
 
     const disponible = theme.multi_select !== false && Boolean(comercio.whatsapp);
 
@@ -31,44 +30,39 @@ export function useSeleccionMultiple(theme, comercio, rutaBase) {
         );
     }, []);
 
-    const limpiar = useCallback(() => setIds([]), []);
-
-    const cerrar = useCallback(() => {
-        setActiva(false);
-        setIds([]);
-    }, []);
+    const vaciar = useCallback(() => setIds([]), []);
 
     return useMemo(
         () => ({
             disponible,
-            activa: disponible && activa,
             ids,
             tope: TOPE,
             lleno: ids.length >= TOPE,
             alternar,
-            limpiar,
-            cerrar,
-            abrir: () => setActiva(true),
+            vaciar,
             tiene: (articulo) => ids.includes(articulo.id),
-            // Los artículos marcados se recogen mientras se pintan: la
-            // rejilla llega por tandas y no hay una lista completa a mano.
-            enlace: (articulos) => enlaceDeLaLista(articulos, theme, comercio, rutaBase),
+            // Los artículos se recogen mientras se pintan: la rejilla llega
+            // por tandas y no hay una lista completa a mano.
+            enlace: (articulos) => enlaceDeLaLista(articulos, comercio),
         }),
-        [disponible, activa, ids, alternar, limpiar, cerrar, theme, comercio, rutaBase],
+        [disponible, ids, alternar, vaciar, comercio],
     );
 }
 
-function enlaceDeLaLista(articulos, theme, comercio, rutaBase) {
+/**
+ * El mensaje que se le manda al comercio.
+ *
+ * Cada línea lleva el nombre y la foto, que es lo único que identifica al
+ * producto desde fuera del catálogo: así quien recibe el mensaje sabe cuál
+ * es sin tener que adivinar por el nombre.
+ */
+function enlaceDeLaLista(articulos, comercio) {
     const numero = (comercio.whatsapp || '').replace(/\D/g, '');
-    const conPagina = theme.product_view === 'pagina';
-    const origen = typeof window === 'undefined' ? '' : window.location.origin;
 
     const lineas = articulos.map((articulo, indice) => {
-        const enlace = conPagina
-            ? `${origen}${rutaBase}/p/${articulo.id}`
-            : (articulo.image_url ?? articulo.thumb_url ?? '');
+        const foto = articulo.image_url ?? articulo.thumb_url ?? '';
 
-        return `${indice + 1}. ${articulo.name}${enlace ? `\n${enlace}` : ''}`;
+        return `${indice + 1}. ${articulo.name}${foto ? `\n${foto}` : ''}`;
     });
 
     const mensaje = [
@@ -81,75 +75,92 @@ function enlaceDeLaLista(articulos, theme, comercio, rutaBase) {
 }
 
 /**
- * Marca de selección sobre la foto de una tarjeta.
+ * El más de la tarjeta, que se queda en check al elegirlo.
  *
- * Solo aparece con el modo encendido: mientras no lo esté, la tarjeta se
- * comporta como siempre y no hay un recuadro extra estorbando la foto.
+ * Está siempre a la vista, no al pasar el mouse: en un teléfono no hay
+ * mouse que pasar, y en una computadora obligaría a recorrer la rejilla
+ * para saber qué llevas.
  */
 export function MarcaDeSeleccion({ articulo, seleccion }) {
-    if (!seleccion?.activa) {
+    if (!seleccion?.disponible) {
         return null;
     }
 
-    const marcado = seleccion.tiene(articulo);
+    const elegido = seleccion.tiene(articulo);
 
     return (
         <button
             type="button"
             role="checkbox"
-            aria-checked={marcado}
-            aria-label={`${marcado ? 'Quitar' : 'Elegir'} ${articulo.name}`}
+            aria-checked={elegido}
+            aria-label={elegido ? `Quitar ${articulo.name} de tu consulta` : `Agregar ${articulo.name} a tu consulta`}
+            title={elegido ? 'Quitar de la consulta' : 'Agregar a la consulta'}
             onClick={(evento) => {
                 evento.preventDefault();
                 evento.stopPropagation();
                 seleccion.alternar(articulo);
             }}
-            disabled={!marcado && seleccion.lleno}
-            className="cat-boton absolute right-2.5 top-2.5 z-10 grid h-9 w-9 place-items-center rounded-full backdrop-blur-md transition-transform duration-150 disabled:opacity-40"
-            style={{
-                background: marcado ? 'var(--cat-primario)' : 'rgba(0,0,0,0.42)',
-                color: marcado ? 'var(--cat-sobre-primario, #fff)' : '#fff',
-                outline: marcado ? '2px solid var(--cat-primario)' : 'none',
-                outlineOffset: '2px',
-            }}
+            disabled={!elegido && seleccion.lleno}
+            className="cat-boton absolute right-2.5 top-2.5 z-10 grid h-9 w-9 place-items-center rounded-full backdrop-blur-md disabled:opacity-40"
+            style={
+                elegido
+                    ? {
+                          background: 'var(--cat-primario)',
+                          color: 'var(--cat-sobre-primario, #fff)',
+                          outline: '2px solid var(--cat-primario)',
+                          outlineOffset: '2px',
+                      }
+                    : { background: 'rgba(0,0,0,0.42)', color: '#fff' }
+            }
         >
-            {marcado ? <Check className="h-5 w-5" /> : <span className="h-4 w-4 rounded-full ring-2 ring-white/80" />}
-        </button>
-    );
-}
-
-/** Botón que enciende el modo, para la cabecera de la rejilla. */
-export function BotonDeSeleccion({ seleccion }) {
-    if (!seleccion?.disponible || seleccion.activa) {
-        return null;
-    }
-
-    return (
-        <button
-            type="button"
-            onClick={seleccion.abrir}
-            className="cat-boton inline-flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-sm font-medium"
-            style={{
-                border: '1px solid color-mix(in srgb, var(--cat-texto) 18%, transparent)',
-                borderRadius: 'var(--cat-radio)',
-                color: 'var(--cat-tenue)',
-            }}
-        >
-            <Check className="h-4 w-4" />
-            Elegir varios
+            {elegido ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
         </button>
     );
 }
 
 /**
- * Barra de abajo mientras se eligen productos.
+ * El mismo botón dentro de la ventana del producto, junto al de WhatsApp.
  *
- * Se queda fija aunque no haya nada marcado: con el modo encendido hay que
- * poder apagarlo, y si desapareciera al desmarcar el último quedaría un
- * catálogo con recuadros y sin salida.
+ * Quien abrió un producto para mirarlo de cerca es justo quien decide
+ * llevárselo, y cerrar la ventana para buscar el más de la tarjeta es un
+ * paso que no hace falta.
+ */
+export function BotonAgregarALaConsulta({ articulo, seleccion }) {
+    if (!seleccion?.disponible) {
+        return null;
+    }
+
+    const elegido = seleccion.tiene(articulo);
+    const topado = !elegido && seleccion.lleno;
+
+    return (
+        <button
+            type="button"
+            onClick={() => seleccion.alternar(articulo)}
+            disabled={topado}
+            className="cat-boton mt-2.5 flex w-full items-center justify-center gap-2 py-3 text-sm font-semibold disabled:opacity-50"
+            style={{
+                borderRadius: 'var(--cat-radio)',
+                border: `1px solid ${elegido ? 'var(--cat-primario)' : 'color-mix(in srgb, var(--cat-texto) 22%, transparent)'}`,
+                background: elegido ? 'color-mix(in srgb, var(--cat-primario) 12%, transparent)' : 'transparent',
+                color: elegido ? 'var(--cat-primario)' : 'var(--cat-texto)',
+            }}
+        >
+            {elegido ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {elegido ? 'Ya está en tu consulta' : topado ? `Solo caben ${seleccion.tope}` : 'Agregar a mi consulta'}
+        </button>
+    );
+}
+
+/**
+ * Barra de abajo con lo que lleva elegido.
+ *
+ * Aparece sola con el primero y desaparece al vaciarla: mientras no haya
+ * nada elegido no hay nada que decir, y una barra fija tapando el catálogo
+ * sin contenido estorba.
  */
 export function BarraDeSeleccion({ seleccion, articulos = [] }) {
-    if (!seleccion?.activa) {
+    if (!seleccion?.disponible || seleccion.ids.length === 0) {
         return null;
     }
 
@@ -159,7 +170,7 @@ export function BarraDeSeleccion({ seleccion, articulos = [] }) {
     return (
         <div className="fixed inset-x-0 bottom-0 z-40 p-3 sm:p-4">
             <div
-                className="cat-dialogo mx-auto flex max-w-2xl items-center gap-3 p-2.5 pl-4"
+                className="cat-dialogo mx-auto flex max-w-2xl items-center gap-2 p-2.5 pl-4"
                 style={{
                     background: 'var(--cat-superficie)',
                     color: 'var(--cat-texto)',
@@ -169,9 +180,9 @@ export function BarraDeSeleccion({ seleccion, articulos = [] }) {
                 }}
             >
                 <span className="min-w-0 flex-1 text-sm font-medium">
-                    {cuantos === 0
-                        ? 'Toca los productos que quieras'
-                        : `${cuantos} ${cuantos === 1 ? 'producto elegido' : 'productos elegidos'}`}
+                    {/* En un teléfono la frase entera deja al botón sin sitio */}
+                    {cuantos} {cuantos === 1 ? 'producto' : 'productos'}
+                    <span className="hidden sm:inline"> en tu consulta</span>
                     {seleccion.lleno && (
                         <span className="block text-xs" style={{ color: 'var(--cat-tenue)' }}>
                             Son los {seleccion.tope} que caben en un mensaje
@@ -179,32 +190,31 @@ export function BarraDeSeleccion({ seleccion, articulos = [] }) {
                     )}
                 </span>
 
-                {cuantos > 0 && (
-                    <a
-                        href={seleccion.enlace(elegidos)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="cat-boton inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold"
-                        style={{
-                            background: 'var(--cat-primario)',
-                            color: 'var(--cat-sobre-primario, #fff)',
-                            borderRadius: 'var(--cat-radio)',
-                        }}
-                    >
-                        <MessageCircle className="h-4 w-4" />
-                        Enviar
-                    </a>
-                )}
-
                 <button
                     type="button"
-                    onClick={seleccion.cerrar}
-                    aria-label="Salir de elegir varios"
+                    onClick={seleccion.vaciar}
+                    aria-label="Vaciar la consulta"
+                    title="Vaciar"
                     className="cat-boton grid h-10 w-10 shrink-0 place-items-center rounded-full"
                     style={{ color: 'var(--cat-tenue)' }}
                 >
-                    <X className="h-5 w-5" />
+                    <Trash2 className="h-4 w-4" />
                 </button>
+
+                <a
+                    href={seleccion.enlace(elegidos)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="cat-boton inline-flex shrink-0 items-center gap-2 px-4 py-2.5 text-sm font-semibold"
+                    style={{
+                        background: 'var(--cat-primario)',
+                        color: 'var(--cat-sobre-primario, #fff)',
+                        borderRadius: 'var(--cat-radio)',
+                    }}
+                >
+                    <MessageCircle className="h-4 w-4" />
+                    Enviar consulta
+                </a>
             </div>
         </div>
     );

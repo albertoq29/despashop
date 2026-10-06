@@ -137,7 +137,7 @@ export default function Publico({
     }, [theme.animation_level, theme.animation_entrance, theme.animation_speed, theme.animation_stagger]);
 
     const verArticulo = useCallback((articulo) => setArticuloAbierto(articulo), []);
-    const seleccionMultiple = useSeleccionMultiple(theme, comercio, rutaBase);
+    const seleccionMultiple = useSeleccionMultiple(theme, comercio);
 
     // El mensaje necesita los artículos completos, y uno marcado puede estar
     // en cualquier bloque: se juntan todos los que la página llegó a pintar.

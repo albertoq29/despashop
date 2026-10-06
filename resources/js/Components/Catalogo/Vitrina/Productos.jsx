@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Link, router } from '@inertiajs/react';
+import { router } from '@inertiajs/react';
 import { ArrowRight, ArrowUpDown, ChevronLeft, ChevronRight, Clock, MessageCircle, Plus, Search, X } from 'lucide-react';
 import { BotonCatalogo, EncabezadoSeccion, Imagen, irASeccion, PreciosPorVolumen, SinContenido, useVitrina } from './Comunes';
 import {
@@ -16,12 +16,12 @@ import {
     SOMBRAS,
 } from './estilos';
 import { useAparecer } from './movimiento';
-import { BotonDeSeleccion, MarcaDeSeleccion } from './Seleccion';
+import { MarcaDeSeleccion } from './Seleccion';
 
 /* ── Tarjeta ────────────────────────────────────────────────────────────── */
 
 export function Tarjeta({ articulo, indice = 0, enFila = false }) {
-    const { theme, comercio, bcvRate, verArticulo, rutaBase, modoEditor, seleccionMultiple } = useVitrina();
+    const { theme, comercio, bcvRate, verArticulo, seleccionMultiple } = useVitrina();
     const ref = useAparecer(Math.min(indice % 4, 3) * 60);
 
     const lista = theme.layout === 'list' && !enFila;
@@ -37,17 +37,8 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
     const precio = articulo.price_usdt;
     const esServicio = Boolean(articulo.esServicio);
     const agotado = !esServicio && articulo.stock !== null && Number(articulo.stock) <= 0 && !articulo.por_llegar;
-    // Cómo se abre el producto. En el editor siempre es la ventana: dentro
-    // del iframe de la vista previa, irse a otra dirección deja al comercio
-    // fuera de su propio editor.
     const manera = theme.product_view ?? (theme.quick_view === false ? 'ninguna' : 'modal');
-    const enSuPagina = manera === 'pagina' && !modoEditor && rutaBase;
     const abrir = manera === 'ninguna' ? undefined : () => verArticulo(articulo);
-    const direccion = enSuPagina ? `${rutaBase}/p/${articulo.id}` : null;
-
-    // Mientras se eligen varios, tocar la tarjeta marca en vez de abrir
-    const eligiendo = seleccionMultiple?.activa;
-    const alTocar = eligiendo ? () => seleccionMultiple.alternar(articulo) : abrir;
 
     const estiloTarjeta = {
         elevated: { background: 'var(--cat-superficie)', boxShadow: SOMBRAS[theme.shadow] },
@@ -65,28 +56,17 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
         </div>
     );
 
-    const claseFoto = `relative block w-full overflow-hidden text-left disabled:cursor-default ${
-        lista ? 'h-full w-32 shrink-0 sm:w-44' : ''
-    }`;
-    const fondoFoto = { background: 'color-mix(in srgb, var(--cat-primario) 8%, var(--cat-superficie))' };
-
-    // Con página propia es un enlace de verdad: se puede abrir en otra
-    // pestaña, copiar la dirección y Google lo sigue.
-    const EnvolturaFoto = direccion && !eligiendo ? Link : 'button';
-    const propiedadesFoto =
-        direccion && !eligiendo
-            ? { href: direccion, className: claseFoto, style: fondoFoto, 'aria-label': `Ver ${articulo.name}` }
-            : {
-                  type: 'button',
-                  onClick: alTocar,
-                  disabled: !alTocar,
-                  'aria-label': alTocar ? `Ver ${articulo.name}` : undefined,
-                  className: claseFoto,
-                  style: fondoFoto,
-              };
-
     const foto = (
-        <EnvolturaFoto {...propiedadesFoto}>
+        <button
+            type="button"
+            onClick={abrir}
+            disabled={!abrir}
+            aria-label={abrir ? `Ver ${articulo.name}` : undefined}
+            className={`relative block w-full overflow-hidden text-left disabled:cursor-default ${
+                lista ? 'h-full w-32 shrink-0 sm:w-44' : ''
+            }`}
+            style={{ background: 'color-mix(in srgb, var(--cat-primario) 8%, var(--cat-superficie))' }}
+        >
             {imagen ? (
                 <Imagen
                     src={imagen}
@@ -109,7 +89,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
             )}
 
             {distintivos}
-        </EnvolturaFoto>
+        </button>
     );
 
     const botonConsultar = comercio.whatsapp && (
@@ -178,15 +158,9 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
 
                 <div className={`flex min-w-0 flex-1 flex-col ${aire(theme).tarjeta}`}>
                     <h3 className="line-clamp-2 text-sm font-semibold leading-snug sm:text-[15px]" style={{ fontFamily: 'var(--cat-titulo)' }}>
-                        {direccion && !eligiendo ? (
-                            <Link href={direccion} className="text-left">
-                                {articulo.name}
-                            </Link>
-                        ) : (
-                            <button type="button" onClick={alTocar} disabled={!alTocar} className="text-left disabled:cursor-default">
-                                {articulo.name}
-                            </button>
-                        )}
+                        <button type="button" onClick={abrir} disabled={!abrir} className="text-left disabled:cursor-default">
+                            {articulo.name}
+                        </button>
                     </h3>
 
                     {articulo.esCombo && articulo.incluye?.length > 0 && (
@@ -475,7 +449,7 @@ const ORDENES = [
 ];
 
 export function SeccionProductos({ seccion }) {
-    const { theme, datos, filtrar, seleccionMultiple } = useVitrina();
+    const { theme, datos, filtrar } = useVitrina();
     const filtrando = Boolean(datos.filters.search || datos.filters.category_id);
 
     // El servidor manda una tanda; el resto se pide solo si alguien lo pide
@@ -484,11 +458,7 @@ export function SeccionProductos({ seccion }) {
 
     return (
         <section id="productos" className={`mx-auto max-w-6xl px-5 ${aire(theme).seccion}`}>
-            <EncabezadoSeccion
-                titulo={seccion.title}
-                subtitulo={seccion.subtitle}
-                accion={<BotonDeSeleccion seleccion={seleccionMultiple} />}
-            />
+            <EncabezadoSeccion titulo={seccion.title} subtitulo={seccion.subtitle} />
 
             <BarraDeFiltros />
 

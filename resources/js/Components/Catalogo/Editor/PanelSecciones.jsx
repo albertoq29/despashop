@@ -659,14 +659,12 @@ function EditorDeProductos({ editor, c, campo, propio }) {
                     valor={datos.product_view ?? 'modal'}
                     onCambiar={(v) => cambiar('product_view', v)}
                     opciones={[
-                        { valor: 'modal', texto: 'Ventana' },
-                        { valor: 'pagina', texto: 'Página propia' },
-                        { valor: 'ninguna', texto: 'Nada' },
+                        { valor: 'modal', texto: 'Se abre una ventana' },
+                        { valor: 'ninguna', texto: 'No pasa nada' },
                     ]}
                     ayuda={
                         {
-                            modal: 'Se abre encima del catálogo, sin salir de la página. Lo más rápido para ojear.',
-                            pagina: 'Cada producto tiene su propia dirección: se comparte por separado y la encuentra Google. Aquí al lado seguirás viendo la ventana; la página solo existe en tu catálogo de verdad.',
+                            modal: 'Fotos, descripción y variantes encima del catálogo, sin salir de la página.',
                             ninguna: 'Las tarjetas no se abren: se ve lo que cabe en la rejilla.',
                         }[datos.product_view ?? 'modal']
                     }

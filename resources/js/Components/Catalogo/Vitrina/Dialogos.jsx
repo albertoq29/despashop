@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
 import { BotonCatalogo, PreciosPorVolumen, useVitrina } from './Comunes';
 import { BORDE_SUAVE, enlaceWhatsapp, formatoBs, SOMBRAS } from './estilos';
+import { BotonAgregarALaConsulta } from './Seleccion';
 
 /**
  * Cierre con animación de salida.
@@ -93,8 +94,8 @@ export function VistaRapida({ articulo, onCerrar }) {
  * son dos maneras de enseñar exactamente lo mismo. Devuelve las dos
  * columnas sueltas para que cada una las acomode a su manera.
  */
-export function DetalleDeProducto({ articulo, enPagina = false }) {
-    const { theme, comercio, bcvRate } = useVitrina();
+export function DetalleDeProducto({ articulo }) {
+    const { theme, comercio, bcvRate, seleccionMultiple } = useVitrina();
 
     // Aquí sí se muestra la foto completa; la liviana queda para los recuadros
     const fotos = [
@@ -127,7 +128,7 @@ export function DetalleDeProducto({ articulo, enPagina = false }) {
         <>
             {/* Galería */}
             <div className="relative shrink-0 sm:w-1/2" style={{ background: 'color-mix(in srgb, var(--cat-primario) 8%, var(--cat-superficie))' }}>
-                <div className={`relative aspect-square w-full overflow-hidden sm:max-h-none ${enPagina ? '' : 'max-h-[46dvh]'}`}>
+                <div className="relative aspect-square max-h-[46dvh] w-full overflow-hidden sm:max-h-none">
                     {fotos.length > 0 ? (
                         fotos.map((foto, indice) => (
                             <img
@@ -175,7 +176,7 @@ export function DetalleDeProducto({ articulo, enPagina = false }) {
             </div>
 
             {/* Información */}
-            <div className={`flex flex-1 flex-col p-6 sm:p-8 ${enPagina ? '' : 'min-h-0 overflow-y-auto'}`}>
+            <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-6 sm:p-8">
                 <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider" style={{ color: estado.color }}>
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: estado.color }} />
                     {articulo.esCombo ? `Combo · ${estado.texto}` : estado.texto}
@@ -265,6 +266,9 @@ export function DetalleDeProducto({ articulo, enPagina = false }) {
                             <MessageCircle className="h-5 w-5" />
                             {esServicio ? 'Pedir este servicio' : agotado ? 'Preguntar disponibilidad' : 'Pedir por WhatsApp'}
                         </BotonCatalogo>
+
+                        {/* Para llevarse varios de una vez sin cerrar la ventana */}
+                        <BotonAgregarALaConsulta articulo={articulo} seleccion={seleccionMultiple} />
                     </div>
                 )}
             </div>
