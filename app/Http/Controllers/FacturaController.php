@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use App\Models\Delivery;
 use App\Models\Factura;
 use App\Models\FacturaItem;
 use App\Models\Product;
@@ -133,6 +134,9 @@ class FacturaController extends Controller
             'total_bs'                 => 'nullable|numeric|min:0',
             'has_delivery'             => 'nullable|boolean',
             'delivery_date'            => 'nullable|date',
+            // Entrega en mano o mandada con alguien: se agendan las dos,
+            // pero cada una va a su propia lista
+            'delivery_type'            => 'nullable|in:personal,delivery',
             // Texto libre: un punto de entrega aquí se dice «frente a la
             // panadería», no con una dirección postal
             'delivery_point_a'         => 'nullable|string|max:255',
@@ -267,13 +271,9 @@ class FacturaController extends Controller
             }
 
             if ($request->has_delivery && $request->filled('delivery_date')) {
-                \App\Models\Delivery::create([
-                    'factura_id'    => $factura->id,
-                    'delivery_date' => $request->delivery_date,
-                    'status'        => 'pending',
-                    'point_a'       => $request->input('delivery_point_a'),
-                    'point_b'       => $request->input('delivery_point_b'),
-                ]);
+                \App\Models\Delivery::create(
+                    $this->datosDeLaEntrega($request, $factura->id)
+                );
             }
 
             session(['new_factura_id' => $factura->id]);
@@ -522,6 +522,31 @@ class FacturaController extends Controller
     }
 
     // ── Actualizar factura borrador ───────────────────────────────────────────
+    /**
+     * La entrega que se guarda con la factura.
+     *
+     * Los puntos solo viajan con un delivery: una entrega en mano la hace
+     * el propio comercio y no tiene recorrido que anotar, así que dejarlos
+     * ahí solo ensuciaría la lista de quien reparte.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosDeLaEntrega(Request $request, int $facturaId): array
+    {
+        $tipo = $request->input('delivery_type') === Delivery::DELIVERY
+            ? Delivery::DELIVERY
+            : Delivery::PERSONAL;
+
+        return [
+            'factura_id'    => $facturaId,
+            'type'          => $tipo,
+            'delivery_date' => $request->delivery_date,
+            'status'        => 'pending',
+            'point_a'       => $tipo === Delivery::DELIVERY ? $request->input('delivery_point_a') : null,
+            'point_b'       => $tipo === Delivery::DELIVERY ? $request->input('delivery_point_b') : null,
+        ];
+    }
+
     public function update(Request $request, Factura $factura)
     {
         if ($factura->user_id !== $this->tenantId()) {
@@ -549,6 +574,9 @@ class FacturaController extends Controller
             'total_bs'                 => 'nullable|numeric|min:0',
             'has_delivery'             => 'nullable|boolean',
             'delivery_date'            => 'nullable|date',
+            // Entrega en mano o mandada con alguien: se agendan las dos,
+            // pero cada una va a su propia lista
+            'delivery_type'            => 'nullable|in:personal,delivery',
             // Texto libre: un punto de entrega aquí se dice «frente a la
             // panadería», no con una dirección postal
             'delivery_point_a'         => 'nullable|string|max:255',
@@ -631,12 +659,7 @@ class FacturaController extends Controller
             if ($request->has_delivery && $request->filled('delivery_date')) {
                 \App\Models\Delivery::updateOrCreate(
                     ['factura_id' => $factura->id],
-                    [
-                        'delivery_date' => $request->delivery_date,
-                        'status'        => 'pending',
-                        'point_a'       => $request->input('delivery_point_a'),
-                        'point_b'       => $request->input('delivery_point_b'),
-                    ]
+                    collect($this->datosDeLaEntrega($request, $factura->id))->except('factura_id')->all()
                 );
             } else {
                 $factura->delivery()->delete();

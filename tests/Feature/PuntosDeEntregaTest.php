@@ -69,8 +69,14 @@ class PuntosDeEntregaTest extends TestCase
         return $this->factura([
             'has_delivery' => true,
             'delivery_date' => now()->addDay()->format('Y-m-d H:i:s'),
+            'delivery_type' => Delivery::DELIVERY,
             ...$extra,
         ]);
+    }
+
+    private function conEntregaPersonal(array $extra = []): array
+    {
+        return $this->conEntrega(['delivery_type' => Delivery::PERSONAL, ...$extra]);
     }
 
     // ── Con puntos ────────────────────────────────────────────────────────────
@@ -220,5 +226,89 @@ class PuntosDeEntregaTest extends TestCase
                 'delivery_point_b' => str_repeat('a', 256),
             ]))
             ->assertSessionHasErrors('delivery_point_b');
+    }
+
+    // ── Entrega personal y delivery son cosas distintas ──────────────────────
+
+    public function test_la_entrega_personal_se_guarda_como_tal(): void
+    {
+        $this->actingAs($this->comercio)
+            ->post(route('facturas.store'), $this->conEntregaPersonal())
+            ->assertSessionHasNoErrors();
+
+        $entrega = Delivery::firstOrFail();
+
+        $this->assertSame(Delivery::PERSONAL, $entrega->type);
+        $this->assertFalse($entrega->esDelivery());
+    }
+
+    public function test_una_entrega_personal_no_guarda_puntos(): void
+    {
+        // Aunque lleguen en la petición: una entrega en mano no tiene
+        // recorrido que anotar, y ensuciaría la lista de quien reparte
+        $this->actingAs($this->comercio)->post(route('facturas.store'), $this->conEntregaPersonal([
+            'delivery_point_a' => 'Mi negocio',
+            'delivery_point_b' => 'Casa del cliente',
+        ]));
+
+        $entrega = Delivery::firstOrFail();
+
+        $this->assertNull($entrega->point_a);
+        $this->assertNull($entrega->point_b);
+    }
+
+    public function test_sin_decir_el_tipo_se_entiende_personal(): void
+    {
+        $this->actingAs($this->comercio)->post(route('facturas.store'), $this->factura([
+            'has_delivery' => true,
+            'delivery_date' => now()->addDay()->format('Y-m-d H:i:s'),
+        ]));
+
+        $this->assertSame(Delivery::PERSONAL, Delivery::firstOrFail()->type);
+    }
+
+    public function test_no_se_acepta_un_tipo_inventado(): void
+    {
+        $this->actingAs($this->comercio)
+            ->post(route('facturas.store'), $this->conEntrega(['delivery_type' => 'dron']))
+            ->assertSessionHasErrors('delivery_type');
+    }
+
+    public function test_cambiar_de_delivery_a_personal_borra_el_recorrido(): void
+    {
+        $this->actingAs($this->comercio)->post(route('facturas.store'), $this->conEntrega([
+            'delivery_point_a' => 'Mi negocio',
+            'delivery_point_b' => 'Casa del cliente',
+        ]));
+
+        $factura = Factura::firstOrFail();
+
+        $this->actingAs($this->comercio)
+            ->put(route('facturas.update', $factura), $this->conEntregaPersonal())
+            ->assertSessionHasNoErrors();
+
+        $entrega = Delivery::firstOrFail();
+
+        $this->assertSame(Delivery::PERSONAL, $entrega->type);
+        $this->assertNull($entrega->point_b);
+    }
+
+    public function test_la_lista_separa_las_dos_clases(): void
+    {
+        $this->actingAs($this->comercio)->post(route('facturas.store'), $this->conEntregaPersonal());
+        $this->actingAs($this->comercio)->post(route('facturas.store'), $this->conEntrega([
+            'delivery_point_b' => 'Casa del cliente',
+        ]));
+
+        $this->assertSame(1, Delivery::personales()->count());
+        $this->assertSame(1, Delivery::deliveries()->count());
+
+        $this->actingAs($this->comercio)
+            ->get(route('deliveries.index'))
+            ->assertOk()
+            ->assertInertia(fn ($pagina) => $pagina
+                ->has('deliveries', 2)
+                ->where('deliveries.0.type', Delivery::PERSONAL)
+                ->where('deliveries.1.type', Delivery::DELIVERY));
     }
 }

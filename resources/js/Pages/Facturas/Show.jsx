@@ -3,6 +3,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { BotonDeTutorial } from '@/Components/Tutorial';
 import { Head, router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
+import { Check, Download, Eye, EyeOff, Pencil, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 
 const PRICE_LABELS = { detal: 'Detal', mayor: 'Mayor', distribuidor: 'Distribuidor', custom: 'Personalizado' };
@@ -15,6 +16,20 @@ const PRINT_STYLE = `
     .no-print { display: none !important; }
 }
 `;
+
+
+/** Las acciones de siempre: ni deciden nada ni cambian la factura. */
+function BotonUtilidad({ onClick, children }) {
+    return (
+        <button
+            type="button"
+            onClick={onClick}
+            className="inline-flex min-w-0 items-center justify-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 whitespace-nowrap px-2.5 py-2.5 text-xs font-bold text-stone-700 sm:text-sm transition-colors hover:bg-stone-100 dark:border-stone-800 dark:bg-stone-900 dark:text-stone-300 dark:hover:bg-stone-800 sm:px-4"
+        >
+            {children}
+        </button>
+    );
+}
 
 export default function Show({ auth, factura, plantilla }) {
     const items = factura.items || [];
@@ -178,7 +193,9 @@ export default function Show({ auth, factura, plantilla }) {
                             </svg>
                         </button>
                         <h2 className="font-bold text-xl text-stone-800 dark:text-stone-200">Factura #{factura.id}</h2>
-                        <span className={`px-2.5 py-1 rounded-full text-xs font-black border ${
+                        {/* En un teléfono el título ya llena la barra, y el
+                            estado se ve igual de claro dentro del recibo */}
+                        <span className={`hidden sm:inline-block shrink-0 px-2.5 py-1 rounded-full text-xs font-black border ${
                             factura.status === 'confirmed' ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900' :
                             factura.status === 'pending_variants' ? 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-800' :
                             'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900'
@@ -188,51 +205,6 @@ export default function Show({ auth, factura, plantilla }) {
                              '⏳ Borrador'}
                         </span>
                     </div>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 no-print w-full md:w-auto">
-                        <button
-                            onClick={() => router.patch(route('facturas.toggle-variants-receipt', factura.id), {}, { preserveScroll: true })}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 text-xs font-black rounded-xl hover:bg-stone-200 dark:hover:bg-stone-800 transition-colors border border-stone-200 dark:border-stone-800 cursor-pointer w-full sm:w-auto"
-                        >
-                            <span>{factura.show_variants_in_receipt !== false ? 'Ocultar Variantes en Recibo' : 'Mostrar Variantes en Recibo'}</span>
-                        </button>
-                        <button
-                            onClick={downloadImage}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-marca-50 dark:bg-marca-950/40 text-marca-800 dark:text-marca-300 text-xs font-black rounded-xl hover:bg-marca-100 dark:hover:bg-marca-950/60 transition-colors border border-stone-200 dark:border-stone-800 cursor-pointer w-full sm:w-auto"
-                        >
-                            Descargar Imagen
-                        </button>
-                        <button
-                            onClick={() => window.print()}
-                            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-stone-50 dark:bg-stone-900 text-stone-700 dark:text-stone-300 text-xs font-black rounded-xl hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors border border-stone-200 dark:border-stone-800 cursor-pointer w-full sm:w-auto"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
-                            </svg>
-                            Imprimir
-                        </button>
-                        {!isConfirmed && (
-                            <>
-                                <button
-                                    onClick={() => router.visit(route('facturas.edit', factura.id))}
-                                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-marca-700 dark:bg-marca-500 text-white text-xs font-black rounded-xl hover:bg-marca-800 dark:hover:bg-marca-400 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
-                                    </svg>
-                                    Editar Factura
-                                </button>
-                                <button
-                                    onClick={confirmar}
-                                    className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-green-600 text-white text-xs font-black rounded-xl hover:bg-green-700 transition-colors shadow-sm cursor-pointer w-full sm:w-auto"
-                                >
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7"/>
-                                    </svg>
-                                    Confirmar y Descontar Stock
-                                </button>
-                            </>
-                        )}
-                    </div>
                 </div>
             }
         >
@@ -241,6 +213,58 @@ export default function Show({ auth, factura, plantilla }) {
  
             <div className="py-4 sm:py-8">
                 <div className="max-w-3xl mx-auto px-2 sm:px-6 lg:px-8">
+
+                {/* Cinco botones apilados llenaban la pantalla de un
+                    teléfono y ninguno destacaba. Las tres utilidades se
+                    van a una fila compacta y abajo quedan las dos
+                    decisiones, que son las que se buscan. */}
+                <div className="no-print mb-4 space-y-2 md:mb-5 md:flex md:flex-wrap md:items-center md:justify-end md:gap-2 md:space-y-0">
+                    <div className="grid grid-cols-3 gap-2 md:flex md:items-center md:gap-2">
+                        <BotonUtilidad onClick={() => router.patch(route('facturas.toggle-variants-receipt', factura.id), {}, { preserveScroll: true })}>
+                            {factura.show_variants_in_receipt !== false ? (
+                                <EyeOff className="h-4 w-4" />
+                            ) : (
+                                <Eye className="h-4 w-4" />
+                            )}
+                            <span className="truncate">
+                                {factura.show_variants_in_receipt !== false ? 'Ocultar' : 'Mostrar'}
+                                <span className="hidden sm:inline"> variantes</span>
+                            </span>
+                        </BotonUtilidad>
+
+                        <BotonUtilidad onClick={downloadImage}>
+                            <Download className="h-4 w-4" />
+                            <span className="truncate">Imagen</span>
+                        </BotonUtilidad>
+
+                        <BotonUtilidad onClick={() => window.print()}>
+                            <Printer className="h-4 w-4" />
+                            <span className="truncate">Imprimir</span>
+                        </BotonUtilidad>
+                    </div>
+
+                    {!isConfirmed && (
+                        <div className="grid gap-2 sm:grid-cols-2 md:flex md:items-center md:gap-2">
+                            <button
+                                onClick={() => router.visit(route('facturas.edit', factura.id))}
+                                className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-bold text-stone-800 transition-colors hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-100 dark:hover:bg-stone-800"
+                            >
+                                <Pencil className="h-4 w-4" />
+                                Editar factura
+                            </button>
+
+                            <button
+                                onClick={confirmar}
+                                className="inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-xl bg-green-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-green-700"
+                            >
+                                <Check className="h-4 w-4" />
+                                Confirmar y descontar
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+
                     <div id="recibo-print" className="bg-white dark:bg-stone-900 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-800 overflow-hidden">
 
                         {/* Encabezado del recibo (Fondo Blanco) */}

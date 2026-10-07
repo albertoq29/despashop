@@ -112,6 +112,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
     const [manualTotalBs, setManualTotalBs] = useState('');
     const [hasDelivery, setHasDelivery] = useState(false);
     const [deliveryDate, setDeliveryDate] = useState('');
+    const [tipoEntrega, setTipoEntrega] = useState('personal');
     const [registrarPuntos, setRegistrarPuntos] = useState(false);
     const [puntoA, setPuntoA] = useState('');
     const [puntoB, setPuntoB] = useState('');
@@ -648,9 +649,10 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
             total_bs:          totals.totalBs,
             has_delivery:      hasDelivery,
             delivery_date:     hasDelivery ? deliveryDate : null,
-            // Los puntos solo viajan si hay entrega y se pidieron
-            delivery_point_a:  hasDelivery && registrarPuntos ? puntoA : null,
-            delivery_point_b:  hasDelivery && registrarPuntos ? puntoB : null,
+            delivery_type:     hasDelivery ? tipoEntrega : null,
+            // Los puntos son cosa del delivery, y solo si se pidieron
+            delivery_point_a:  hasDelivery && tipoEntrega === 'delivery' && registrarPuntos ? puntoA : null,
+            delivery_point_b:  hasDelivery && tipoEntrega === 'delivery' && registrarPuntos ? puntoB : null,
             has_delivery_fee:  hasDeliveryFee,
             delivery_bs:       hasDeliveryFee ? (parseFloat(deliveryBs) || 0) : 0,
             items: items.map(i => ({
@@ -971,7 +973,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                 }}
                                                 className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25"
                                             />
-                                            <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Aplica Entrega (Agendar)</span>
+                                            <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Programar entrega o delivery</span>
                                         </label>
                                         
                                         {hasDelivery && (
@@ -990,6 +992,8 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
 
                                         {hasDelivery && (
                                             <PuntosDeEntrega
+                                                tipo={tipoEntrega}
+                                                onTipo={setTipoEntrega}
                                                 activo={registrarPuntos}
                                                 onActivo={setRegistrarPuntos}
                                                 puntoA={puntoA}

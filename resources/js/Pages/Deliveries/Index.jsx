@@ -1,12 +1,37 @@
+import { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import { CalendarClock, CalendarPlus, MapPin, MessageCircle, Phone, Receipt, Truck } from 'lucide-react';
+import { Bike, CalendarClock, CalendarPlus, MapPin, MessageCircle, Phone, Receipt, Truck, User } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Boton, Cabecera, Insignia, Metrica, Pagina, Tarjeta, Vacio } from '@/Components/UI';
 
+/**
+ * Dos listas, no una.
+ *
+ * Una entrega personal la lleva el propio comercio y se acuerda con el
+ * cliente; un delivery se manda con alguien y tiene un recorrido. Quien
+ * sale a repartir no necesita ver las que se entregan en mano, y al revés
+ * igual, así que cada clase tiene su pestaña y sus propios números.
+ */
+const PESTANAS = [
+    { id: 'personal', texto: 'Entregas personales', Icono: User, vacio: 'No tienes entregas personales agendadas' },
+    { id: 'delivery', texto: 'Delivery', Icono: Bike, vacio: 'No tienes deliveries agendados' },
+];
+
 export default function Index({ deliveries }) {
-    const vencidas = deliveries.filter((entrega) => entrega.is_expired);
-    const hoy = deliveries.filter((entrega) => !entrega.is_expired && esHoy(entrega.delivery_date));
-    const proximas = deliveries.filter((entrega) => !entrega.is_expired && !esHoy(entrega.delivery_date));
+    const porTipo = (id) => deliveries.filter((entrega) => (entrega.type ?? 'personal') === id);
+
+    // Arranca donde haya algo que mirar: si no hay entregas en mano pero sí
+    // deliveries, abrir en una pestaña vacía sería un paso de más.
+    const [pestana, setPestana] = useState(() =>
+        porTipo('personal').length === 0 && porTipo('delivery').length > 0 ? 'delivery' : 'personal',
+    );
+
+    const dePestana = porTipo(pestana);
+    const vencidas = dePestana.filter((entrega) => entrega.is_expired);
+    const hoy = dePestana.filter((entrega) => !entrega.is_expired && esHoy(entrega.delivery_date));
+    const proximas = dePestana.filter((entrega) => !entrega.is_expired && !esHoy(entrega.delivery_date));
+
+    const actual = PESTANAS.find((p) => p.id === pestana);
 
     return (
         <AuthenticatedLayout header="Entregas">
@@ -18,20 +43,12 @@ export default function Index({ deliveries }) {
                     descripcion="Las entregas se archivan solas tres días después de su fecha."
                 />
 
-                {deliveries.length > 0 && (
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Metrica etiqueta="Vencidas" valor={vencidas.length} Icono={CalendarClock} tono={vencidas.length ? 'alerta' : 'neutro'} />
-                        <Metrica etiqueta="Para hoy" valor={hoy.length} Icono={Truck} tono={hoy.length ? 'marca' : 'neutro'} />
-                        <Metrica etiqueta="Próximas" valor={proximas.length} Icono={CalendarPlus} />
-                    </div>
-                )}
-
                 {deliveries.length === 0 ? (
                     <Tarjeta cuerpo={false}>
                         <Vacio
                             Icono={Truck}
                             titulo="No tienes entregas agendadas"
-                            texto="Al confirmar una factura puedes agendarle una fecha de entrega y aparecerá aquí."
+                            texto="Al armar una factura puedes agendarle una entrega personal o un delivery, y aparecerá aquí."
                         >
                             <Boton href={route('facturas.index')} variante="contorno">
                                 <Receipt className="h-4 w-4" />
@@ -40,11 +57,50 @@ export default function Index({ deliveries }) {
                         </Vacio>
                     </Tarjeta>
                 ) : (
-                    <div className="space-y-5">
-                        <Grupo titulo="Vencidas" entregas={vencidas} tono="alerta" />
-                        <Grupo titulo="Para hoy" entregas={hoy} tono="marca" />
-                        <Grupo titulo="Próximas" entregas={proximas} tono="neutro" />
-                    </div>
+                    <>
+                        <div className="flex flex-wrap gap-2">
+                            {PESTANAS.map(({ id, texto, Icono }) => {
+                                const cuantas = porTipo(id).length;
+                                const activa = pestana === id;
+
+                                return (
+                                    <button
+                                        key={id}
+                                        type="button"
+                                        onClick={() => setPestana(id)}
+                                        aria-current={activa ? 'page' : undefined}
+                                        className={`pulsable inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-semibold ${
+                                            activa
+                                                ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
+                                                : 'border border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800'
+                                        }`}
+                                    >
+                                        <Icono className="h-4 w-4" />
+                                        {texto}
+                                        <span className="tabular-nums opacity-70">{cuantas}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <Metrica etiqueta="Vencidas" valor={vencidas.length} Icono={CalendarClock} tono={vencidas.length ? 'alerta' : 'neutro'} />
+                            <Metrica etiqueta="Para hoy" valor={hoy.length} Icono={Truck} tono={hoy.length ? 'marca' : 'neutro'} />
+                            <Metrica etiqueta="Próximas" valor={proximas.length} Icono={CalendarPlus} />
+                        </div>
+
+                        {dePestana.length === 0 ? (
+                            <Tarjeta cuerpo={false}>
+                                <Vacio Icono={actual.Icono} titulo={actual.vacio} texto="Las de la otra pestaña siguen ahí." />
+                            </Tarjeta>
+                        ) : (
+                            <div className="space-y-5">
+                                <Grupo titulo="Vencidas" entregas={vencidas} tono="alerta" />
+                                <Grupo titulo="Para hoy" entregas={hoy} tono="marca" />
+                                <Grupo titulo="Próximas" entregas={proximas} tono="neutro" />
+                            </div>
+                        )}
+                    </>
                 )}
             </Pagina>
         </AuthenticatedLayout>

@@ -30,6 +30,7 @@ class DeliveryController extends Controller
                 'client_phone'  => $del->factura->client_phone ?? '',
                 'total_usd'     => (float)$del->factura->total_usd,
                 'delivery_date' => $del->delivery_date->toIso8601String(),
+                'type'          => $del->type,
                 'status'        => $del->status,
                 'point_a'       => $del->point_a,
                 'point_b'       => $del->point_b,

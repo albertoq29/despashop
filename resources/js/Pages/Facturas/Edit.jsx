@@ -205,6 +205,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             return '';
         }
     });
+    const [tipoEntrega, setTipoEntrega] = useState(factura.delivery?.type ?? 'personal');
     // Si la factura ya traía puntos, el bloque llega abierto
     const [registrarPuntos, setRegistrarPuntos] = useState(
         Boolean(factura.delivery?.point_a || factura.delivery?.point_b)
@@ -736,9 +737,10 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             total_bs:          totals.totalBs,
             has_delivery:      hasDelivery,
             delivery_date:     hasDelivery ? deliveryDate : null,
-            // Los puntos solo viajan si hay entrega y se pidieron
-            delivery_point_a:  hasDelivery && registrarPuntos ? puntoA : null,
-            delivery_point_b:  hasDelivery && registrarPuntos ? puntoB : null,
+            delivery_type:     hasDelivery ? tipoEntrega : null,
+            // Los puntos son cosa del delivery, y solo si se pidieron
+            delivery_point_a:  hasDelivery && tipoEntrega === 'delivery' && registrarPuntos ? puntoA : null,
+            delivery_point_b:  hasDelivery && tipoEntrega === 'delivery' && registrarPuntos ? puntoB : null,
             has_delivery_fee:  hasDeliveryFee,
             delivery_bs:       hasDeliveryFee ? (parseFloat(deliveryBs) || 0) : 0,
             items: items.map(i => ({
@@ -1059,7 +1061,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                 }}
                                                 className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25"
                                             />
-                                            <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Aplica Entrega (Agendar)</span>
+                                            <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Programar entrega o delivery</span>
                                         </label>
                                         
                                         {hasDelivery && (
@@ -1078,6 +1080,8 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
 
                                         {hasDelivery && (
                                             <PuntosDeEntrega
+                                                tipo={tipoEntrega}
+                                                onTipo={setTipoEntrega}
                                                 activo={registrarPuntos}
                                                 onActivo={setRegistrarPuntos}
                                                 puntoA={puntoA}
