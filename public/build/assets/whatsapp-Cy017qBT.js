@@ -1,0 +1,1 @@
+function s(e){const t=String(e??"").replace(/\D/g,"");return t.startsWith("00")?t.slice(2):t.startsWith("0")?`58${t.slice(1)}`:t}function r(e,t=""){const n=s(e);return t?`https://wa.me/${n}?text=${encodeURIComponent(t)}`:`https://wa.me/${n}`}export{r as e,s as n};

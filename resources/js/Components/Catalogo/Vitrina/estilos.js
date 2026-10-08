@@ -1,3 +1,4 @@
+import { enlaceDeWhatsapp } from '@/utils/whatsapp';
 import { contrasteSobre, mezclar, opacidadHex } from '../colores';
 
 /**
@@ -170,10 +171,9 @@ export function formatoBs(monto) {
 }
 
 export function enlaceWhatsapp(comercio, articulo = null, mensajeBase = '') {
-    const numero = (comercio.whatsapp || '').replace(/\D/g, '');
     const mensaje = articulo
         ? `Hola, me interesa "${articulo.name}" de ${comercio.name}.`
         : mensajeBase || `Hola, vi el catálogo de ${comercio.name}.`;
 
-    return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+    return enlaceDeWhatsapp(comercio.whatsapp, mensaje);
 }

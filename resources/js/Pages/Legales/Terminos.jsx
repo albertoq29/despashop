@@ -1,6 +1,7 @@
 import { Head, Link, usePage } from '@inertiajs/react';
 import { ArrowLeft, Mail, MessageCircle } from 'lucide-react';
 import CambiarTema from '@/Components/CambiarTema';
+import { numeroDeWhatsapp } from '@/utils/whatsapp';
 
 /**
  * Condiciones de uso de la plataforma.
@@ -11,7 +12,7 @@ import CambiarTema from '@/Components/CambiarTema';
 export default function Terminos({ secciones, version, contacto }) {
     const { plataforma } = usePage().props;
     const marca = plataforma?.marca ?? 'Despashop';
-    const whatsapp = (contacto?.whatsapp ?? '').replace(/\D/g, '');
+    const whatsapp = numeroDeWhatsapp(contacto?.whatsapp);
 
     return (
         <>

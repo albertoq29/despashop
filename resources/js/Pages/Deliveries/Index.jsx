@@ -3,6 +3,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Bike, CalendarClock, CalendarPlus, MapPin, MessageCircle, Phone, Receipt, Truck, User } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Boton, Cabecera, Insignia, Metrica, Pagina, Tarjeta, Vacio } from '@/Components/UI';
+import { numeroDeWhatsapp } from '@/utils/whatsapp';
 
 /**
  * Dos listas, no una.
@@ -142,7 +143,7 @@ function Entrega({ entrega, tono }) {
         );
     };
 
-    const telefono = (entrega.client_phone || '').replace(/\D/g, '');
+    const telefono = numeroDeWhatsapp(entrega.client_phone);
 
     return (
         <li className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">

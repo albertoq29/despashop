@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, router, usePage } from '@inertiajs/react';
+import { numeroDeWhatsapp } from '@/utils/whatsapp';
 import {
     BarChart3,
     CalendarClock,
@@ -107,7 +108,7 @@ export default function AuthenticatedLayout({ header, children }) {
 function AvisoDePlan({ aviso }) {
     const vencido = aviso.estado === 'vencido';
     const dias = aviso.dias_restantes;
-    const numero = (aviso.contacto?.whatsapp ?? '').replace(/\D/g, '');
+    const numero = numeroDeWhatsapp(aviso.contacto?.whatsapp);
     const plan = aviso.plan ? `Tu plan ${aviso.plan}` : 'Tu plan';
 
     const texto = vencido

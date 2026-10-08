@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Check, MessageCircle, Plus, Trash2 } from 'lucide-react';
+import { enlaceDeWhatsapp } from '@/utils/whatsapp';
 import { SOMBRAS } from './estilos';
 
 const TOPE = 20;
@@ -57,8 +58,6 @@ export function useSeleccionMultiple(theme, comercio) {
  * es sin tener que adivinar por el nombre.
  */
 function enlaceDeLaLista(articulos, comercio) {
-    const numero = (comercio.whatsapp || '').replace(/\D/g, '');
-
     const lineas = articulos.map((articulo, indice) => {
         const foto = articulo.image_url ?? articulo.thumb_url ?? '';
 
@@ -71,7 +70,7 @@ function enlaceDeLaLista(articulos, comercio) {
         lineas.join('\n\n'),
     ].join('\n');
 
-    return `https://wa.me/${numero}?text=${encodeURIComponent(mensaje)}`;
+    return enlaceDeWhatsapp(comercio.whatsapp, mensaje);
 }
 
 /**

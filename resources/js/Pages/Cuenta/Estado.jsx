@@ -2,6 +2,7 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Check, Clock, LogOut, Mail, MailWarning, MessageCircle, ShieldAlert, ShieldX } from 'lucide-react';
 import CambiarTema from '@/Components/CambiarTema';
 import Marca from '@/Components/Marca';
+import { enlaceDeWhatsapp } from '@/utils/whatsapp';
 
 const ESTADOS = {
     pending: {
@@ -150,7 +151,7 @@ export default function Estado({ cuenta, catalogUrl, soporte }) {
                                 )}
                                 {soporte.whatsapp && (
                                     <a
-                                        href={`https://wa.me/${soporte.whatsapp.replace(/\D/g, '')}`}
+                                        href={enlaceDeWhatsapp(soporte.whatsapp)}
                                         target="_blank"
                                         rel="noreferrer"
                                         className="pulsable inline-flex items-center gap-2 rounded-lg border border-stone-300 bg-white px-4 py-2.5 text-sm font-medium hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 dark:hover:bg-stone-700"

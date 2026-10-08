@@ -5,7 +5,7 @@
     $pendiente = $cambio === 'pendiente';
     $reactivada = $cambio === 'reactivada';
 
-    $numero = preg_replace('/\D/', '', (string) ($contacto['whatsapp'] ?? ''));
+    $numero = \App\Support\Whatsapp::numero($contacto['whatsapp'] ?? null);
 @endphp
 <!DOCTYPE html>
 <html lang="es">

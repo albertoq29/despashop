@@ -44,7 +44,7 @@
         </p>
 
         @php
-            $numero = preg_replace('/\D/', '', (string) ($contacto['whatsapp'] ?? ''));
+            $numero = \App\Support\Whatsapp::numero($contacto['whatsapp'] ?? null);
         @endphp
 
         @if ($numero)

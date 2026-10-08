@@ -36,7 +36,7 @@
             <p style="margin:0;font-size:14px;line-height:1.6;color:#78350f;">
                 <strong>¿No pediste esto?</strong> Ignora el correo y no pulses nada: tu contraseña no cambia sola.
                 @php
-                    $numero = preg_replace('/\D/', '', (string) ($contacto['whatsapp'] ?? ''));
+                    $numero = \App\Support\Whatsapp::numero($contacto['whatsapp'] ?? null);
                 @endphp
                 @if ($numero || ! empty($contacto['email']))
                     Si te llegan varios seguidos, avísanos

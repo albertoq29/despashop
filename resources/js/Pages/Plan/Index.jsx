@@ -3,6 +3,7 @@ import { Head, useForm, usePage } from '@inertiajs/react';
 import { ArrowRight, CalendarClock, Check, MessageCircle, Mail, X } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import ResumenDelPlan, { fechaLarga } from '@/Components/Plan/ResumenDelPlan';
+import { enlaceDeWhatsapp } from '@/utils/whatsapp';
 
 const PERIODOS = { monthly: '/mes', yearly: '/año', lifetime: 'pago único', free: 'gratis' };
 
@@ -317,7 +318,7 @@ function Contacto({ contacto }) {
             ¿Prefieres hablarlo?
             {contacto.whatsapp && (
                 <a
-                    href={`https://wa.me/${contacto.whatsapp.replace(/\D/g, '')}`}
+                    href={enlaceDeWhatsapp(contacto.whatsapp)}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center gap-1.5 font-medium text-marca-700 hover:underline dark:text-marca-400"

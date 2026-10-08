@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
+import { numeroDeWhatsapp } from '@/utils/whatsapp';
 import {
     Area,
     AreaChart,
@@ -323,7 +324,7 @@ function GraficoVentas({ datos }) {
 
 /** Cómo renovar o cambiar de plan: con el contacto de soporte de la plataforma. */
 function ContactoParaElPlan({ soporte, plan }) {
-    const numero = (soporte?.whatsapp ?? '').replace(/\D/g, '');
+    const numero = numeroDeWhatsapp(soporte?.whatsapp);
     const urgente = ['por_vencer', 'vencido'].includes(plan.estado);
     const mensaje = encodeURIComponent(
         plan.plan ? `Hola, quiero renovar o cambiar mi plan ${plan.plan.nombre}.` : 'Hola, quiero contratar un plan.',
