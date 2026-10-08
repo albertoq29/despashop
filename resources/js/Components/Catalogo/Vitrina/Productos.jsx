@@ -62,9 +62,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
             onClick={abrir}
             disabled={!abrir}
             aria-label={abrir ? `Ver ${articulo.name}` : undefined}
-            className={`relative block w-full overflow-hidden text-left disabled:cursor-default ${
-                lista ? 'h-full w-32 shrink-0 sm:w-44' : ''
-            }`}
+            className="relative block h-full w-full overflow-hidden text-left disabled:cursor-default"
             style={{ background: 'color-mix(in srgb, var(--cat-primario) 8%, var(--cat-superficie))' }}
         >
             {imagen ? (
@@ -92,6 +90,24 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
         </button>
     );
 
+    /**
+     * La foto con el «más» de la selección encima.
+     *
+     * El «más» no puede ir dentro del botón de la foto —dos botones
+     * anidados no son HTML válido—, así que comparten envoltorio, y es ese
+     * envoltorio el que le da el marco. Tiene que ser el de la imagen y no
+     * el de la tarjeta: en lista la foto es una columna angosta a la
+     * izquierda, y la esquina de la tarjeta cae sobre el nombre del
+     * producto. Sin un ancestro posicionado se iba más lejos todavía, a la
+     * esquina de lo primero que tuviera `position` arriba en el árbol.
+     */
+    const fotoConMarca = (
+        <div className={`relative ${lista ? 'h-full w-32 shrink-0 sm:w-44' : ''}`}>
+            {foto}
+            <MarcaDeSeleccion articulo={articulo} seleccion={seleccionMultiple} />
+        </div>
+    );
+
     const botonConsultar = comercio.whatsapp && (
         <a
             href={enlaceWhatsapp(comercio, articulo)}
@@ -113,8 +129,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                     className={`group relative overflow-hidden ${EFECTO_TARJETA[theme.card_hover] ?? ''}`}
                     style={{ ...estiloTarjeta, borderRadius: 'var(--cat-radio)' }}
                 >
-                    {foto}
-                    <MarcaDeSeleccion articulo={articulo} seleccion={seleccionMultiple} />
+                    {fotoConMarca}
 
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 p-4 text-white">
                         <h3 className="line-clamp-2 text-sm font-semibold leading-snug sm:text-base" style={{ fontFamily: 'var(--cat-titulo)' }}>
@@ -153,8 +168,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                 className={`group flex h-full overflow-hidden ${lista ? 'flex-row' : 'flex-col'} ${EFECTO_TARJETA[theme.card_hover] ?? ''}`}
                 style={{ ...estiloTarjeta, borderRadius: 'var(--cat-radio)' }}
             >
-                {foto}
-                <MarcaDeSeleccion articulo={articulo} seleccion={seleccionMultiple} />
+                {fotoConMarca}
 
                 <div className={`flex min-w-0 flex-1 flex-col ${aire(theme).tarjeta}`}>
                     <h3 className="line-clamp-2 text-sm font-semibold leading-snug sm:text-[15px]" style={{ fontFamily: 'var(--cat-titulo)' }}>
