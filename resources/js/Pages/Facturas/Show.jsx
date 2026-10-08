@@ -5,8 +5,7 @@ import { Head, router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 import { Check, Download, Eye, EyeOff, Pencil, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
-
-const PRICE_LABELS = { detal: 'Detal', mayor: 'Mayor', distribuidor: 'Distribuidor', custom: 'Personalizado' };
+import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
 
 const PRINT_STYLE = `
 @media print {
@@ -34,6 +33,7 @@ function BotonUtilidad({ onClick, children }) {
 export default function Show({ auth, factura, plantilla }) {
     const items = factura.items || [];
     const isConfirmed = factura.status === 'confirmed';
+    const PRICE_LABELS = useEtiquetasDePrecio();
 
     const groupedItems = React.useMemo(() => {
         const groups = [];

@@ -7,6 +7,7 @@ use App\Models\Setting;
 use App\Models\Suggestion;
 use App\Models\User;
 use App\Services\Seguridad\RegistroDeSeguridad;
+use App\Support\NivelesDePrecio;
 use App\Support\Tenancy;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -48,6 +49,9 @@ class HandleInertiaRequests extends Middleware
             'inspeccion' => fn () => $this->inspeccion($request),
             // Aviso de vencimiento para todo el panel del comercio
             'avisoDePlan' => fn () => $this->avisoDePlan($request),
+            // Cómo llama este comercio a su tercer nivel de precio. Va
+            // compartido porque se lee en productos, combos y facturas.
+            'nivelesDePrecio' => fn () => $this->nivelesDePrecio(),
             // Insignia del registro de seguridad, solo para el admin
             'seguridad' => fn () => $this->seguridad($request),
             // Buzón de sugerencias: pendientes para el admin, respuestas para el comercio
@@ -64,6 +68,19 @@ class HandleInertiaRequests extends Middleware
                 'status'  => fn () => $request->session()->get('status'),
             ],
         ];
+    }
+
+    /**
+     * El nombre del tercer nivel de precio, si hay comercio a quien
+     * preguntárselo. Sin tenant activo no hay nada que resolver y se
+     * ahorra la consulta: en la bienvenida o en el panel del admin ese
+     * nombre no se usa.
+     */
+    private function nivelesDePrecio(): ?array
+    {
+        $tenantId = app(Tenancy::class)->id();
+
+        return $tenantId ? NivelesDePrecio::para($tenantId) : null;
     }
 
     /**

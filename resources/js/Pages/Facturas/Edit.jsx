@@ -5,8 +5,8 @@ import { Head, router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 import { buildHaystack, fuzzySearchList } from '@/utils/fuzzySearch';
 import AgregadoRapido from '@/Components/AgregadoRapido';
+import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
 
-const PRICE_LABELS = { detal: 'Detal', mayor: 'Mayor', distribuidor: 'Distribuidor', custom: 'Personalizado' };
 const PRICE_COLORS = {
     detal:        'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-900',
     mayor:        'bg-amber-100 dark:bg-amber-950 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900',
@@ -70,6 +70,7 @@ let _uid = 0;
 const uid = () => ++_uid;
 
 export default function Edit({ auth, productos, combos = [], bcvRate, factura, supplements = [], appliedSupplements: appliedSupplementsProp = [], categorias = [] }) {
+    const PRICE_LABELS = useEtiquetasDePrecio();
     const [search, setSearch] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [activeTab, setActiveTab] = useState('productos');

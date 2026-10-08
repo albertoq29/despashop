@@ -13,6 +13,7 @@ use App\Models\Product;
 use App\Models\User;
 use App\Services\CatalogProvisioner;
 use App\Support\Archivos;
+use App\Support\NivelesDePrecio;
 use App\Support\SeccionesDelCatalogo;
 use App\Support\Tenancy;
 use Illuminate\Database\Eloquent\Builder;
@@ -207,6 +208,12 @@ class PublicCatalogController extends Controller
                 'username' => $owner->username,
                 'name' => $owner->business_name ?: $owner->name,
                 'whatsapp' => $theme->whatsapp_number ?: $owner->whatsapp,
+                // Unos venden «al distribuidor» y otros «al gran mayor»: es
+                // el mismo precio con el nombre que usa cada ramo. Solo se
+                // consulta si esos precios se van a mostrar.
+                'nombreDistribuidor' => $this->mostrarPreciosPorVolumen()
+                    ? NivelesDePrecio::nombre($owner->id)
+                    : null,
             ],
             'theme' => $theme,
             'banners' => $data['banners'],

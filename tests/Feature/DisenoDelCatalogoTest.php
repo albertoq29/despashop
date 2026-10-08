@@ -4,8 +4,10 @@ namespace Tests\Feature;
 
 use App\Models\CatalogTheme;
 use App\Models\Product;
+use App\Models\Setting;
 use App\Models\User;
 use App\Services\CatalogProvisioner;
+use App\Support\NivelesDePrecio;
 use App\Support\Tenancy;
 use App\Support\SeccionesDelCatalogo;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -450,5 +452,83 @@ class DisenoDelCatalogoTest extends TestCase
             ->assertSessionHasNoErrors();
 
         $this->assertSame('card', $this->tema($usuario)->fresh()->wholesale_prices);
+    }
+
+    /* ── Cómo se llama el tercer precio ─────────────────────────────────── */
+
+    /** Las promociones se guardan juntas: el nombre viaja con lo demás. */
+    private function guardarPromociones(User $usuario, array $cambios = [])
+    {
+        return $this->actingAs($usuario)->post(route('settings.update'), [
+            'global_discount' => 0,
+            'force_wholesale' => false,
+            'force_distributor' => false,
+            'distributor_price_label' => NivelesDePrecio::DISTRIBUIDOR,
+            ...$cambios,
+        ]);
+    }
+
+    public function test_sin_elegir_nada_se_llama_distribuidor(): void
+    {
+        $usuario = $this->comercio();
+
+        $this->assertSame('Distribuidor', NivelesDePrecio::nombre($usuario->id));
+    }
+
+    public function test_el_comercio_lo_llama_gran_mayor(): void
+    {
+        $usuario = $this->comercio();
+
+        $this->guardarPromociones($usuario, [
+            'distributor_price_label' => NivelesDePrecio::GRAN_MAYOR,
+        ])->assertSessionHasNoErrors();
+
+        $this->assertSame('Gran mayor', NivelesDePrecio::nombre($usuario->id));
+    }
+
+    public function test_no_se_le_puede_poner_cualquier_nombre(): void
+    {
+        $usuario = $this->comercio();
+
+        $this->guardarPromociones($usuario, ['distributor_price_label' => 'al_mayoreo'])
+            ->assertSessionHasErrors(NivelesDePrecio::CLAVE);
+
+        $this->assertSame('Distribuidor', NivelesDePrecio::nombre($usuario->id));
+    }
+
+    public function test_el_panel_recibe_el_nombre_elegido(): void
+    {
+        $usuario = $this->comercio();
+        Setting::put(NivelesDePrecio::CLAVE, NivelesDePrecio::GRAN_MAYOR, $usuario->id);
+
+        $this->actingAs($usuario)
+            ->get(route('productos.index'))
+            ->assertOk()
+            ->assertInertia(fn ($pagina) => $pagina
+                ->where('nivelesDePrecio.distribuidor', 'Gran mayor')
+                ->where('nivelesDePrecio.elegido', NivelesDePrecio::GRAN_MAYOR));
+    }
+
+    public function test_el_catalogo_usa_el_nombre_del_comercio(): void
+    {
+        $usuario = $this->comercio();
+        $this->productoConEscalones($usuario);
+        $this->tema($usuario)->forceFill(['is_published' => true, 'wholesale_prices' => 'card'])->save();
+        Setting::put(NivelesDePrecio::CLAVE, NivelesDePrecio::GRAN_MAYOR, $usuario->id);
+
+        $this->get('/' . $usuario->username)
+            ->assertOk()
+            ->assertInertia(fn ($pagina) => $pagina->where('comercio.nombreDistribuidor', 'Gran mayor'));
+    }
+
+    public function test_con_los_precios_ocultos_el_nombre_no_hace_falta(): void
+    {
+        $usuario = $this->comercio();
+        $this->productoConEscalones($usuario);
+        $this->tema($usuario)->forceFill(['is_published' => true, 'wholesale_prices' => 'off'])->save();
+
+        $this->get('/' . $usuario->username)
+            ->assertOk()
+            ->assertInertia(fn ($pagina) => $pagina->where('comercio.nombreDistribuidor', null));
     }
 }

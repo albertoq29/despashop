@@ -10,6 +10,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
 import { hoyLocal } from '@/utils/fechas';
+import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
 
 const normalizeText = (str) => {
     if (!str) return '';
@@ -25,6 +26,7 @@ const MODALIDADES_SERVICIO = {
 };
 
 export default function Index({ auth, productos, categories }) {
+    const nombreDistribuidor = useNombreDistribuidor();
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
@@ -666,7 +668,7 @@ const VARIANT_TYPES = [
                                         {gainMayor !== null && <span className="text-xs text-marca-700 dark:text-marca-400 font-bold block mt-1 bg-marca-50 dark:bg-marca-950/40 px-2 py-0.5 rounded border border-marca-200 dark:border-marca-900">Ganancia: ${gainMayor} ({costNum > 0 ? ((gainMayor / costNum) * 100).toFixed(0) : 0}%)</span>}
                                     </div>
                                     <div>
-                                        <InputLabel htmlFor="price_distribuidor" value="Precio Distribuidor (Opcional)" />
+                                        <InputLabel htmlFor="price_distribuidor" value={`Precio ${nombreDistribuidor} (Opcional)`} />
                                         <div className="relative mt-1"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-500 dark:text-stone-400 font-bold">$</span>
                                             <TextInput id="price_distribuidor" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.price_distribuidor_usdt} onChange={e => setData('price_distribuidor_usdt', e.target.value)} />
                                         </div>

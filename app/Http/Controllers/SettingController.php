@@ -3,8 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Setting;
+use App\Support\NivelesDePrecio;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -30,6 +32,8 @@ class SettingController extends Controller
             'global_discount' => 'required|numeric|min:0|max:100',
             'force_wholesale' => 'required|boolean',
             'force_distributor' => 'required|boolean',
+            // Dos nombres para el mismo precio; lo elige el comercio
+            NivelesDePrecio::CLAVE => ['required', Rule::in(array_keys(NivelesDePrecio::NOMBRES))],
         ]);
 
         foreach ($validated as $key => $value) {

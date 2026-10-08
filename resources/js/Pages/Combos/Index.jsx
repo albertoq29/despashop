@@ -8,8 +8,10 @@ import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
+import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
 
 export default function CombosIndex({ auth, combos, products }) {
+    const nombreDistribuidor = useNombreDistribuidor();
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
@@ -428,7 +430,7 @@ export default function CombosIndex({ auth, combos, products }) {
                                                         >
                                                             <option value="detal">Detal (${parseFloat(p.price_usdt || 0).toFixed(2)})</option>
                                                             {p.price_mayor_usdt && <option value="mayor">Mayor (${parseFloat(p.price_mayor_usdt).toFixed(2)})</option>}
-                                                            {p.price_distribuidor_usdt && <option value="distribuidor">Distribuidor (${parseFloat(p.price_distribuidor_usdt).toFixed(2)})</option>}
+                                                            {p.price_distribuidor_usdt && <option value="distribuidor">{nombreDistribuidor} (${parseFloat(p.price_distribuidor_usdt).toFixed(2)})</option>}
                                                         </select>
                                                         
                                                         <span className="font-mono text-xs font-bold text-stone-900 dark:text-stone-100 w-16 text-right">${currentPrice.toFixed(2)}</span>

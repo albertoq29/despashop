@@ -68,7 +68,7 @@ export function EncabezadoSeccion({ titulo, subtitulo, alineacion = 'left', acci
  * Si están ocultos, el servidor no los manda: aquí no llegan ni como dato.
  */
 export function PreciosPorVolumen({ articulo, donde = 'tarjeta' }) {
-    const { theme } = useVitrina();
+    const { theme, comercio } = useVitrina();
     const nivel = theme.wholesale_prices ?? 'off';
 
     if (nivel === 'off' || (donde === 'tarjeta' && nivel !== 'card')) {
@@ -77,7 +77,9 @@ export function PreciosPorVolumen({ articulo, donde = 'tarjeta' }) {
 
     const escalones = [
         ['Por mayor', articulo.price_mayor_usdt],
-        ['Distribuidor', articulo.price_distribuidor_usdt],
+        // El mismo precio se llama «distribuidor» o «gran mayor» según el
+        // ramo del comercio, y el cliente reconoce solo el suyo.
+        [comercio.nombreDistribuidor || 'Distribuidor', articulo.price_distribuidor_usdt],
     ].filter(([, precio]) => precio && Number(precio) > 0);
 
     if (escalones.length === 0) {

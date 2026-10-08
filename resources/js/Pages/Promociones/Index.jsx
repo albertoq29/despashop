@@ -1,5 +1,5 @@
 import { Head, useForm, usePage } from '@inertiajs/react';
-import { Megaphone, Percent, Users } from 'lucide-react';
+import { Megaphone, Percent, Tag, Users } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import {
     Aviso,
@@ -12,14 +12,19 @@ import {
     Pagina,
     Tarjeta,
 } from '@/Components/UI';
+import { NOMBRES_DISTRIBUIDOR, useOpcionesDeDistribuidor } from '@/utils/nivelesDePrecio';
 
 export default function Index({ settings }) {
     const { flash } = usePage().props;
+    const opcionesDeNombre = useOpcionesDeDistribuidor();
 
     const promos = useForm({
         global_discount: settings.global_discount ?? '0',
         force_wholesale: settings.force_wholesale === 'true' || settings.force_wholesale === '1',
         force_distributor: settings.force_distributor === 'true' || settings.force_distributor === '1',
+        distributor_price_label: settings.distributor_price_label in NOMBRES_DISTRIBUIDOR
+            ? settings.distributor_price_label
+            : 'distribuidor',
     });
 
     const banner = useForm({
@@ -37,6 +42,10 @@ export default function Index({ settings }) {
     };
 
     const descuento = Number(promos.data.global_discount) || 0;
+
+    // El nombre sale del formulario y no del servidor: así los textos de
+    // abajo cambian al tocar la opción, antes de guardar.
+    const nombreDistribuidor = opcionesDeNombre[promos.data.distributor_price_label] ?? 'Distribuidor';
 
     return (
         <AuthenticatedLayout header="Promociones">
@@ -85,6 +94,41 @@ export default function Index({ settings }) {
                             </Aviso>
                         )}
 
+                        {/* El nombre va antes que los interruptores porque uno
+                            de ellos lo usa: primero se decide cómo se llama. */}
+                        <div className="mt-6 border-t border-stone-200 pt-5 dark:border-stone-800">
+                            <p className="text-sm font-medium text-stone-700 dark:text-stone-300">
+                                ¿Cómo llamas a tu tercer precio?
+                            </p>
+                            <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                                Es el mismo precio con dos nombres. Elige el que usa tu ramo: se lee así en el
+                                formulario del producto, en las facturas y en tu catálogo.
+                            </p>
+
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {Object.entries(opcionesDeNombre).map(([clave, nombre]) => {
+                                    const elegido = promos.data.distributor_price_label === clave;
+
+                                    return (
+                                        <button
+                                            key={clave}
+                                            type="button"
+                                            onClick={() => promos.setData('distributor_price_label', clave)}
+                                            aria-pressed={elegido}
+                                            className={`pulsable flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-semibold ${
+                                                elegido
+                                                    ? 'border-marca-600 bg-marca-50 text-marca-800 dark:border-marca-500 dark:bg-marca-950/40 dark:text-marca-300'
+                                                    : 'border-stone-200 text-stone-600 hover:bg-stone-50 dark:border-stone-800 dark:text-stone-400 dark:hover:bg-stone-800/50'
+                                            }`}
+                                        >
+                                            <Tag className="h-4 w-4 shrink-0" />
+                                            Precio {nombre.toLowerCase()}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
                         <div className="mt-6 space-y-4 border-t border-stone-200 pt-5 dark:border-stone-800">
                             <p className="text-sm font-medium text-stone-700 dark:text-stone-300">
                                 Precio que ve el público
@@ -98,7 +142,7 @@ export default function Index({ settings }) {
                             />
 
                             <Interruptor
-                                etiqueta="Mostrar precio de distribuidor a todos"
+                                etiqueta={`Mostrar precio de ${nombreDistribuidor.toLowerCase()} a todos`}
                                 ayuda="Tiene prioridad sobre el precio al mayor."
                                 valor={promos.data.force_distributor}
                                 onCambiar={(v) => promos.setData('force_distributor', v)}
@@ -108,8 +152,10 @@ export default function Index({ settings }) {
                         {(promos.data.force_wholesale || promos.data.force_distributor) && (
                             <Aviso tono="aviso" className="mt-4">
                                 Con esta opción activa, cualquier visitante verá el precio{' '}
-                                {promos.data.force_distributor ? 'de distribuidor' : 'al mayor'}, no solo tus clientes
-                                habituales.
+                                {promos.data.force_distributor
+                                    ? `de ${nombreDistribuidor.toLowerCase()}`
+                                    : 'al mayor'}
+                                , no solo tus clientes habituales.
                             </Aviso>
                         )}
 
