@@ -289,4 +289,78 @@ class CambioDePlanTest extends TestCase
                 ->has('solicitudes.data', 2)
                 ->where('conteos.pendientes', 2));
     }
+
+    /* ── La prueba gratis es para quien llega ──────────────────────── */
+
+    public function test_a_quien_ya_tiene_plan_no_se_le_ofrece_la_prueba(): void
+    {
+        $this->avanzado->update(['discount_percent' => 100, 'trial_days' => 30, 'discount_limit' => 10]);
+
+        $this->actingAs($this->comercio())
+            ->get(route('plan.index'))
+            ->assertOk()
+            ->assertInertia(fn ($pagina) => $pagina
+                ->where('planes.1.name', 'Avanzado')
+                ->where('planes.1.es_prueba_gratis', false)
+                ->where('planes.1.descuento_activo', false)
+                ->where('planes.1.precio_final', 30)
+                ->where('planes.1.cupos_libres', null)
+                ->where('pruebaOculta', true));
+    }
+
+    public function test_los_cupos_no_se_gastan_por_mirar(): void
+    {
+        $this->avanzado->update(['discount_percent' => 100, 'discount_limit' => 10]);
+
+        $this->actingAs($this->comercio())->get(route('plan.index'))->assertOk();
+
+        // Esconderla es solo de pantalla: el plan sigue con su oferta intacta
+        $this->avanzado->refresh();
+
+        $this->assertSame(100, $this->avanzado->discount_percent);
+        $this->assertSame(10, $this->avanzado->cupos_libres);
+    }
+
+    public function test_un_descuento_normal_si_se_le_ofrece(): void
+    {
+        $this->avanzado->update(['discount_percent' => 20, 'discount_label' => 'Aniversario']);
+
+        $this->actingAs($this->comercio())
+            ->get(route('plan.index'))
+            ->assertInertia(fn ($pagina) => $pagina
+                ->where('planes.1.descuento_activo', true)
+                ->where('planes.1.precio_final', 24)
+                ->where('planes.1.discount_label', 'Aniversario')
+                ->where('pruebaOculta', false));
+    }
+
+    public function test_sin_plan_todavia_la_prueba_se_ve(): void
+    {
+        $this->avanzado->update(['discount_percent' => 100, 'trial_days' => 30]);
+
+        $reciente = $this->comercio(['plan_id' => null, 'plan_started_at' => null]);
+
+        $this->actingAs($reciente)
+            ->get(route('plan.index'))
+            ->assertInertia(fn ($pagina) => $pagina
+                ->where('planes.1.es_prueba_gratis', true)
+                ->where('planes.1.descuento_activo', true)
+                ->where('pruebaOculta', false));
+    }
+
+    public function test_sin_ninguna_prueba_corriendo_no_se_avisa_nada(): void
+    {
+        $this->actingAs($this->comercio())
+            ->get(route('plan.index'))
+            ->assertInertia(fn ($pagina) => $pagina->where('pruebaOculta', false));
+    }
+
+    public function test_una_prueba_que_ya_cerro_no_cuenta_como_escondida(): void
+    {
+        $this->avanzado->update(['discount_percent' => 100, 'discount_ends_at' => now()->subDay()]);
+
+        $this->actingAs($this->comercio())
+            ->get(route('plan.index'))
+            ->assertInertia(fn ($pagina) => $pagina->where('pruebaOculta', false));
+    }
 }

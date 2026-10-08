@@ -6,6 +6,7 @@ use App\Models\ActivityLog;
 use App\Models\Plan;
 use App\Models\PlanChangeRequest;
 use App\Models\Setting;
+use App\Models\User;
 use App\Mail\SolicitudDeCambioDePlan;
 use App\Services\PlanDelComercio;
 use App\Support\Administradores;
@@ -30,15 +31,16 @@ class PlanChangeRequestController extends Controller
     {
         $comercio = $request->user();
 
+        $planes = $this->planesQuePuedePedir($comercio);
+
         return Inertia::render('Plan/Index', [
             // El mismo resumen que ve en su panel: plan, vigencia y uso de límites
             'resumen' => $planDelComercio->resumen($comercio),
             'planActualId' => $comercio->plan_id,
             'planPendiente' => $comercio->planPendiente?->only(['id', 'name']),
-            'planes' => Plan::where('is_active', true)
-                ->orderBy('display_order')
-                ->orderBy('price_usd')
-                ->get(),
+            'planes' => $planes,
+            // Para poder decirle por qué aquí no ve la oferta que sí está en la web
+            'pruebaOculta' => $this->hayPruebaEscondida($comercio),
             'solicitudes' => $comercio->solicitudesDePlan()
                 ->with(['planActual:id,name', 'planPedido:id,name'])
                 ->limit(10)
@@ -48,6 +50,54 @@ class PlanChangeRequestController extends Controller
                 'email' => Setting::platform('support_email'),
             ],
         ]);
+    }
+
+    /**
+     * Los planes que puede pedir, con el precio que de verdad le toca.
+     *
+     * Si ya tiene plan, las pruebas gratis se le quitan antes de que salgan
+     * de aquí. Mostrarle «$0.00» sería ofrecerle de regalo lo que va a
+     * seguir pagando, y la oferta no es para él: es para quien llega. Se
+     * recorta en el servidor y no en la pantalla para que no se escape por
+     * descuido, y los descuentos normales se quedan, que esos sí aplican.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, Plan>
+     */
+    private function planesQuePuedePedir(User $comercio)
+    {
+        $planes = Plan::where('is_active', true)
+            ->orderBy('display_order')
+            ->orderBy('price_usd')
+            ->get();
+
+        if (! $comercio->yaTuvoPlan()) {
+            return $planes;
+        }
+
+        return $planes->each(function (Plan $plan) {
+            if (! $plan->esPruebaGratis()) {
+                return;
+            }
+
+            // Sin guardar: es el precio que ve este comercio, no el del plan
+            $plan->discount_percent = null;
+            $plan->discount_label = null;
+            $plan->discount_limit = null;
+            $plan->trial_days = null;
+        });
+    }
+
+    /** Si hay alguna prueba gratis corriendo que a este comercio no le toca. */
+    private function hayPruebaEscondida(User $comercio): bool
+    {
+        if (! $comercio->yaTuvoPlan()) {
+            return false;
+        }
+
+        return Plan::where('is_active', true)
+            ->where('discount_percent', 100)
+            ->get()
+            ->contains(fn (Plan $plan) => $plan->descuentoVigente());
     }
 
     public function store(Request $request): RedirectResponse

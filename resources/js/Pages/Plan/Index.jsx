@@ -21,7 +21,7 @@ const ESTADOS = {
  * comercio, y el cambio entra en la próxima renovación. Decirlo en voz alta
  * evita la decepción de esperar que el plan cambie al instante.
  */
-export default function Index({ resumen, planActualId, planPendiente, planes, solicitudes, contacto }) {
+export default function Index({ resumen, planActualId, planPendiente, planes, pruebaOculta, solicitudes, contacto }) {
     const { flash } = usePage().props;
     const abierta = solicitudes.find((s) => ['pendiente', 'aceptada'].includes(s.status));
 
@@ -59,7 +59,7 @@ export default function Index({ resumen, planActualId, planPendiente, planes, so
                 {abierta ? (
                     <SolicitudAbierta solicitud={abierta} />
                 ) : (
-                    <Pedir planes={planes} planActualId={planActualId} />
+                    <Pedir planes={planes} planActualId={planActualId} pruebaOculta={pruebaOculta} />
                 )}
 
                 {solicitudes.length > 0 && <Historial solicitudes={solicitudes} />}
@@ -72,7 +72,7 @@ export default function Index({ resumen, planActualId, planPendiente, planes, so
 
 /* ── Pedir un cambio ────────────────────────────────────────────────────── */
 
-function Pedir({ planes, planActualId }) {
+function Pedir({ planes, planActualId, pruebaOculta }) {
     const form = useForm({ to_plan_id: '', message: '' });
 
     const enviar = (evento) => {
@@ -92,6 +92,15 @@ function Pedir({ planes, planActualId }) {
                 Elige el que quieres y lo revisamos. El cambio entra en tu próxima renovación, así no pierdes los días
                 que ya pagaste.
             </p>
+
+            {/* Si en la web hay una prueba gratis y aquí sale el precio
+                normal, mejor decir por qué que dejarlo pensando. */}
+            {pruebaOculta && (
+                <p className="mt-2 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                    Las pruebas gratis que anunciamos son para cuentas nuevas. Como ya tienes plan con nosotros, aquí
+                    ves el precio de siempre.
+                </p>
+            )}
 
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {planes.map((plan) => {

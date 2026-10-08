@@ -223,6 +223,19 @@ class User extends Authenticatable implements MustVerifyEmail
             : (int) floor(now()->startOfDay()->diffInDays($fecha->copy()->startOfDay(), false));
     }
 
+    /**
+     * Si este comercio ya pasó por un plan.
+     *
+     * Una prueba gratis es para quien llega, no para quien ya está adentro.
+     * Basta con que tenga plan asignado o con que alguna vez le hayan
+     * abierto un período: en los dos casos ya es cliente, y regalarle lo
+     * que viene pagando no tiene sentido.
+     */
+    public function yaTuvoPlan(): bool
+    {
+        return $this->plan_id !== null || $this->plan_started_at !== null;
+    }
+
     /** Precio que realmente paga, con el descuento que le dio el admin. */
     public function precioConDescuento(): ?float
     {

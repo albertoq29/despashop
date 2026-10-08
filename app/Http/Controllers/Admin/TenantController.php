@@ -286,11 +286,15 @@ class TenantController extends Controller
      * el formulario. Si la oferta se agotó entre medias, la aprobación sigue
      * su curso con el período normal —nadie se queda sin cuenta por eso—.
      *
+     * Tampoco va para quien ya pasó por un plan: una cuenta rechazada que
+     * vuelve, o una que el admin ya había puesto en marcha, no es alguien
+     * que llega. La oferta es para ganar clientes, no para los que están.
+     *
      * Devuelve el plan cuando la prueba se aplicó, para poder contarlo.
      */
     private function aplicarOfertaDePrueba(User $comercio, ?int $planId): ?Plan
     {
-        if ($planId === null) {
+        if ($planId === null || $comercio->yaTuvoPlan()) {
             return null;
         }
 
