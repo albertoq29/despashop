@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, Check, Store } from 'lucide-react';
+import { ArrowLeft, Check, Gift, Store } from 'lucide-react';
 import CambiarTema from '@/Components/CambiarTema';
+
+/** Si el plan se está regalando: la prueba la pone el admin al aprobar. */
+function gratis(plan) {
+    return Boolean(plan.descuento_activo && plan.es_prueba_gratis);
+}
 
 /**
  * Solicitud de cuenta. No crea un comercio activo: queda pendiente de que
@@ -242,12 +247,20 @@ export default function Register({ plans, selectedPlan, resumenLegal = [] }) {
                                                     <span className="flex items-baseline justify-between gap-2">
                                                         <span className="font-semibold">{plan.name}</span>
                                                         <span className="text-sm text-stone-500">
-                                                            ${Number(plan.price_usd).toFixed(0)}
+                                                            {gratis(plan) ? 'Gratis' : `$${Number(plan.price_usd).toFixed(0)}`}
                                                         </span>
                                                     </span>
                                                     {plan.tagline && (
                                                         <span className="mt-0.5 block text-xs text-stone-500 dark:text-stone-400">
                                                             {plan.tagline}
+                                                        </span>
+                                                    )}
+                                                    {gratis(plan) && (
+                                                        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-marca-100 px-2 py-0.5 text-[11px] font-bold text-marca-800 dark:bg-marca-950 dark:text-marca-300">
+                                                            <Gift className="h-3 w-3" />
+                                                            {plan.discount_label || 'Prueba gratis'}
+                                                            {plan.cupos_libres !== null &&
+                                                                ` · ${plan.cupos_libres} cupos`}
                                                         </span>
                                                     )}
                                                 </span>

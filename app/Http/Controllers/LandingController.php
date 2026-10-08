@@ -37,11 +37,17 @@ class LandingController extends Controller
             'support_whatsapp' => '',
             'terms_url' => '',
             'privacy_url' => '',
+            'trial_days' => '',
         ], Setting::allPlatform());
+
+        // Lo que dura una prueba gratis cuando el plan no pide otra cosa.
+        // Sale de los ajustes ya cargados, sin otra consulta.
+        $diasDePrueba = (int) $ajustes['trial_days'] ?: (int) config('planes.dias_de_prueba');
 
         return Inertia::render('Bienvenida', [
             'ajustes' => $ajustes,
             'planes' => Plan::public()->get(),
+            'diasDePrueba' => $diasDePrueba,
             // Solo el primero vigente: varias ventanas al entrar no se leen,
             // se cierran
             'aviso' => LandingNotice::vigentes()->first(),

@@ -4,6 +4,7 @@ import {
     BarChart3,
     Check,
     FileText,
+    Gift,
     Link2,
     Package,
     Palette,
@@ -13,7 +14,7 @@ import CambiarTema from '@/Components/CambiarTema';
 import Marca from '@/Components/Marca';
 import { useRevelar } from '@/hooks/useRevelar';
 
-export default function Bienvenida({ ajustes, planes, registroAbierto, catalogosDestacados, auth, aviso }) {
+export default function Bienvenida({ ajustes, planes, diasDePrueba, registroAbierto, catalogosDestacados, auth, aviso }) {
     const marca = ajustes.brand_name;
 
     return (
@@ -46,6 +47,7 @@ export default function Bienvenida({ ajustes, planes, registroAbierto, catalogos
 
                     <Planes
                         planes={planes}
+                        diasDePrueba={diasDePrueba}
                         titulo={ajustes.plans_title}
                         subtitulo={ajustes.plans_subtitle}
                         registroAbierto={registroAbierto}
@@ -468,7 +470,7 @@ function Facturacion() {
 
 /* ── Planes ─────────────────────────────────────────────────────────────── */
 
-function Planes({ planes, titulo, subtitulo, registroAbierto }) {
+function Planes({ planes, diasDePrueba, titulo, subtitulo, registroAbierto }) {
     const contenedor = useRevelar({ escalonado: 70 });
 
     if (!planes?.length) {
@@ -513,25 +515,7 @@ function Planes({ planes, titulo, subtitulo, registroAbierto }) {
                                 <p className="mt-1 text-sm text-stone-600 dark:text-stone-400">{plan.tagline}</p>
                             )}
 
-                            {plan.descuento_activo && (
-                                <p className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-300">
-                                    {plan.discount_label || `${plan.discount_percent}% de descuento`}
-                                </p>
-                            )}
-
-                            <p className={`flex items-baseline gap-1.5 ${plan.descuento_activo ? 'mt-2' : 'mt-6'}`}>
-                                <span className="font-display text-4xl font-semibold tracking-tight">
-                                    ${precio(plan.descuento_activo ? plan.precio_final : plan.price_usd)}
-                                </span>
-
-                                {plan.descuento_activo && (
-                                    <span className="text-lg text-stone-400 line-through dark:text-stone-500">
-                                        ${precio(plan.price_usd)}
-                                    </span>
-                                )}
-
-                                <span className="text-sm text-stone-500">{periodo(plan.billing_period)}</span>
-                            </p>
+                            <Precio plan={plan} diasDePrueba={diasDePrueba} />
 
                             <ul className="mt-7 flex-1 space-y-3">
                                 {(plan.features || []).map((caracteristica) => (
@@ -551,7 +535,7 @@ function Planes({ planes, titulo, subtitulo, registroAbierto }) {
                                             : 'border border-stone-300 bg-white text-stone-900 hover:bg-stone-100 dark:border-stone-700 dark:bg-stone-800 dark:text-stone-100 dark:hover:bg-stone-700'
                                     }`}
                                 >
-                                    Solicitar este plan
+                                    {esPrueba(plan) ? 'Probarlo gratis' : 'Solicitar este plan'}
                                 </Link>
                             )}
                         </article>
@@ -559,6 +543,75 @@ function Planes({ planes, titulo, subtitulo, registroAbierto }) {
                 </div>
             </div>
         </section>
+    );
+}
+
+/** Si el plan se está regalando ahora mismo. */
+function esPrueba(plan) {
+    return Boolean(plan.descuento_activo && plan.es_prueba_gratis);
+}
+
+/**
+ * El precio, y lo que pasa si el plan está en oferta.
+ *
+ * Una prueba gratis no se cuenta como descuento. «$0.00 en vez de $12.00»
+ * suena a error de la página; lo que hay que decir es cuántos días sale
+ * gratis y cuánto cuesta después, que es la pregunta que viene detrás.
+ * Si la oferta se limita por cupos, los que quedan empujan a decidir.
+ */
+function Precio({ plan, diasDePrueba }) {
+    if (esPrueba(plan)) {
+        const dias = plan.trial_days || diasDePrueba || 30;
+
+        return (
+            <>
+                <p className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-marca-700 px-2.5 py-1 text-xs font-bold text-white dark:bg-marca-500 dark:text-stone-950">
+                    <Gift className="h-3.5 w-3.5" />
+                    {plan.discount_label || 'Prueba gratis'}
+                    {plan.cupos_libres !== null && (
+                        <span className="font-semibold">
+                            · {plan.cupos_libres === 1 ? 'queda 1 cupo' : `quedan ${plan.cupos_libres} cupos`}
+                        </span>
+                    )}
+                </p>
+
+                <p className="mt-2 flex items-baseline gap-1.5">
+                    <span className="font-display text-4xl font-semibold tracking-tight">Gratis</span>
+                    <span className="text-sm text-stone-500">
+                        {dias} días
+                    </span>
+                </p>
+
+                <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
+                    Después ${precio(plan.price_usd)}
+                    {periodo(plan.billing_period)}. No se cobra nada solo: renuevas si te sirvió.
+                </p>
+            </>
+        );
+    }
+
+    return (
+        <>
+            {plan.descuento_activo && (
+                <p className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                    {plan.discount_label || `${plan.discount_percent}% de descuento`}
+                </p>
+            )}
+
+            <p className={`flex items-baseline gap-1.5 ${plan.descuento_activo ? 'mt-2' : 'mt-6'}`}>
+                <span className="font-display text-4xl font-semibold tracking-tight">
+                    ${precio(plan.descuento_activo ? plan.precio_final : plan.price_usd)}
+                </span>
+
+                {plan.descuento_activo && (
+                    <span className="text-lg text-stone-400 line-through dark:text-stone-500">
+                        ${precio(plan.price_usd)}
+                    </span>
+                )}
+
+                <span className="text-sm text-stone-500">{periodo(plan.billing_period)}</span>
+            </p>
+        </>
     );
 }
 

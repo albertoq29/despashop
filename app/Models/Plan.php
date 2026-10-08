@@ -14,7 +14,7 @@ class Plan extends Model
     protected $guarded = ['id'];
 
     /** Lo que mira la web pública: el precio ya con el descuento del día. */
-    protected $appends = ['descuento_activo', 'precio_final', 'precio_bs_final'];
+    protected $appends = ['descuento_activo', 'precio_final', 'precio_bs_final', 'es_prueba_gratis', 'cupos_libres'];
 
     protected function casts(): array
     {
@@ -24,6 +24,9 @@ class Plan extends Model
             'discount_percent' => 'integer',
             'discount_starts_at' => 'datetime',
             'discount_ends_at' => 'datetime',
+            'trial_days' => 'integer',
+            'discount_limit' => 'integer',
+            'discount_claimed' => 'integer',
             'features' => 'array',
             'allows_custom_domain' => 'boolean',
             'allows_invoice_branding' => 'boolean',
@@ -75,7 +78,7 @@ class Plan extends Model
      */
     public function descuentoVigente(): bool
     {
-        if (! $this->discount_percent) {
+        if (! $this->discount_percent || $this->cuposAgotados()) {
             return false;
         }
 
@@ -105,6 +108,76 @@ class Plan extends Model
     public function getPrecioBsFinalAttribute(): ?float
     {
         return $this->tienePrecio('price_bs') ? $this->conDescuento((float) $this->price_bs) : null;
+    }
+
+    /* ── Prueba gratis ─────────────────────────────────────────────────────── */
+
+    /**
+     * Un descuento del 100% no es un descuento: es regalar el plan.
+     *
+     * Se trata aparte porque se cuenta distinto. «$0 en vez de $20» no le
+     * dice nada a nadie; «prueba gratis 30 días, luego $20» sí.
+     */
+    public function esPruebaGratis(): bool
+    {
+        return (int) $this->discount_percent === 100;
+    }
+
+    public function getEsPruebaGratisAttribute(): bool
+    {
+        return $this->esPruebaGratis();
+    }
+
+    /** Cuánto dura el período gratis. Sin valor propio, el de la plataforma. */
+    public function diasDePrueba(): int
+    {
+        return $this->trial_days ?: Setting::platformInt('trial_days', (int) config('planes.dias_de_prueba'));
+    }
+
+    /**
+     * Cupos que quedan, o null si la oferta no se limita por cupos.
+     *
+     * Nunca da negativo: si alguien baja el tope por debajo de lo ya
+     * repartido, la oferta queda cerrada y no debiendo cupos.
+     */
+    public function getCuposLibresAttribute(): ?int
+    {
+        if ($this->discount_limit === null) {
+            return null;
+        }
+
+        return max(0, (int) $this->discount_limit - (int) $this->discount_claimed);
+    }
+
+    public function cuposAgotados(): bool
+    {
+        return $this->cupos_libres === 0;
+    }
+
+    /**
+     * Aparta un cupo. Devuelve false si ya no quedaba ninguno.
+     *
+     * La cuenta la hace la base de datos y no PHP: dos aprobaciones a la vez
+     * no pueden repartir el mismo cupo, y «los primeros diez» son diez de
+     * verdad. Sin tope no hay nada que apartar.
+     */
+    public function tomarCupo(): bool
+    {
+        if ($this->discount_limit === null) {
+            return true;
+        }
+
+        $apartado = static::whereKey($this->getKey())
+            ->where('discount_claimed', '<', $this->discount_limit)
+            ->increment('discount_claimed');
+
+        if ($apartado === 0) {
+            return false;
+        }
+
+        $this->discount_claimed = (int) $this->discount_claimed + 1;
+
+        return true;
     }
 
     private function tienePrecio(string $columna): bool

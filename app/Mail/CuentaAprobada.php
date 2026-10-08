@@ -41,6 +41,9 @@ class CuentaAprobada extends Mailable
                 'catalogo' => $this->comercio->catalogUrl(),
                 'plan' => $this->comercio->plan?->name,
                 'vence' => $this->comercio->plan_expires_at,
+                // Si entró con una prueba, conviene que lo sepa desde el
+                // primer correo y no el día que le pidan pagar
+                'prueba' => (bool) $this->comercio->plan_is_trial,
                 'panel' => route('dashboard'),
                 'personalizar' => route('catalogo.personalizar'),
                 'contacto' => [

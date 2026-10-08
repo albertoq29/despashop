@@ -18,10 +18,10 @@ class DescuentosDePlanTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function plan(array $atributos = []): Plan
+    private function plan(array $atributos = [], string $nombre = 'Emprende'): Plan
     {
         return Plan::create([
-            'name' => 'Emprende',
+            'name' => $nombre,
             'price_usd' => 20,
             'billing_period' => 'monthly',
             'ai_daily_limit' => 3,
@@ -174,14 +174,14 @@ class DescuentosDePlanTest extends TestCase
             ->assertSessionHasErrors('discount_ends_at');
     }
 
-    public function test_no_se_puede_regalar_el_plan_entero(): void
+    public function test_no_se_puede_pasar_del_cien(): void
     {
         $plan = $this->plan();
 
         $this->actingAs($this->admin())
             ->put(route('admin.planes.update', $plan), [
                 ...$plan->only(['name', 'price_usd', 'billing_period', 'ai_daily_limit', 'color']),
-                'discount_percent' => 100,
+                'discount_percent' => 120,
             ])
             ->assertSessionHasErrors('discount_percent');
     }
@@ -197,5 +197,278 @@ class DescuentosDePlanTest extends TestCase
             ]);
 
         $this->assertNull($plan->fresh()->discount_percent);
+    }
+
+    /* ── Prueba gratis ─────────────────────────────────────────── */
+
+    /** Un comercio recién registrado, pendiente de aprobación. */
+    private function solicitante(Plan $plan, string $correo = 'tienda@ejemplo.test'): User
+    {
+        return User::create([
+            'name' => 'Tienda',
+            'business_name' => 'Tienda de prueba',
+            'username' => 'tienda' . substr(md5($correo), 0, 6),
+            'email' => $correo,
+            'password' => 'Clave.Segura9',
+            'role' => User::ROLE_TENANT,
+            'status' => User::STATUS_PENDING,
+            'requested_plan_id' => $plan->id,
+            'email_verified_at' => now(),
+        ]);
+    }
+
+    private function aprobar(User $comercio): void
+    {
+        $this->actingAs($this->admin())
+            ->patch(route('admin.comercios.estado', $comercio), ['status' => User::STATUS_APPROVED])
+            ->assertRedirect();
+    }
+
+    public function test_el_cien_por_ciento_es_una_prueba_gratis(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100]);
+
+        $this->assertTrue($plan->esPruebaGratis());
+        $this->assertTrue($plan->descuentoVigente());
+        $this->assertSame(0.0, $plan->precio_final);
+    }
+
+    public function test_un_descuento_normal_no_es_prueba_gratis(): void
+    {
+        $this->assertFalse($this->plan(['discount_percent' => 90])->esPruebaGratis());
+    }
+
+    public function test_sin_dias_propios_usa_los_de_la_plataforma(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100]);
+
+        $this->assertSame((int) config('planes.dias_de_prueba'), $plan->diasDePrueba());
+        $this->assertSame(10, $this->plan(['trial_days' => 10], 'Otro')->diasDePrueba());
+    }
+
+    public function test_sin_tope_no_hay_cupos_que_contar(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100]);
+
+        $this->assertNull($plan->cupos_libres);
+        $this->assertFalse($plan->cuposAgotados());
+        $this->assertTrue($plan->tomarCupo());
+    }
+
+    public function test_los_cupos_se_reparten_hasta_agotarse(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 2]);
+
+        $this->assertTrue($plan->tomarCupo());
+        $this->assertSame(1, $plan->cupos_libres);
+
+        $this->assertTrue($plan->tomarCupo());
+        $this->assertSame(0, $plan->cupos_libres);
+
+        // El tercero se queda sin nada, y el contador no se pasa del tope
+        $this->assertFalse($plan->tomarCupo());
+        $this->assertSame(2, $plan->fresh()->discount_claimed);
+    }
+
+    public function test_agotados_los_cupos_la_oferta_deja_de_correr(): void
+    {
+        $plan = $this->plan([
+            'discount_percent' => 100,
+            'discount_limit' => 1,
+            'discount_claimed' => 1,
+        ]);
+
+        $this->assertTrue($plan->cuposAgotados());
+        $this->assertFalse($plan->descuentoVigente());
+        $this->assertSame(20.0, $plan->precio_final);
+    }
+
+    public function test_bajar_el_tope_no_deja_cupos_negativos(): void
+    {
+        $plan = $this->plan([
+            'discount_percent' => 100,
+            'discount_limit' => 2,
+            'discount_claimed' => 5,
+        ]);
+
+        $this->assertSame(0, $plan->cupos_libres);
+    }
+
+    public function test_una_oferta_agotada_no_llega_a_la_pagina(): void
+    {
+        $this->plan(['discount_percent' => 100, 'discount_limit' => 1, 'discount_claimed' => 1]);
+
+        $this->get(route('home'))
+            ->assertInertia(fn ($pagina) => $pagina
+                ->where('planes.0.descuento_activo', false)
+                ->where('planes.0.es_prueba_gratis', true)
+                ->where('planes.0.cupos_libres', 0));
+    }
+
+    // ── Al aprobar la cuenta ──────────────────────────────────────
+
+    public function test_al_aprobar_se_aplica_la_prueba_y_se_gasta_un_cupo(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 3, 'trial_days' => 45]);
+        $comercio = $this->solicitante($plan);
+
+        $this->aprobar($comercio);
+
+        $comercio->refresh();
+
+        $this->assertTrue((bool) $comercio->plan_is_trial);
+        $this->assertSame($plan->id, $comercio->plan_id);
+        $this->assertSame(
+            now()->addDays(45)->toDateString(),
+            $comercio->plan_expires_at->toDateString(),
+        );
+        $this->assertSame(2, $plan->fresh()->cupos_libres);
+    }
+
+    public function test_sin_oferta_la_aprobacion_abre_el_mes_de_siempre(): void
+    {
+        $plan = $this->plan();
+        $comercio = $this->solicitante($plan);
+
+        $this->aprobar($comercio);
+
+        $comercio->refresh();
+
+        $this->assertFalse((bool) $comercio->plan_is_trial);
+        $this->assertSame(
+            now()->addMonthNoOverflow()->toDateString(),
+            $comercio->plan_expires_at->toDateString(),
+        );
+    }
+
+    public function test_agotada_la_oferta_la_aprobacion_sigue_sin_prueba(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 1, 'discount_claimed' => 1]);
+        $comercio = $this->solicitante($plan);
+
+        $this->aprobar($comercio);
+
+        $comercio->refresh();
+
+        $this->assertSame(User::STATUS_APPROVED, $comercio->status);
+        $this->assertFalse((bool) $comercio->plan_is_trial);
+        $this->assertSame(1, $plan->fresh()->discount_claimed);
+    }
+
+    public function test_una_oferta_que_todavia_no_empieza_no_regala_nada(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_starts_at' => now()->addWeek()]);
+        $comercio = $this->solicitante($plan);
+
+        $this->aprobar($comercio);
+
+        $this->assertFalse((bool) $comercio->refresh()->plan_is_trial);
+    }
+
+    public function test_reactivar_una_cuenta_suspendida_no_gasta_cupos(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 3]);
+        $comercio = $this->solicitante($plan);
+        $comercio->update(['status' => User::STATUS_SUSPENDED, 'plan_id' => $plan->id]);
+
+        $this->aprobar($comercio);
+
+        $this->assertSame(0, $plan->fresh()->discount_claimed);
+    }
+
+    // ── El formulario del admin ──────────────────────────────────
+
+    public function test_la_pagina_de_planes_trae_los_dias_por_defecto(): void
+    {
+        $this->plan(['discount_percent' => 100, 'discount_limit' => 4, 'discount_claimed' => 1]);
+
+        $this->actingAs($this->admin())
+            ->get(route('admin.planes.index'))
+            ->assertOk()
+            ->assertInertia(fn ($pagina) => $pagina
+                ->where('diasDePrueba', (int) config('planes.dias_de_prueba'))
+                ->where('planes.0.es_prueba_gratis', true)
+                ->where('planes.0.discount_claimed', 1)
+                ->where('planes.0.cupos_libres', 3));
+    }
+
+    public function test_el_admin_ofrece_una_prueba_por_cupos(): void
+    {
+        $plan = $this->plan();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.planes.update', $plan), [
+                ...$plan->only(['name', 'price_usd', 'billing_period', 'ai_daily_limit', 'color']),
+                'discount_percent' => 100,
+                'discount_label' => 'Lanzamiento',
+                'trial_days' => 30,
+                'discount_limit' => 10,
+            ])
+            ->assertRedirect();
+
+        $plan->refresh();
+
+        $this->assertTrue($plan->esPruebaGratis());
+        $this->assertSame(30, $plan->trial_days);
+        $this->assertSame(10, $plan->discount_limit);
+        $this->assertSame(10, $plan->cupos_libres);
+    }
+
+    public function test_quitar_la_oferta_pone_los_cupos_en_cero(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 5, 'discount_claimed' => 3]);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.planes.update', $plan), [
+                ...$plan->only(['name', 'price_usd', 'billing_period', 'ai_daily_limit', 'color']),
+                'discount_percent' => '',
+            ]);
+
+        $this->assertSame(0, $plan->fresh()->discount_claimed);
+    }
+
+    public function test_el_conteo_sobrevive_a_un_cambio_de_tope(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 5, 'discount_claimed' => 3]);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.planes.update', $plan), [
+                ...$plan->only(['name', 'price_usd', 'billing_period', 'ai_daily_limit', 'color']),
+                'discount_percent' => 100,
+                'discount_limit' => 8,
+            ]);
+
+        $plan->refresh();
+
+        $this->assertSame(3, $plan->discount_claimed);
+        $this->assertSame(5, $plan->cupos_libres);
+    }
+
+    public function test_el_admin_puede_volver_el_conteo_a_cero(): void
+    {
+        $plan = $this->plan(['discount_percent' => 100, 'discount_limit' => 5, 'discount_claimed' => 3]);
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.planes.update', $plan), [
+                ...$plan->only(['name', 'price_usd', 'billing_period', 'ai_daily_limit', 'color']),
+                'discount_percent' => 100,
+                'discount_limit' => 5,
+                'reiniciar_cupos' => true,
+            ]);
+
+        $this->assertSame(0, $plan->fresh()->discount_claimed);
+    }
+
+    public function test_los_cupos_no_pueden_ser_cero(): void
+    {
+        $plan = $this->plan();
+
+        $this->actingAs($this->admin())
+            ->put(route('admin.planes.update', $plan), [
+                ...$plan->only(['name', 'price_usd', 'billing_period', 'ai_daily_limit', 'color']),
+                'discount_percent' => 100,
+                'discount_limit' => 0,
+            ])
+            ->assertSessionHasErrors('discount_limit');
     }
 }

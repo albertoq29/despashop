@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\ActivityLog;
 use App\Models\Plan;
+use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,8 @@ class PlanController extends Controller
             'planes' => Plan::withCount(['subscribers as suscriptores' => fn ($q) => $q->where('status', User::STATUS_APPROVED)])
                 ->orderBy('display_order')
                 ->get(),
+            // Lo que dura una prueba cuando el plan no pide otra cosa
+            'diasDePrueba' => Setting::platformInt('trial_days', (int) config('planes.dias_de_prueba')),
         ]);
     }
 
@@ -47,13 +50,13 @@ class PlanController extends Controller
         if ($descuentoAnterior !== $plan->discount_percent) {
             ActivityLog::record(
                 'plan.descuento',
-                $plan->discount_percent
-                    ? 'Programó un ' . $plan->discount_percent . '% de descuento en ' . $plan->name
-                    : 'Quitó el descuento de ' . $plan->name,
+                $this->comoQuedoElDescuento($plan),
                 [
                     'porcentaje' => $plan->discount_percent,
                     'desde' => $plan->discount_starts_at?->toDateString(),
                     'hasta' => $plan->discount_ends_at?->toDateString(),
+                    'cupos' => $plan->discount_limit,
+                    'dias_de_prueba' => $plan->esPruebaGratis() ? $plan->diasDePrueba() : null,
                 ],
                 $plan
             );
@@ -99,6 +102,25 @@ class PlanController extends Controller
         return back();
     }
 
+    /** Lo que queda escrito en el registro: regalar no es rebajar. */
+    private function comoQuedoElDescuento(Plan $plan): string
+    {
+        if (! $plan->discount_percent) {
+            return 'Quitó el descuento de ' . $plan->name;
+        }
+
+        if ($plan->esPruebaGratis()) {
+            $alcance = $plan->discount_limit
+                ? $plan->discount_limit . ' cupos'
+                : 'sin tope de cupos';
+
+            return 'Abrió una prueba gratis de ' . $plan->diasDePrueba()
+                . ' días en ' . $plan->name . ' (' . $alcance . ')';
+        }
+
+        return 'Programó un ' . $plan->discount_percent . '% de descuento en ' . $plan->name;
+    }
+
     private function validated(Request $request, ?Plan $plan = null): array
     {
         // `after` contra un campo vacío no compara nada útil, así que la regla
@@ -119,11 +141,17 @@ class PlanController extends Controller
             'price_bs' => ['nullable', 'numeric', 'min:0'],
             'billing_period' => ['required', 'in:monthly,yearly,lifetime,free'],
 
-            // Un descuento del 100% regalaría el plan sin querer; 90 ya es mucho
-            'discount_percent' => ['nullable', 'integer', 'min:0', 'max:90'],
+            // El 100% es la prueba gratis, y el formulario la pide con su
+            // propio botón: nadie llega ahí subiendo el porcentaje de a uno.
+            'discount_percent' => ['nullable', 'integer', 'min:0', 'max:100'],
             'discount_label' => ['nullable', 'string', 'max:40'],
             'discount_starts_at' => ['nullable', 'date'],
             'discount_ends_at' => $finDelDescuento,
+
+            // Oferta por tiempo o por cupos; el tope cabe en un smallint
+            'trial_days' => ['nullable', 'integer', 'min:1', 'max:365'],
+            'discount_limit' => ['nullable', 'integer', 'min:1', 'max:65535'],
+            'reiniciar_cupos' => ['boolean'],
 
             'max_products' => ['nullable', 'integer', 'min:1'],
             'max_images_per_product' => ['nullable', 'integer', 'min:1'],
@@ -148,12 +176,23 @@ class PlanController extends Controller
         // La promoción corre desde el primer minuto del día de inicio hasta el
         // último del de cierre: nadie piensa una oferta en horas.
         $datos['discount_percent'] = $datos['discount_percent'] ?: null;
+        $datos['trial_days'] = ($datos['trial_days'] ?? null) ?: null;
+        $datos['discount_limit'] = ($datos['discount_limit'] ?? null) ?: null;
         $datos['discount_starts_at'] = filled($datos['discount_starts_at'] ?? null)
             ? Carbon::parse($datos['discount_starts_at'])->startOfDay()
             : null;
         $datos['discount_ends_at'] = filled($datos['discount_ends_at'] ?? null)
             ? Carbon::parse($datos['discount_ends_at'])->endOfDay()
             : null;
+
+        // Los cupos tomados son de la oferta que los repartió. Si se quita el
+        // descuento, esa oferta ya no existe y el conteo no significa nada;
+        // también se puede volver a cero a mano para repetir la promoción.
+        if ($datos['discount_percent'] === null || $request->boolean('reiniciar_cupos')) {
+            $datos['discount_claimed'] = 0;
+        }
+
+        unset($datos['reiniciar_cupos']);
 
         return $datos;
     }

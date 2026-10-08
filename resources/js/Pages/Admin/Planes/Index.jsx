@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Head, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { Check, Plus, Star, Trash2, Users, X } from 'lucide-react';
+import { CalendarRange, Check, Gift, Plus, Star, Ticket, Trash2, Users, X } from 'lucide-react';
 
-export default function Index({ planes }) {
+export default function Index({ planes, diasDePrueba }) {
     const [creando, setCreando] = useState(false);
 
     return (
@@ -27,11 +27,11 @@ export default function Index({ planes }) {
                     </button>
                 </div>
 
-                {creando && <Formulario onListo={() => setCreando(false)} />}
+                {creando && <Formulario diasDePrueba={diasDePrueba} onListo={() => setCreando(false)} />}
 
                 <div className="space-y-4">
                     {planes.map((plan) => (
-                        <Tarjeta key={plan.id} plan={plan} />
+                        <Tarjeta key={plan.id} plan={plan} diasDePrueba={diasDePrueba} />
                     ))}
                 </div>
             </div>
@@ -39,11 +39,11 @@ export default function Index({ planes }) {
     );
 }
 
-function Tarjeta({ plan }) {
+function Tarjeta({ plan, diasDePrueba }) {
     const [editando, setEditando] = useState(false);
 
     if (editando) {
-        return <Formulario plan={plan} onListo={() => setEditando(false)} />;
+        return <Formulario plan={plan} diasDePrueba={diasDePrueba} onListo={() => setEditando(false)} />;
     }
 
     return (
@@ -76,6 +76,8 @@ function Tarjeta({ plan }) {
                                     Oculto en la web
                                 </span>
                             )}
+
+                            <Oferta plan={plan} />
                         </div>
 
                         {plan.tagline && (
@@ -135,7 +137,7 @@ const PERIODOS = {
     free: 'gratis',
 };
 
-function Formulario({ plan = null, onListo }) {
+function Formulario({ plan = null, diasDePrueba, onListo }) {
     const esNuevo = plan === null;
 
     const form = useForm({
@@ -150,6 +152,9 @@ function Formulario({ plan = null, onListo }) {
         discount_label: plan?.discount_label ?? '',
         discount_starts_at: soloFecha(plan?.discount_starts_at),
         discount_ends_at: soloFecha(plan?.discount_ends_at),
+        trial_days: plan?.trial_days ?? '',
+        discount_limit: plan?.discount_limit ?? '',
+        reiniciar_cupos: false,
         max_products: plan?.max_products ?? '',
         max_images_per_product: plan?.max_images_per_product ?? '',
         max_banners: plan?.max_banners ?? '',
@@ -215,7 +220,7 @@ function Formulario({ plan = null, onListo }) {
                 <Campo etiqueta="Etiqueta destacada" campo="badge" form={form} marcador="Más elegido" />
             </div>
 
-            <Descuento form={form} precio={form.data.price_usd} />
+            <Descuento form={form} plan={plan} precio={form.data.price_usd} diasPorDefecto={diasDePrueba} />
 
             <div>
                 <label className="text-sm font-medium">Descripción</label>
@@ -367,11 +372,27 @@ function Formulario({ plan = null, onListo }) {
  *
  * Se muestra el precio que va a ver el visitante mientras corra, porque el
  * porcentaje solo no dice nada: lo que se decide es a cuánto queda.
+ *
+ * Al 100% deja de ser un descuento y se vuelve una prueba gratis, que se
+ * piensa de otra manera: no importa «a cuánto queda» sino cuántos días
+ * dura y hasta cuándo se ofrece. Por eso el panel cambia entero.
  */
-function Descuento({ form, precio }) {
+function Descuento({ form, plan, precio, diasPorDefecto }) {
     const porcentaje = Number(form.data.discount_percent) || 0;
+
+    if (porcentaje === 100) {
+        return <PruebaGratis form={form} plan={plan} precio={precio} diasPorDefecto={diasPorDefecto} />;
+    }
+
     const base = Number(precio) || 0;
     const rebajado = porcentaje > 0 ? base * (1 - porcentaje / 100) : base;
+
+    const ofrecerPrueba = () =>
+        form.setData((datos) => ({
+            ...datos,
+            discount_percent: 100,
+            discount_label: datos.discount_label || 'Prueba gratis',
+        }));
 
     return (
         <fieldset className="rounded-xl border border-stone-200 p-4 dark:border-stone-800">
@@ -401,8 +422,247 @@ function Descuento({ form, precio }) {
                     )}
                 </p>
             )}
+
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-stone-200 pt-4 dark:border-stone-800">
+                <button
+                    type="button"
+                    onClick={ofrecerPrueba}
+                    className="pulsable inline-flex items-center gap-1.5 rounded-lg border border-marca-600 px-3.5 py-2 text-sm font-semibold text-marca-800 hover:bg-marca-50 dark:border-marca-500 dark:text-marca-300 dark:hover:bg-marca-950/40"
+                >
+                    <Gift className="h-4 w-4" />
+                    Ofrecer prueba gratis
+                </button>
+
+                <p className="text-xs text-stone-500 dark:text-stone-400">
+                    Regala el plan unos días, por tiempo limitado o por cupos.
+                </p>
+            </div>
         </fieldset>
     );
+}
+
+const LIMITES = [
+    { id: 'tiempo', texto: 'Por un tiempo', Icono: CalendarRange, ayuda: 'Cierra en una fecha' },
+    { id: 'cupos', texto: 'Por cupos', Icono: Ticket, ayuda: 'Cierra al repartirse' },
+];
+
+/**
+ * La oferta de prueba gratis: cuánto dura y hasta cuándo se ofrece.
+ *
+ * Las dos formas de cerrarla son excluyentes a propósito. Por tiempo se
+ * apaga en una fecha; por cupos se apaga al repartir los que había, que es
+ * como se piensa un lanzamiento: «los primeros diez». Mezclar las dos deja
+ * una oferta que nadie sabe explicar. Sin ninguna, el plan queda regalado
+ * hasta que alguien se acuerde de apagarlo, y eso se avisa.
+ */
+function PruebaGratis({ form, plan, precio, diasPorDefecto }) {
+    const [limite, setLimite] = useState(() => (plan?.discount_limit ? 'cupos' : 'tiempo'));
+
+    const dias = Number(form.data.trial_days) || diasPorDefecto;
+    const base = Number(precio) || 0;
+
+    const cupos = Number(form.data.discount_limit) || 0;
+    const tomados = plan?.discount_claimed ?? 0;
+    const libres = Math.max(0, cupos - tomados);
+    const sinCerrar = limite === 'cupos' ? cupos === 0 : !form.data.discount_ends_at;
+
+    // Al cambiar de forma se limpia la otra: lo que no cierra la oferta no
+    // debe quedar guardado diciendo que sí.
+    const elegirLimite = (nuevo) => {
+        setLimite(nuevo);
+
+        form.setData((datos) =>
+            nuevo === 'cupos'
+                ? { ...datos, discount_starts_at: '', discount_ends_at: '' }
+                : { ...datos, discount_limit: '', reiniciar_cupos: false },
+        );
+    };
+
+    const quitar = () =>
+        form.setData((datos) => ({
+            ...datos,
+            discount_percent: '',
+            discount_label: '',
+            discount_starts_at: '',
+            discount_ends_at: '',
+            discount_limit: '',
+            trial_days: '',
+            reiniciar_cupos: false,
+        }));
+
+    return (
+        <fieldset className="rounded-xl border border-marca-600 bg-marca-50/40 p-4 dark:border-marca-500/60 dark:bg-marca-950/20">
+            <legend className="inline-flex items-center gap-1.5 px-1.5 text-sm font-semibold text-marca-800 dark:text-marca-300">
+                <Gift className="h-4 w-4" />
+                Prueba gratis
+            </legend>
+
+            <p className="text-xs leading-relaxed text-stone-600 dark:text-stone-400">
+                Quien pida este plan y le aprueben la cuenta lo usa sin pagar{' '}
+                <strong className="font-semibold">{dias} días</strong>. Al terminar vence como cualquier plan
+                {base > 0 && <> y pasa a costar ${base.toFixed(2)}</>}.
+            </p>
+
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                <Campo
+                    etiqueta="Días gratis"
+                    campo="trial_days"
+                    form={form}
+                    tipo="number"
+                    marcador={String(diasPorDefecto ?? 30)}
+                />
+                <Campo etiqueta="Nombre de la promoción" campo="discount_label" form={form} marcador="Prueba gratis" />
+            </div>
+
+            <div className="mt-4">
+                <span className="text-sm font-medium">¿Hasta cuándo se ofrece?</span>
+
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                    {LIMITES.map(({ id, texto, Icono, ayuda }) => (
+                        <button
+                            key={id}
+                            type="button"
+                            onClick={() => elegirLimite(id)}
+                            aria-pressed={limite === id}
+                            className={`pulsable flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-left text-sm font-semibold ${
+                                limite === id
+                                    ? 'border-marca-600 bg-white text-marca-800 dark:border-marca-500 dark:bg-stone-900 dark:text-marca-300'
+                                    : 'border-stone-200 text-stone-600 hover:bg-white/60 dark:border-stone-700 dark:text-stone-400 dark:hover:bg-stone-900/60'
+                            }`}
+                        >
+                            <Icono className="h-4 w-4 shrink-0" />
+                            <span>
+                                {texto}
+                                <span className="block text-xs font-normal opacity-70">{ayuda}</span>
+                            </span>
+                        </button>
+                    ))}
+                </div>
+
+                {limite === 'tiempo' ? (
+                    <div className="mt-3 grid gap-4 sm:grid-cols-2">
+                        <Campo etiqueta="Empieza" campo="discount_starts_at" form={form} tipo="date" />
+                        <Campo etiqueta="Termina" campo="discount_ends_at" form={form} tipo="date" />
+                    </div>
+                ) : (
+                    <div className="mt-3 space-y-2.5">
+                        <div className="sm:max-w-[11rem]">
+                            <Campo etiqueta="Cupos" campo="discount_limit" form={form} tipo="number" marcador="10" />
+                        </div>
+
+                        {plan && cupos > 0 && <Cupos form={form} tomados={tomados} cupos={cupos} libres={libres} />}
+                    </div>
+                )}
+            </div>
+
+            {sinCerrar && (
+                <p className="mt-3 rounded-lg bg-amber-100 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                    {limite === 'cupos'
+                        ? 'Sin cupos la oferta no se cierra: todo el que pida este plan lo recibe gratis hasta que la quites.'
+                        : 'Sin fecha de cierre la oferta queda abierta: todo el que pida este plan lo recibe gratis hasta que la quites.'}
+                </p>
+            )}
+
+            <button
+                type="button"
+                onClick={quitar}
+                className="pulsable mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100"
+            >
+                <X className="h-4 w-4" />
+                Quitar la oferta
+            </button>
+        </fieldset>
+    );
+}
+
+/**
+ * Cómo van los cupos, y cómo volver a empezar.
+ *
+ * El conteo no se borra al cambiar el tope: si ya se repartieron tres, son
+ * tres repartidos. Para repetir la promoción hay que decirlo, porque poner
+ * el contador en cero regala cupos de nuevo.
+ */
+function Cupos({ form, tomados, cupos, libres }) {
+    const agotados = libres === 0;
+
+    return (
+        <div
+            className={`rounded-lg px-3 py-2 text-xs leading-relaxed ${
+                agotados
+                    ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300'
+                    : 'bg-white text-stone-600 dark:bg-stone-900 dark:text-stone-400'
+            }`}
+        >
+            {agotados ? (
+                <>Se repartieron los {cupos} cupos. La oferta ya no se muestra en la web.</>
+            ) : (
+                <>
+                    <strong className="font-semibold">{tomados}</strong> de {cupos} repartidos · quedan{' '}
+                    <strong className="font-semibold">{libres}</strong>.
+                </>
+            )}
+
+            {tomados > 0 && (
+                <label className="mt-1.5 flex cursor-pointer items-center gap-2 font-medium">
+                    <input
+                        type="checkbox"
+                        checked={Boolean(form.data.reiniciar_cupos)}
+                        onChange={(e) => form.setData('reiniciar_cupos', e.target.checked)}
+                        className="h-3.5 w-3.5 rounded border-stone-300 text-marca-700 focus:ring-marca-600 dark:border-stone-600"
+                    />
+                    Volver el conteo a cero al guardar
+                </label>
+            )}
+        </div>
+    );
+}
+
+/**
+ * La oferta del plan resumida en la ficha, para no abrir el formulario.
+ *
+ * Una oferta programada que todavía no empezó —o que ya se agotó— también
+ * se muestra: es justo cuando conviene saber que está ahí.
+ */
+function Oferta({ plan }) {
+    if (!plan.discount_percent) {
+        return null;
+    }
+
+    const corre = plan.descuento_activo;
+    const titulo = plan.es_prueba_gratis ? 'Prueba gratis' : `${plan.discount_percent}% de descuento`;
+
+    const detalle =
+        plan.cupos_libres === 0
+            ? 'cupos agotados'
+            : plan.cupos_libres !== null
+              ? `quedan ${plan.cupos_libres} de ${plan.discount_limit}`
+              : plan.discount_ends_at
+                ? `hasta el ${enCriollo(plan.discount_ends_at)}`
+                : !corre && plan.discount_starts_at
+                  ? `desde el ${enCriollo(plan.discount_starts_at)}`
+                  : null;
+
+    return (
+        <span
+            className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium ${
+                corre
+                    ? 'bg-marca-100 text-marca-800 dark:bg-marca-950 dark:text-marca-300'
+                    : 'bg-stone-200 text-stone-600 dark:bg-stone-700 dark:text-stone-300'
+            }`}
+        >
+            {plan.es_prueba_gratis ? <Gift className="h-3 w-3" /> : <Ticket className="h-3 w-3" />}
+            {titulo}
+            {detalle && <span className="font-normal opacity-80">· {detalle}</span>}
+            {!corre && <span className="font-normal opacity-80">· sin correr</span>}
+        </span>
+    );
+}
+
+/** Una fecha del servidor como se lee aquí: día primero. */
+function enCriollo(valor) {
+    const [anio, mes, dia] = soloFecha(valor).split('-');
+
+    return dia ? `${dia}/${mes}/${anio}` : '';
 }
 
 /** Del timestamp que devuelve el servidor a lo que entiende un input date. */

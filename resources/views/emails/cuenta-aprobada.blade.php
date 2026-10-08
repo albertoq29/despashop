@@ -64,10 +64,11 @@
         @if ($plan || $vence)
             <p style="margin:26px 0 0;padding-top:18px;border-top:1px solid #e7e5e4;font-size:13px;line-height:1.6;color:#78716c;">
                 @if ($plan)
-                    Plan <strong>{{ $plan }}</strong>.
+                    {{ $prueba ? 'Prueba gratis del plan' : 'Plan' }} <strong>{{ $plan }}</strong>.
                 @endif
                 @if ($vence)
-                    Activo hasta el {{ $vence->timezone(config('app.timezone'))->format('d/m/Y') }}; te avisamos
+                    {{ $prueba ? 'Gratis hasta el' : 'Activo hasta el' }}
+                    {{ $vence->timezone(config('app.timezone'))->format('d/m/Y') }}; te avisamos
                     antes de que venza.
                 @else
                     Sin fecha de vencimiento.

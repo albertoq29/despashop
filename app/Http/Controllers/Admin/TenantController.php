@@ -242,13 +242,18 @@ class TenantController extends Controller
         $seAprueba = $validated['status'] === User::STATUS_APPROVED
             && in_array($comercio->status, [User::STATUS_PENDING, User::STATUS_REJECTED], true);
 
-        if ($seAprueba && ! ($comercio->plan_expires_at?->isFuture())) {
+        $planId = $seAprueba ? ($comercio->plan_id ?? $comercio->requested_plan_id) : $comercio->plan_id;
+
+        // La prueba gratis pone las fechas ella misma, y son otras
+        $prueba = $seAprueba ? $this->aplicarOfertaDePrueba($comercio, $planId) : null;
+
+        if ($seAprueba && ! $prueba && ! ($comercio->plan_expires_at?->isFuture())) {
             $comercio->iniciarPeriodoDePlan();
         }
 
         $comercio->fill([
             'status' => $validated['status'],
-            'plan_id' => $seAprueba ? ($comercio->plan_id ?? $comercio->requested_plan_id) : $comercio->plan_id,
+            'plan_id' => $planId,
             'reviewed_at' => now(),
             'reviewed_by' => $request->user()->id,
         ])->save();
@@ -256,13 +261,51 @@ class TenantController extends Controller
         ActivityLog::record(
             'comercio.estado',
             'Cambió el estado de ' . ($comercio->business_name ?: $comercio->name) . ' a ' . $validated['status'],
-            [],
+            $prueba ? ['prueba_gratis' => $prueba->name, 'dias' => $prueba->diasDePrueba()] : [],
             $comercio
         );
 
         $this->avisarCambioDeEstado($comercio, $anterior);
 
+        if ($prueba) {
+            $quedan = $prueba->cupos_libres;
+
+            return back()->with('success', 'Aprobado con la prueba gratis de ' . $prueba->diasDePrueba()
+                . ' días del plan ' . $prueba->name . '.'
+                . ($quedan === null ? '' : ' Quedan ' . $quedan . ' cupos.'));
+        }
+
         return back()->with('success', 'Estado actualizado.');
+    }
+
+    /**
+     * Si el plan que recibe tiene una prueba gratis abierta, se la aplica.
+     *
+     * El cupo se gasta aquí y no al registrarse: «los primeros diez» son los
+     * primeros diez comercios aprobados, no los primeros diez que llenaron
+     * el formulario. Si la oferta se agotó entre medias, la aprobación sigue
+     * su curso con el período normal —nadie se queda sin cuenta por eso—.
+     *
+     * Devuelve el plan cuando la prueba se aplicó, para poder contarlo.
+     */
+    private function aplicarOfertaDePrueba(User $comercio, ?int $planId): ?Plan
+    {
+        if ($planId === null) {
+            return null;
+        }
+
+        $plan = Plan::find($planId);
+
+        if (! $plan?->esPruebaGratis() || ! $plan->descuentoVigente() || ! $plan->tomarCupo()) {
+            return null;
+        }
+
+        $comercio->plan_started_at = now();
+        $comercio->plan_expires_at = now()->addDays($plan->diasDePrueba())->endOfDay();
+        $comercio->plan_is_trial = true;
+        $comercio->expiry_notified_at = null;
+
+        return $plan;
     }
 
     /**
