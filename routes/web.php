@@ -125,6 +125,10 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     Route::get('/promociones', [SettingController::class, 'index'])->name('settings.index');
     Route::post('/promociones', [SettingController::class, 'update'])->name('settings.update');
     Route::post('/settings/banner', [SettingController::class, 'updateBanner'])->name('settings.banner');
+    // Se cambia desde el formulario del producto, que es donde se escriben
+    // los precios y donde se nota que el nombre no encaja.
+    Route::post('/settings/nombre-del-precio', [SettingController::class, 'updateNombreDelPrecio'])
+        ->name('settings.nombre-del-precio');
 
     // Inventario
     Route::resource('suplementos', SupplementController::class)->except(['create', 'show', 'edit']);

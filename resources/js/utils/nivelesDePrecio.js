@@ -25,6 +25,11 @@ export function useOpcionesDeDistribuidor() {
     return usePage().props.nivelesDePrecio?.opciones ?? NOMBRES_DISTRIBUIDOR;
 }
 
+/** Cuál está elegida. Es la clave, no el nombre: se compara mejor. */
+export function useClaveDistribuidor() {
+    return usePage().props.nivelesDePrecio?.elegido ?? 'distribuidor';
+}
+
 /** Los nombres del selector de precio de la factura. */
 export function useEtiquetasDePrecio() {
     return {

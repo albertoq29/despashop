@@ -43,6 +43,25 @@ class SettingController extends Controller
         return back()->with('success', 'Promociones actualizadas correctamente.');
     }
 
+    /**
+     * Solo el nombre del tercer precio, sin pasar por Promociones.
+     *
+     * Se decide escribiendo el precio, no buscándolo en otra pantalla: es
+     * ahí donde el comercio ve que el campo se llama como no le sirve. Va
+     * aparte de `update` porque esa guarda las promociones completas y
+     * aquí no hay ninguna que mandar.
+     */
+    public function updateNombreDelPrecio(Request $request): RedirectResponse
+    {
+        $validado = $request->validate([
+            NivelesDePrecio::CLAVE => ['required', Rule::in(array_keys(NivelesDePrecio::NOMBRES))],
+        ]);
+
+        Setting::put(NivelesDePrecio::CLAVE, $validado[NivelesDePrecio::CLAVE], $this->tenantId());
+
+        return back();
+    }
+
     public function updateBanner(Request $request): RedirectResponse
     {
         $validated = $request->validate([

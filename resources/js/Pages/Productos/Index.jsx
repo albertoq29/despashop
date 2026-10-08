@@ -10,6 +10,7 @@ import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
 import { hoyLocal } from '@/utils/fechas';
+import NombreDelPrecio from '@/Components/NombreDelPrecio';
 import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
 
 const normalizeText = (str) => {
@@ -677,6 +678,10 @@ const VARIANT_TYPES = [
                                 </div>
                             );
                         })()}
+
+                        {/* Justo debajo de los precios: es viendo el campo donde se
+                            nota que «Distribuidor» no es la palabra del negocio. */}
+                        <NombreDelPrecio />
 
                         {/* Reponer escribiendo el stock a mano sale mal cuando la
                             mercancia cambio de precio: el libro de compras la valora

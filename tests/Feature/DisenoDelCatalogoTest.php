@@ -496,6 +496,36 @@ class DisenoDelCatalogoTest extends TestCase
         $this->assertSame('Distribuidor', NivelesDePrecio::nombre($usuario->id));
     }
 
+    public function test_el_nombre_se_cambia_desde_el_formulario_del_producto(): void
+    {
+        $usuario = $this->comercio();
+
+        // Sin mandar promociones: ahí solo va el nombre
+        $this->actingAs($usuario)
+            ->post(route('settings.nombre-del-precio'), [
+                'distributor_price_label' => NivelesDePrecio::GRAN_MAYOR,
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('Gran mayor', NivelesDePrecio::nombre($usuario->id));
+    }
+
+    public function test_cambiar_el_nombre_no_toca_las_promociones(): void
+    {
+        $usuario = $this->comercio();
+        Setting::put('global_discount', '15', $usuario->id);
+        Setting::put('force_distributor', '1', $usuario->id);
+
+        $this->actingAs($usuario)->post(route('settings.nombre-del-precio'), [
+            'distributor_price_label' => NivelesDePrecio::GRAN_MAYOR,
+        ]);
+
+        $ajustes = Setting::forTenant($usuario->id);
+
+        $this->assertSame('15', $ajustes['global_discount']);
+        $this->assertSame('1', $ajustes['force_distributor']);
+    }
+
     public function test_el_panel_recibe_el_nombre_elegido(): void
     {
         $usuario = $this->comercio();
