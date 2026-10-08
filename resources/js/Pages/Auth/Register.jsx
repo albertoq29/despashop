@@ -145,6 +145,7 @@ export default function Register({ plans, selectedPlan, resumenLegal = [] }) {
                                             value={data.phone}
                                             onChange={(e) => setData('phone', e.target.value)}
                                             placeholder="+58 412 0000000"
+                                            required
                                         />
                                     </Campo>
 
@@ -154,6 +155,7 @@ export default function Register({ plans, selectedPlan, resumenLegal = [] }) {
                                             value={data.whatsapp}
                                             onChange={(e) => setData('whatsapp', e.target.value)}
                                             placeholder="+58 412 0000000"
+                                            required
                                         />
                                     </Campo>
                                 </div>
@@ -212,7 +214,7 @@ export default function Register({ plans, selectedPlan, resumenLegal = [] }) {
                             <div className="rounded-2xl border border-stone-200 bg-white p-6 dark:border-stone-800 dark:bg-stone-900">
                                 <h2 className="font-display font-semibold">Plan que te interesa</h2>
                                 <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                                    Lo confirmamos contigo al aprobar la cuenta.
+                                    Elige uno para continuar. Lo confirmamos contigo al aprobar la cuenta.
                                 </p>
 
                                 <div className="mt-5 space-y-2">
@@ -223,7 +225,10 @@ export default function Register({ plans, selectedPlan, resumenLegal = [] }) {
                                             <button
                                                 type="button"
                                                 key={plan.id}
-                                                onClick={() => setData('requested_plan_id', activo ? '' : plan.id)}
+                                                // Antes volver a pulsarlo lo desmarcaba. Ahora hace
+                                                // falta elegir uno, y dejar quitarlo sería una trampa:
+                                                // no hay opción de «ninguno» que poner en su lugar.
+                                                onClick={() => setData('requested_plan_id', plan.id)}
                                                 aria-pressed={activo}
                                                 className={`pulsable flex w-full items-start gap-3 rounded-xl border p-4 text-left ${
                                                     activo

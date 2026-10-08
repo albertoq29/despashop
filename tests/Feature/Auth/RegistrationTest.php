@@ -29,6 +29,8 @@ class RegistrationTest extends TestCase
             'business_name' => 'Comercio de prueba',
             'username' => 'comercio-de-prueba',
             'email' => 'test@example.com',
+            'phone' => '+58 414 1112233',
+            'whatsapp' => '+58 414 1112233',
             'password' => 'Clave.Segura9',
             'password_confirmation' => 'Clave.Segura9',
             'acepta_terminos' => true,

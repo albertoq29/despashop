@@ -7,6 +7,7 @@ use App\Models\InvoiceTemplate;
 use App\Models\Plan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -38,6 +39,9 @@ class RegistroYAprobacionTest extends TestCase
             'username' => 'floresrivas',
             'email' => 'ana@ejemplo.test',
             'phone' => '+58 414 1112233',
+            'whatsapp' => '+58 414 1112233',
+            // El formulario exige elegir plan cuando hay alguno publicado
+            'requested_plan_id' => Plan::public()->value('id'),
             'password' => 'Clave.Segura9',
             'password_confirmation' => 'Clave.Segura9',
             'acepta_terminos' => true,
@@ -111,6 +115,69 @@ class RegistroYAprobacionTest extends TestCase
 
         $this->post('/register', $this->datosDeSolicitud(['email' => 'otra@ejemplo.test']))
             ->assertSessionHasErrors('username');
+    }
+
+    /* ── Todo obligatorio menos lo que dice «opcional» ──────────────────── */
+
+    public static function camposObligatorios(): array
+    {
+        return [
+            'nombre' => ['name'],
+            'nombre del negocio' => ['business_name'],
+            'usuario' => ['username'],
+            'correo' => ['email'],
+            'teléfono' => ['phone'],
+            'whatsapp' => ['whatsapp'],
+            'contraseña' => ['password'],
+        ];
+    }
+
+    #[DataProvider('camposObligatorios')]
+    public function test_sin_cualquiera_de_estos_campos_no_hay_solicitud(string $campo): void
+    {
+        $this->post('/register', $this->datosDeSolicitud([$campo => '']))
+            ->assertSessionHasErrors($campo);
+
+        $this->assertDatabaseMissing('users', ['email' => 'ana@ejemplo.test']);
+    }
+
+    public function test_hay_que_elegir_un_plan(): void
+    {
+        Plan::create(['name' => 'Emprendedor', 'slug' => 'emprendedor', 'price_usd' => 9]);
+
+        $this->post('/register', $this->datosDeSolicitud(['requested_plan_id' => '']))
+            ->assertSessionHasErrors('requested_plan_id');
+
+        $this->assertDatabaseMissing('users', ['email' => 'ana@ejemplo.test']);
+    }
+
+    /**
+     * Sin planes publicados no se puede exigir elegir uno: el registro
+     * quedaría cerrado y nadie entendería por qué.
+     */
+    public function test_sin_planes_publicados_el_registro_sigue_abierto(): void
+    {
+        $this->assertSame(0, Plan::public()->count());
+
+        $this->post('/register', $this->datosDeSolicitud())
+            ->assertSessionHasNoErrors()
+            ->assertRedirect(route('cuenta.estado'));
+    }
+
+    public function test_un_plan_oculto_no_obliga_a_nada(): void
+    {
+        Plan::create(['name' => 'Interno', 'slug' => 'interno', 'price_usd' => 5, 'is_public' => false]);
+
+        $this->post('/register', $this->datosDeSolicitud())
+            ->assertSessionHasNoErrors();
+    }
+
+    public function test_contarnos_del_negocio_sigue_siendo_opcional(): void
+    {
+        $this->post('/register', $this->datosDeSolicitud(['request_message' => '']))
+            ->assertSessionHasNoErrors();
+
+        $this->assertNull(User::where('email', 'ana@ejemplo.test')->sole()->request_message);
     }
 
     public function test_al_aprobar_se_activa_la_cuenta_y_queda_lista_para_usar(): void

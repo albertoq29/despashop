@@ -55,6 +55,8 @@ class CuentaYDatosTest extends TestCase
             'business_name' => 'Flores Ana',
             'username' => 'flores-ana',
             'email' => 'ana@ejemplo.test',
+            'phone' => '+58 414 1112233',
+            'whatsapp' => '+58 414 1112233',
             'password' => 'Clave.Segura9',
             'password_confirmation' => 'Clave.Segura9',
             'acepta_terminos' => true,

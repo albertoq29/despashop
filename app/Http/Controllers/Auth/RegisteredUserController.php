@@ -40,6 +40,11 @@ class RegisteredUserController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        // Elegir plan es obligatorio, pero solo si hay alguno publicado:
+        // exigirlo sin planes dejaría el registro cerrado sin que nadie se
+        // dé cuenta de por qué.
+        $planes = Plan::public()->exists();
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'business_name' => ['required', 'string', 'max:255'],
@@ -53,9 +58,10 @@ class RegisteredUserController extends Controller
                 Rule::notIn(User::RESERVED_USERNAMES),
             ],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', 'max:40'],
-            'whatsapp' => ['nullable', 'string', 'max:40'],
-            'requested_plan_id' => ['nullable', 'exists:plans,id'],
+            'phone' => ['required', 'string', 'max:40'],
+            'whatsapp' => ['required', 'string', 'max:40'],
+            'requested_plan_id' => [$planes ? 'required' : 'nullable', 'exists:plans,id'],
+            // El único campo que se queda opcional, y lo dice en su etiqueta
             'request_message' => ['nullable', 'string', 'max:1000'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'acepta_terminos' => ['accepted'],
@@ -63,6 +69,7 @@ class RegisteredUserController extends Controller
             'username.regex' => 'El usuario solo admite minúsculas, números y guiones, y no puede empezar ni terminar con guion.',
             'username.not_in' => 'Ese nombre de usuario está reservado por la plataforma. Elige otro.',
             'acepta_terminos.accepted' => 'Para abrir una cuenta hay que aceptar los términos y condiciones.',
+            'requested_plan_id.required' => 'Elige el plan que te interesa.',
         ]);
 
         unset($validated['acepta_terminos']);
