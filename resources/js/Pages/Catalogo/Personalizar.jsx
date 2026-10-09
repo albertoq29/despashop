@@ -648,7 +648,11 @@ function Pestanas({ activa, onCambiar }) {
     return (
         <nav
             aria-label="Secciones del editor"
-            className="sticky top-16 z-20 grid grid-cols-6 border-b border-stone-200 bg-white/95 px-1.5 backdrop-blur-md dark:border-stone-800 dark:bg-stone-900/95 lg:static"
+            // En móvil queda pegada justo debajo del encabezado, que es donde
+            // se abre el menú de la cuenta. Con el mismo z-20 que él ganaba
+            // por venir después en el marcado y le tapaba «Cerrar sesión»:
+            // basta con estar por encima del editor que pasa por debajo.
+            className="sticky top-16 z-10 grid grid-cols-6 border-b border-stone-200 bg-white/95 px-1.5 backdrop-blur-md dark:border-stone-800 dark:bg-stone-900/95 lg:static"
         >
             {PESTANAS.map(({ id, etiqueta, Icono }) => {
                 const esActiva = activa === id;
