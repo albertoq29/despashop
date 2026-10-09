@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { ArrowLeft, Check, ExternalLink, LogIn, Package, Receipt, X } from 'lucide-react';
+import { ArrowLeft, Check, ExternalLink, LogIn, Package, Pin, PinOff, Receipt, X } from 'lucide-react';
 import { Insignia } from './Index';
 import ResumenDelPlan, { fechaLarga } from '@/Components/Plan/ResumenDelPlan';
 
@@ -473,6 +473,10 @@ export default function Show({ comercio, theme, catalogUrl, metricas, planes, ac
                             </div>
                         </Panel>
 
+                        <Panel titulo="Vitrina de la bienvenida">
+                            <Vitrina comercio={comercio} theme={theme} />
+                        </Panel>
+
                         <Panel titulo="Estado de la cuenta">
                             <div className="space-y-2">
                                 {[
@@ -507,6 +511,108 @@ export default function Show({ comercio, theme, catalogUrl, metricas, planes, ac
                 </div>
             </div>
         </AdminLayout>
+    );
+}
+
+/**
+ * Anclar este catálogo en la bienvenida.
+ *
+ * La tira de «negocios que ya publicaron» se llena sola por fecha; esto es
+ * otra cosa y por eso se elige a mano: lo que se enseña ahí es lo que se
+ * puede lograr con la plataforma, y el catálogo más nuevo no es el mejor
+ * armado.
+ *
+ * El orden es la fecha de anclaje, el último primero. Así subir uno al
+ * frente es volver a anclarlo, y no hace falta una pantalla aparte para
+ * ordenarlos.
+ *
+ * Se manda con `router` y no con `useForm`: el valor de «anclado» lo decide
+ * el botón que se pulse, y `transform()` de Inertia no devuelve el
+ * formulario, así que no se puede encadenar para cambiarlo al enviar.
+ */
+function Vitrina({ comercio, theme }) {
+    const [nota, setNota] = useState(comercio.showcase_note ?? '');
+    const [enviando, setEnviando] = useState(false);
+
+    const anclado = Boolean(comercio.showcase_at);
+    const publicado = Boolean(theme?.is_published);
+
+    const guardar = (valor) => {
+        setEnviando(true);
+
+        router.patch(
+            route('admin.comercios.vitrina', comercio.id),
+            { anclado: valor, showcase_note: nota },
+            { preserveScroll: true, onFinish: () => setEnviando(false) },
+        );
+    };
+
+    if (!publicado && !anclado) {
+        return (
+            <p className="text-sm leading-relaxed text-stone-500 dark:text-stone-400">
+                Su catálogo no está publicado todavía. Cuando lo publique podrás anclarlo para que aparezca
+                en la bienvenida.
+            </p>
+        );
+    }
+
+    return (
+        <div className="space-y-3">
+            <p className="text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+                {anclado
+                    ? 'Aparece en la vitrina de la bienvenida.'
+                    : 'Ancla este catálogo si destaca por su diseño: sale en la bienvenida con sus propios colores.'}
+            </p>
+
+            <div>
+                <label htmlFor="showcase_note" className="text-sm font-medium">
+                    Por qué destaca <span className="font-normal text-stone-500">(opcional)</span>
+                </label>
+                <input
+                    id="showcase_note"
+                    type="text"
+                    maxLength={120}
+                    value={nota}
+                    onChange={(e) => setNota(e.target.value)}
+                    placeholder="Portada con fotos propias y una paleta muy suya"
+                    className="mt-2 w-full rounded-lg border-stone-300 bg-white text-sm dark:border-stone-700 dark:bg-stone-950"
+                />
+                <p className="mt-1 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                    Se lee debajo del nombre en la tarjeta. Vacío, se usa el título de su portada.
+                </p>
+            </div>
+
+            <button
+                type="button"
+                disabled={enviando}
+                onClick={() => guardar(!anclado)}
+                className={`pulsable inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-4 py-2.5 text-sm font-semibold disabled:opacity-60 ${
+                    anclado
+                        ? 'border border-stone-300 hover:bg-stone-100 dark:border-stone-700 dark:hover:bg-stone-800'
+                        : 'bg-marca-700 text-white hover:bg-marca-600 dark:bg-marca-500 dark:text-stone-950'
+                }`}
+            >
+                {anclado ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                {anclado ? 'Quitar de la vitrina' : 'Anclar en la vitrina'}
+            </button>
+
+            {anclado && (
+                <>
+                    <button
+                        type="button"
+                        disabled={enviando}
+                        onClick={() => guardar(true)}
+                        className="pulsable w-full rounded-lg border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100 disabled:opacity-60 dark:border-stone-700 dark:hover:bg-stone-800"
+                    >
+                        Guardar la nota y mandarlo al frente
+                    </button>
+
+                    <p className="text-xs text-stone-500 dark:text-stone-400">
+                        Anclado el {fechaLarga(comercio.showcase_at)}. Los últimos anclados salen primero.
+                    </p>
+                </>
+            )}
+        </div>
     );
 }
 

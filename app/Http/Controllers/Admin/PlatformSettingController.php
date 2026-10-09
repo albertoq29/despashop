@@ -25,6 +25,9 @@ class PlatformSettingController extends Controller
         'landing_cta_secondary' => 'Ya tengo cuenta',
         'plans_title' => 'Planes',
         'plans_subtitle' => 'Elige el que se ajuste a tu negocio. Puedes cambiarlo cuando quieras.',
+        // Encabezado de la vitrina; los catálogos se anclan desde cada ficha
+        'showcase_title' => 'Hecho por negocios como el tuyo',
+        'showcase_subtitle' => 'Catálogos reales, cada uno con su propio diseño. Entra y míralos por dentro.',
         'registrations_open' => '1',
         // Cinta fina sobre la portada: lo más barato para anunciar algo
         'landing_announcement' => '',
@@ -60,6 +63,8 @@ class PlatformSettingController extends Controller
             'landing_cta_secondary' => ['required', 'string', 'max:40'],
             'plans_title' => ['required', 'string', 'max:80'],
             'plans_subtitle' => ['nullable', 'string', 'max:300'],
+            'showcase_title' => ['required', 'string', 'max:80'],
+            'showcase_subtitle' => ['nullable', 'string', 'max:300'],
             'registrations_open' => ['required', 'in:0,1'],
             'landing_announcement' => ['nullable', 'string', 'max:160'],
             'landing_announcement_link' => ['nullable', 'string', 'max:255'],

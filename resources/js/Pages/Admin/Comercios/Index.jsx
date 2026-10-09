@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
-import { ExternalLink, Search } from 'lucide-react';
+import { ExternalLink, Pin, Search } from 'lucide-react';
 import { fechaLarga, textoDeDias } from '@/Components/Plan/ResumenDelPlan';
 
 const ESTADOS = [
@@ -118,12 +118,22 @@ export default function Index({ comercios, planes, filtros, conteos }) {
                                     {comercios.data.map((comercio) => (
                                         <tr key={comercio.id} className="transition-colors duration-150 ease-salida hover:bg-stone-50 dark:hover:bg-stone-800/50">
                                             <td className="px-5 py-3.5">
-                                                <Link
-                                                    href={route('admin.comercios.show', comercio.id)}
-                                                    className="font-medium hover:underline"
-                                                >
-                                                    {comercio.business_name || comercio.name}
-                                                </Link>
+                                                <span className="flex items-center gap-1.5">
+                                                    <Link
+                                                        href={route('admin.comercios.show', comercio.id)}
+                                                        className="font-medium hover:underline"
+                                                    >
+                                                        {comercio.business_name || comercio.name}
+                                                    </Link>
+
+                                                    {/* Quién está en la vitrina, sin abrir cada ficha */}
+                                                    {comercio.showcase_at && (
+                                                        <Pin
+                                                            className="h-3.5 w-3.5 shrink-0 text-marca-700 dark:text-marca-400"
+                                                            title="Anclado en la vitrina"
+                                                        />
+                                                    )}
+                                                </span>
                                                 <p className="text-xs text-stone-500">/{comercio.username}</p>
                                             </td>
 

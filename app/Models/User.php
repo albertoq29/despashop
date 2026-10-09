@@ -63,6 +63,8 @@ class User extends Authenticatable implements MustVerifyEmail
         'plan_discount_percent',
         'plan_is_trial',
         'plan_note',
+        'showcase_at',
+        'showcase_note',
         'expiry_notified_at',
         'last_login_at',
         'last_login_ip',
@@ -84,6 +86,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'plan_started_at' => 'datetime',
             'plan_expires_at' => 'datetime',
             'plan_is_trial' => 'boolean',
+            'showcase_at' => 'datetime',
             'expiry_notified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
@@ -359,5 +362,21 @@ class User extends Authenticatable implements MustVerifyEmail
     public function scopeApproved($query)
     {
         return $query->where('status', self::STATUS_APPROVED);
+    }
+
+    /**
+     * Los catálogos anclados en la bienvenida, el último anclado primero.
+     *
+     * Se exige que el catálogo esté publicado aunque el admin ya lo haya
+     * comprobado al anclarlo: un comercio puede despublicarlo después, y la
+     * vitrina no puede quedar enlazando a una página que no existe.
+     */
+    public function scopeEnLaVitrina($query)
+    {
+        return $query->tenants()
+            ->approved()
+            ->whereNotNull('showcase_at')
+            ->whereHas('catalogTheme', fn ($q) => $q->where('is_published', true))
+            ->orderByDesc('showcase_at');
     }
 }

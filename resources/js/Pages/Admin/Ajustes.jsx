@@ -12,6 +12,8 @@ export default function Ajustes({ ajustes }) {
         landing_cta_secondary: ajustes.landing_cta_secondary ?? '',
         plans_title: ajustes.plans_title ?? '',
         plans_subtitle: ajustes.plans_subtitle ?? '',
+        showcase_title: ajustes.showcase_title ?? '',
+        showcase_subtitle: ajustes.showcase_subtitle ?? '',
         registrations_open: ajustes.registrations_open ?? '1',
         landing_announcement: ajustes.landing_announcement ?? '',
         landing_announcement_link: ajustes.landing_announcement_link ?? '',
@@ -122,6 +124,16 @@ export default function Ajustes({ ajustes }) {
                     <div className="space-y-4">
                         <Campo etiqueta="Título" campo="plans_title" form={form} />
                         <Campo etiqueta="Subtítulo" campo="plans_subtitle" form={form} />
+                    </div>
+                </Panel>
+
+                <Panel
+                    titulo="Vitrina de catálogos"
+                    descripcion="Solo el encabezado. Los catálogos se anclan uno por uno desde la ficha de cada comercio, y la sección no aparece si no hay ninguno anclado."
+                >
+                    <div className="space-y-4">
+                        <Campo etiqueta="Título" campo="showcase_title" form={form} />
+                        <Campo etiqueta="Subtítulo" campo="showcase_subtitle" form={form} />
                     </div>
                 </Panel>
 

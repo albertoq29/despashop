@@ -419,6 +419,52 @@ class TenantController extends Controller
     }
 
     /**
+     * Ancla o quita un catálogo de la vitrina de la bienvenida.
+     *
+     * Se elige a mano porque lo que se enseña ahí es lo que se puede lograr
+     * con la plataforma, y eso no lo decide una consulta: ni el catálogo más
+     * nuevo ni el que tiene más productos es el mejor armado.
+     *
+     * Solo se ancla lo que está publicado. Un catálogo apagado enlazaría a
+     * una página que no existe, y quien lo descubra lo hará desde la portada.
+     */
+    public function showcase(Request $request, User $comercio): RedirectResponse
+    {
+        abort_unless($comercio->isTenant(), 404);
+
+        $validado = $request->validate([
+            'anclado' => ['required', 'boolean'],
+            'showcase_note' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $nombre = $comercio->business_name ?: $comercio->name;
+
+        if (! $validado['anclado']) {
+            $comercio->update(['showcase_at' => null, 'showcase_note' => null]);
+
+            ActivityLog::record('comercio.vitrina', 'Quitó de la vitrina a ' . $nombre, [], $comercio);
+
+            return back()->with('success', 'Se quitó de la vitrina.');
+        }
+
+        if (! $comercio->catalogTheme?->is_published) {
+            return back()->with('error', 'Ese catálogo no está publicado: publícalo o pídeselo al comercio antes de anclarlo.');
+        }
+
+        // Volver a anclar lo manda al frente: la fecha es también el orden
+        $comercio->update([
+            'showcase_at' => now(),
+            'showcase_note' => $validado['showcase_note'] ?? null,
+        ]);
+
+        ActivityLog::record('comercio.vitrina', 'Ancló en la vitrina a ' . $nombre, [
+            'nota' => $comercio->showcase_note,
+        ], $comercio);
+
+        return back()->with('success', 'Anclado en la vitrina de la bienvenida, al frente de la lista.');
+    }
+
+    /**
      * Da por bueno el correo de un comercio sin que abra el enlace.
      *
      * Existe porque el correo falla: cae en spam, la dirección tiene una

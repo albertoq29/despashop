@@ -272,6 +272,114 @@ function Vitrina({ catalogos }) {
     );
 }
 
+/* ── Escaparate: los catálogos que el admin ancla ──────────────── */
+
+/**
+ * Catálogos elegidos a mano por cómo quedaron.
+ *
+ * La tira de arriba se llena sola por fecha y sirve para mostrar que la
+ * plataforma se usa. Esta es otra cosa: enseña lo que se puede lograr, y
+ * eso no lo decide una consulta —ni el más nuevo ni el que tiene más
+ * productos es el mejor armado—.
+ *
+ * Cada tarjeta se pinta con la paleta de su comercio y no con la nuestra,
+ * porque el argumento de la sección es justo que no se parecen entre sí.
+ * Sin ninguno anclado la sección no existe: mejor eso que un hueco con dos
+ * ejemplos de relleno.
+ */
+function Escaparate({ catalogos, titulo, subtitulo }) {
+    const contenedor = useRevelar({ escalonado: 80 });
+
+    if (!catalogos?.length) {
+        return null;
+    }
+
+    return (
+        <section className="border-b border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900/40">
+            <div ref={contenedor} className="mx-auto max-w-6xl px-5 py-20 lg:py-28">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-marca-700 dark:text-marca-400">
+                    Vitrina
+                </p>
+
+                <h2 className="revelar mt-4 max-w-[24ch] font-display text-3xl font-semibold tracking-tight md:text-4xl">
+                    {titulo}
+                </h2>
+
+                {subtitulo && (
+                    <p className="revelar mt-3 max-w-[55ch] text-lg leading-relaxed text-stone-600 dark:text-stone-400">
+                        {subtitulo}
+                    </p>
+                )}
+
+                <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                    {catalogos.map((catalogo) => (
+                        <TarjetaDeVitrina key={catalogo.username} catalogo={catalogo} />
+                    ))}
+                </div>
+            </div>
+        </section>
+    );
+}
+
+function TarjetaDeVitrina({ catalogo }) {
+    const colores = catalogo.colores ?? {};
+    const primario = colores.primario || '#047857';
+    const fondo = colores.fondo || '#ffffff';
+    const superficie = colores.superficie || '#f5f5f4';
+    const texto = colores.texto || '#1c1917';
+
+    return (
+        <a
+            href={catalogo.url}
+            target="_blank"
+            rel="noreferrer"
+            className="revelar pulsable group flex flex-col overflow-hidden rounded-2xl border border-stone-200 transition-shadow duration-300 ease-salida hover:shadow-lg dark:border-stone-800"
+        >
+            {/* Un adelanto con sus propios colores: la portada si la tiene, y
+                si no, su paleta, que ya dice bastante */}
+            <span className="relative block h-36 overflow-hidden" style={{ background: fondo }}>
+                {catalogo.cover_url ? (
+                    <img
+                        src={catalogo.cover_url}
+                        alt=""
+                        loading="lazy"
+                        className="h-full w-full object-cover transition-transform duration-500 ease-salida group-hover:scale-[1.04]"
+                    />
+                ) : (
+                    <span
+                        className="absolute inset-0"
+                        style={{ background: `linear-gradient(135deg, ${primario} 0%, ${superficie} 100%)` }}
+                    />
+                )}
+
+                {catalogo.logo_url && (
+                    <img
+                        src={catalogo.logo_url}
+                        alt=""
+                        loading="lazy"
+                        className="absolute bottom-3 left-3 h-12 w-12 rounded-xl object-cover ring-2 ring-white/90 dark:ring-stone-900/90"
+                    />
+                )}
+            </span>
+
+            <span className="flex flex-1 flex-col gap-1 p-5" style={{ background: superficie, color: texto }}>
+                <span className="font-display text-lg font-semibold">{catalogo.name}</span>
+
+                {(catalogo.nota || catalogo.titulo) && (
+                    <span className="text-sm leading-relaxed opacity-75">
+                        {catalogo.nota || catalogo.titulo}
+                    </span>
+                )}
+
+                <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: primario }}>
+                    Ver el catálogo
+                    <ArrowRight className="h-4 w-4 transition-transform duration-200 ease-salida group-hover:translate-x-0.5" />
+                </span>
+            </span>
+        </a>
+    );
+}
+
 /* ── Capacidades: rejilla asimétrica, celdas de distinto peso ───────────── */
 
 function Capacidades() {

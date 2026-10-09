@@ -192,6 +192,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::patch('/comercios/{comercio}/plan', [TenantController::class, 'updatePlan'])->name('comercios.plan');
     Route::post('/comercios/{comercio}/prueba', [TenantController::class, 'trial'])->name('comercios.prueba');
     Route::post('/comercios/{comercio}/verificar-correo', [TenantController::class, 'verifyEmail'])->name('comercios.verificar-correo');
+    Route::patch('/comercios/{comercio}/vitrina', [TenantController::class, 'showcase'])->name('comercios.vitrina');
     Route::post('/comercios/{comercio}/inspeccionar', [TenantController::class, 'inspect'])->name('comercios.inspeccionar');
     Route::post('/inspeccion/salir', [TenantController::class, 'stopInspecting'])->name('inspeccion.salir');
 

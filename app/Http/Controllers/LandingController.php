@@ -38,6 +38,8 @@ class LandingController extends Controller
             'terms_url' => '',
             'privacy_url' => '',
             'trial_days' => '',
+            'showcase_title' => 'Hecho por negocios como el tuyo',
+            'showcase_subtitle' => 'Catálogos reales, cada uno con su propio diseño. Entra y míralos por dentro.',
         ], Setting::allPlatform());
 
         // Lo que dura una prueba gratis cuando el plan no pide otra cosa.
@@ -53,6 +55,8 @@ class LandingController extends Controller
             'aviso' => LandingNotice::vigentes()->first(),
             'registroAbierto' => $ajustes['registrations_open'] === '1',
             'catalogosDestacados' => $this->featuredCatalogs(),
+            // La vitrina elegida a mano: lo que se puede lograr, no cuántos hay
+            'vitrina' => $this->showcase(),
             'auth' => [
                 'user' => $request->user()?->only(['id', 'name', 'username', 'role', 'status']),
             ],
@@ -79,6 +83,39 @@ class LandingController extends Controller
                 'logo_url' => $user->catalogTheme?->logo_url,
                 'color' => $user->catalogTheme?->color_primary,
                 'url' => $user->catalogUrl(),
+            ]);
+    }
+
+    /**
+     * Los catálogos que el administrador ancló por su diseño.
+     *
+     * Van sus colores además del logo: el punto de la sección es mostrar lo
+     * distinto que puede verse cada catálogo, y para eso la tarjeta tiene
+     * que pintarse con la paleta de cada comercio y no con la nuestra.
+     *
+     * @return \Illuminate\Support\Collection<int, array>
+     */
+    private function showcase()
+    {
+        return User::enLaVitrina()
+            ->with('catalogTheme')
+            ->limit(9)
+            ->get()
+            ->map(fn (User $user) => [
+                'username' => $user->username,
+                'name' => $user->business_name ?: $user->name,
+                'nota' => $user->showcase_note,
+                'url' => $user->catalogUrl(),
+                'logo_url' => $user->catalogTheme?->logo_url,
+                'cover_url' => $user->catalogTheme?->cover_url,
+                'colores' => [
+                    'primario' => $user->catalogTheme?->color_primary,
+                    'fondo' => $user->catalogTheme?->color_bg,
+                    'superficie' => $user->catalogTheme?->color_surface,
+                    'texto' => $user->catalogTheme?->color_text,
+                    'acento' => $user->catalogTheme?->color_accent,
+                ],
+                'titulo' => $user->catalogTheme?->hero_title,
             ]);
     }
 }
