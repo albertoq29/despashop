@@ -11,6 +11,7 @@ use App\Models\Combo;
 use App\Models\Product;
 use App\Models\User;
 use App\Services\Seguridad\RegistroDeSeguridad;
+use App\Support\Contraste;
 use App\Support\SeccionesDelCatalogo;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -156,8 +157,9 @@ class AsistenteDeCatalogo
         }
 
         // 3. Generación
-        $secciones = CatalogTheme::first()?->sections ?? SeccionesDelCatalogo::normalizar([]);
-        $contexto = $this->contexto($comercio);
+        $tema = CatalogTheme::first();
+        $secciones = $tema?->sections ?? SeccionesDelCatalogo::normalizar([]);
+        $contexto = $this->contexto($comercio, $tema);
 
         try {
             $respuesta = $this->cliente->completar(
@@ -211,7 +213,7 @@ class AsistenteDeCatalogo
     }
 
     /** Lo que la IA necesita saber del comercio. Nunca precios, costos ni datos de clientes. */
-    private function contexto(User $comercio): array
+    private function contexto(User $comercio, ?CatalogTheme $tema): array
     {
         return [
             'nombre' => $comercio->business_name ?: $comercio->name,
@@ -220,7 +222,32 @@ class AsistenteDeCatalogo
             'productos_totales' => Product::count(),
             'banners' => CatalogBanner::count(),
             'combos' => Combo::where('is_hidden', false)->count(),
+            // Un comercio que ya subió su logo tiene su marca decidida: la IA
+            // propone alrededor de esos colores en vez de inventar otros.
+            'colores_del_logo' => $this->coloresDelLogo($tema),
+            'tiene_logo' => (bool) $tema?->logo_path,
+            // Una barbería no vende «productos», y los textos se notan
+            'servicios' => Product::where('item_type', Product::SERVICIO)->count(),
         ];
+    }
+
+    /**
+     * Los colores del logo, si los hay y son válidos.
+     *
+     * Se filtran aquí y no en el prompt porque `logo_palette` es una columna
+     * JSON: lo que haya quedado de una versión vieja del extractor no debe
+     * acabar escrito en la petición.
+     *
+     * @return list<string>
+     */
+    private function coloresDelLogo(?CatalogTheme $tema): array
+    {
+        $colores = array_filter(
+            (array) ($tema?->logo_palette ?? []),
+            fn ($color) => is_string($color) && Contraste::esHex($color),
+        );
+
+        return array_values(array_map('strtolower', array_slice($colores, 0, 4)));
     }
 
     private function registrar(array $datos): AiGeneration

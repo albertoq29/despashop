@@ -470,4 +470,173 @@ class AsistenteIaTest extends TestCase
 
         $this->assertSame('split', $tema->fresh()->hero_layout);
     }
+
+    /* ── La marca que el comercio ya tiene ──────────────────────── */
+
+    /** Pone colores de logo en el tema del comercio, como al subir uno. */
+    private function conLogo(User $usuario, array $colores): void
+    {
+        CatalogTheme::withoutGlobalScope('tenant')
+            ->where('user_id', $usuario->id)
+            ->first()
+            ->forceFill(['logo_path' => 'logos/prueba.png', 'logo_palette' => $colores])
+            ->save();
+    }
+
+    /** El texto del sistema que recibió el generador. */
+    private function promptDelGenerador(): string
+    {
+        $texto = '';
+
+        Http::assertSent(function (PeticionHttp $peticion) use (&$texto) {
+            if ($peticion['model'] !== self::MODERACION) {
+                $texto = $peticion['messages'][0]['content'];
+            }
+
+            return true;
+        });
+
+        return $texto;
+    }
+
+    public function test_la_ia_recibe_los_colores_del_logo(): void
+    {
+        $usuario = $this->comercio();
+        $this->conLogo($usuario, ['#1d4ed8', '#f59e0b']);
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->assertOk();
+
+        $prompt = $this->promptDelGenerador();
+
+        $this->assertStringContainsString('#1d4ed8', $prompt);
+        $this->assertStringContainsString('#f59e0b', $prompt);
+        $this->assertStringContainsString('ya tiene logo', $prompt);
+        $this->assertStringContainsString('familia de color distinta', $prompt);
+    }
+
+    public function test_sin_logo_no_se_le_habla_de_la_marca(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $propuesta = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta');
+
+        $this->assertStringNotContainsString('ya tiene logo', $this->promptDelGenerador());
+        $this->assertFalse($propuesta['tema']['palette_from_logo']);
+    }
+
+    public function test_la_paleta_queda_atada_al_logo_si_lo_siguio(): void
+    {
+        $usuario = $this->comercio();
+        $this->conLogo($usuario, ['#1d4ed8']);
+        // Azul como el del logo: el mismo matiz, otro tono
+        $this->fingirGroq(['paleta' => [
+            'primario' => '#2563eb',
+            'secundario' => '#1e40af',
+            'acento' => '#f59e0b',
+            'fondo' => '#ffffff',
+            'superficie' => '#f8fafc',
+            'texto' => '#0f172a',
+            'tenue' => '#64748b',
+        ]]);
+
+        $propuesta = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta');
+
+        $this->assertTrue($propuesta['tema']['palette_from_logo']);
+    }
+
+    /**
+     * Si la IA no hizo caso, el interruptor no se enciende: diría que la
+     * paleta sigue al logo cuando no lo hace, y al subir otro logo se
+     * repintaría encima sin que el comercio entienda por qué.
+     */
+    public function test_si_la_ia_se_fue_por_otro_color_no_se_marca(): void
+    {
+        $usuario = $this->comercio();
+        $this->conLogo($usuario, ['#1d4ed8']);
+        $this->fingirGroq(['paleta' => [
+            'primario' => '#15803d',   // verde, otra familia
+            'secundario' => '#166534',
+            'acento' => '#f59e0b',
+            'fondo' => '#ffffff',
+            'superficie' => '#f8fafc',
+            'texto' => '#0f172a',
+            'tenue' => '#64748b',
+        ]]);
+
+        $propuesta = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta');
+
+        $this->assertFalse($propuesta['tema']['palette_from_logo']);
+    }
+
+    /** Un logo en blanco y negro no decide ninguna paleta. */
+    public function test_un_logo_sin_color_no_ata_nada(): void
+    {
+        $usuario = $this->comercio();
+        $this->conLogo($usuario, ['#1f1f1f', '#e5e5e5']);
+        $this->fingirGroq();
+
+        $propuesta = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta');
+
+        // Los colores igual se le pasan, pero nada queda marcado como suyo
+        $this->assertStringContainsString('#1f1f1f', $this->promptDelGenerador());
+        $this->assertFalse($propuesta['tema']['palette_from_logo']);
+    }
+
+    public function test_a_un_comercio_de_servicios_se_le_dice_que_no_despacha(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Product::create([
+            'name' => 'Corte de cabello',
+            'item_type' => Product::SERVICIO,
+            'price_usdt' => 8,
+        ]));
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->assertOk();
+
+        $this->assertStringContainsString('no despacha mercancía', $this->promptDelGenerador());
+    }
+
+    public function test_con_productos_y_servicios_los_textos_sirven_para_los_dos(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, function () {
+            Product::create(['name' => 'Corte', 'item_type' => Product::SERVICIO, 'price_usdt' => 8]);
+            Product::create(['name' => 'Cera', 'price_usdt' => 6, 'stock' => 5]);
+        });
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->assertOk();
+
+        $prompt = $this->promptDelGenerador();
+
+        $this->assertStringContainsString('productos y también servicios', $prompt);
+        $this->assertStringNotContainsString('no despacha mercancía', $prompt);
+    }
+
+    public function test_sin_servicios_no_se_menciona_el_rubro(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Product::create(['name' => 'Cera', 'price_usdt' => 6, 'stock' => 5]));
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->assertOk();
+
+        $prompt = $this->promptDelGenerador();
+
+        // «servicios sexuales» vive en las reglas de seguridad, así que se
+        // buscan las frases de la indicación y no la palabra suelta
+        $this->assertStringNotContainsString('no despacha mercancía', $prompt);
+        $this->assertStringNotContainsString('productos y también servicios', $prompt);
+    }
 }
