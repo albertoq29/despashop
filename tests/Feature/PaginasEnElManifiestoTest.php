@@ -83,6 +83,58 @@ class PaginasEnElManifiestoTest extends TestCase
     }
 
     /**
+     * Un componente definido en una página y nunca renderizado.
+     *
+     * Pasó con la vitrina de la bienvenida: el componente quedó escrito y
+     * la sección nunca se pintó, porque la línea que lo renderizaba no se
+     * guardó. Compila igual, las pruebas del servidor pasan igual —el prop
+     * sí viaja— y la pantalla simplemente no muestra nada.
+     *
+     * Se mira el archivo y no el navegador porque aquí no hay forma de
+     * pintar React, pero el síntoma es visible desde el código: nadie usa
+     * la etiqueta.
+     */
+    public function test_ninguna_pagina_define_un_componente_que_no_usa(): void
+    {
+        $muertos = [];
+
+        foreach (File::allFiles(resource_path('js/Pages')) as $archivo) {
+            if ($archivo->getExtension() !== 'jsx') {
+                continue;
+            }
+
+            $codigo = (string) file_get_contents($archivo->getPathname());
+
+            // El componente de la página se exporta por defecto y nunca se
+            // usa como etiqueta dentro de su propio archivo
+            preg_match('/^export\s+default\s+function\s+(\w+)/m', $codigo, $principal);
+
+            preg_match_all('/^(?:export\s+)?function\s+([A-Z]\w*)\s*\(/m', $codigo, $definidos);
+
+            foreach ($definidos[1] as $componente) {
+                if ($componente === ($principal[1] ?? null)) {
+                    continue;
+                }
+
+                // Como etiqueta, o pasado como valor (un mapa de paneles)
+                $sinSuDefinicion = str_replace('function ' . $componente, '', $codigo);
+
+                if (! str_contains($codigo, '<' . $componente)
+                    && ! preg_match('/[:\s,\[(]' . $componente . '[\s,\])}]/', $sinSuDefinicion)) {
+                    $muertos[] = $archivo->getFilename() . ' -> ' . $componente;
+                }
+            }
+        }
+
+        $this->assertSame([], $muertos, implode("\n", [
+            'Estos componentes están definidos en una página y nadie los usa:',
+            ...$muertos,
+            '',
+            'O falta la línea que los renderiza, o son código muerto que sobra.',
+        ]));
+    }
+
+    /**
      * Las pantallas del admin abren de verdad.
      *
      * Son las que menos se prueban y las que más fácil se rompen así: cada

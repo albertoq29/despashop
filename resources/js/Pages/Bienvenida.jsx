@@ -14,7 +14,16 @@ import CambiarTema from '@/Components/CambiarTema';
 import Marca from '@/Components/Marca';
 import { useRevelar } from '@/hooks/useRevelar';
 
-export default function Bienvenida({ ajustes, planes, diasDePrueba, registroAbierto, catalogosDestacados, auth, aviso }) {
+export default function Bienvenida({
+    ajustes,
+    planes,
+    diasDePrueba,
+    registroAbierto,
+    catalogosDestacados,
+    vitrina,
+    auth,
+    aviso,
+}) {
     const marca = ajustes.brand_name;
 
     return (
@@ -36,6 +45,14 @@ export default function Bienvenida({ ajustes, planes, diasDePrueba, registroAbie
 
                 <main>
                     <Portada ajustes={ajustes} registroAbierto={registroAbierto} auth={auth} />
+
+                    {/* Lo elegido a mano va primero: es el argumento fuerte.
+                        La tira de abajo solo dice cuántos ya publicaron. */}
+                    <Escaparate
+                        catalogos={vitrina}
+                        titulo={ajustes.showcase_title}
+                        subtitulo={ajustes.showcase_subtitle}
+                    />
 
                     {catalogosDestacados?.length > 0 && <Vitrina catalogos={catalogosDestacados} />}
 
