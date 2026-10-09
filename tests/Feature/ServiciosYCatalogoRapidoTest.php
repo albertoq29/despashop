@@ -191,6 +191,102 @@ class ServiciosYCatalogoRapidoTest extends TestCase
         $this->assertSame(8, (int) $producto->fresh()->stock);   // el producto sí descuenta
     }
 
+    /* ── Agotado no es lo mismo que oculto ──────────────────────────────── */
+
+    /**
+     * Quedarse sin existencias no saca el producto del catálogo.
+     *
+     * Un producto agotado sigue vendiendo: el cliente lo ve, pregunta y se
+     * lo encarga. Esconderlo al llegar a cero perdería esas ventas y
+     * dejaría al comercio sin saber qué le piden. La tarjeta lo marca como
+     * «Agotado» y la ficha cambia el botón por «Preguntar disponibilidad».
+     */
+    public function test_un_producto_agotado_sigue_en_el_catalogo(): void
+    {
+        $comercio = $this->comercio();
+
+        $this->comoTenant($comercio, fn () => Product::create([
+            'name' => 'Cera para barba',
+            'price_usdt' => 6,
+            'stock' => 0,
+        ]));
+
+        $this->get('/' . $comercio->username)
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina
+                ->has('productos', 1)
+                ->where('productos.0.name', 'Cera para barba')
+                // El cero viaja: es lo que la tarjeta lee para decir «Agotado»
+                ->where('productos.0.stock', 0));
+    }
+
+    public function test_vender_hasta_agotar_no_oculta_el_producto(): void
+    {
+        $comercio = $this->comercio();
+
+        [$producto, $factura] = $this->comoTenant($comercio, function () {
+            $producto = Product::create(['name' => 'Cera', 'price_usdt' => 6, 'stock' => 3]);
+
+            $factura = Factura::create([
+                'client_name' => 'Cliente',
+                'status' => 'draft',
+                'subtotal_usd' => 18,
+                'total_usd' => 18,
+                'bcv_rate' => 39,
+            ]);
+
+            FacturaItem::create([
+                'factura_id' => $factura->id,
+                'product_id' => $producto->id,
+                'product_name' => $producto->name,
+                'price_type' => 'detal',
+                'unit_price_usd' => 6,
+                'qty' => 3,
+                'subtotal_usd' => 18,
+            ]);
+
+            return [$producto, $factura];
+        });
+
+        $this->actingAs($comercio)
+            ->post(route('facturas.confirmar', $factura->id))
+            ->assertSessionHasNoErrors();
+
+        $producto->refresh();
+
+        $this->assertSame(0, (int) $producto->stock);
+        $this->assertFalse((bool) $producto->is_hidden);
+
+        // Y el público lo sigue viendo, agotado
+        $this->get('/' . $comercio->username)
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina
+                ->has('productos', 1)
+                ->where('productos.0.stock', 0));
+    }
+
+    public function test_ocultar_es_cosa_del_comercio_y_se_deshace(): void
+    {
+        $comercio = $this->comercio();
+
+        $producto = $this->comoTenant($comercio, fn () => Product::create([
+            'name' => 'Cera',
+            'price_usdt' => 6,
+            'stock' => 0,
+        ]));
+
+        $this->actingAs($comercio)->patch(route('productos.toggle-hidden', $producto->id));
+
+        $this->assertTrue((bool) $producto->fresh()->is_hidden);
+        $this->get('/' . $comercio->username)
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina->has('productos', 0));
+
+        $this->actingAs($comercio)->patch(route('productos.toggle-hidden', $producto->id));
+
+        $this->assertFalse((bool) $producto->fresh()->is_hidden);
+        $this->get('/' . $comercio->username)
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina->has('productos', 1));
+    }
+
     // ── El catálogo trae solo lo necesario ─────────────────────────────────────
 
     public function test_la_rejilla_llega_por_tandas(): void
