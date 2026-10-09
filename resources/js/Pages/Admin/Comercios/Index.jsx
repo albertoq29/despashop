@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { ExternalLink, Pin, Search } from 'lucide-react';
+import EstadoDeComercio from '@/Components/Admin/EstadoDeComercio';
 import { fechaLarga, textoDeDias } from '@/Components/Plan/ResumenDelPlan';
 
 const ESTADOS = [
@@ -11,20 +12,6 @@ const ESTADOS = [
     { valor: 'suspended', etiqueta: 'Suspendidos', clave: 'suspended' },
     { valor: 'rejected', etiqueta: 'Rechazados', clave: 'rejected' },
 ];
-
-export const TONOS_ESTADO = {
-    pending: 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300',
-    approved: 'bg-marca-100 text-marca-800 dark:bg-marca-950 dark:text-marca-300',
-    suspended: 'bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300',
-    rejected: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
-};
-
-export const NOMBRES_ESTADO = {
-    pending: 'Pendiente',
-    approved: 'Activo',
-    suspended: 'Suspendido',
-    rejected: 'Rechazado',
-};
 
 export default function Index({ comercios, planes, filtros, conteos }) {
     const [busqueda, setBusqueda] = useState(filtros.buscar ?? '');
@@ -138,7 +125,7 @@ export default function Index({ comercios, planes, filtros, conteos }) {
                                             </td>
 
                                             <td className="px-5 py-3.5">
-                                                <Insignia estado={comercio.status} />
+                                                <EstadoDeComercio estado={comercio.status} />
                                             </td>
 
                                             <td className="px-5 py-3.5">
@@ -229,13 +216,5 @@ function Vigencia({ vigencia }) {
             {fechaLarga(vigencia.vence)}
             {vigencia.estado !== 'activo' && ` · ${textoDeDias(vigencia.dias_restantes)}`}
         </p>
-    );
-}
-
-export function Insignia({ estado }) {
-    return (
-        <span className={`inline-block rounded-md px-2 py-1 text-xs font-medium ${TONOS_ESTADO[estado]}`}>
-            {NOMBRES_ESTADO[estado]}
-        </span>
     );
 }

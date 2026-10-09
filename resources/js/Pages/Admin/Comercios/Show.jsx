@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AdminLayout from '@/Layouts/AdminLayout';
 import { ArrowLeft, Check, ExternalLink, LogIn, Package, Pin, PinOff, Receipt, X } from 'lucide-react';
-import { Insignia } from './Index';
+import EstadoDeComercio from '@/Components/Admin/EstadoDeComercio';
 import ResumenDelPlan, { fechaLarga } from '@/Components/Plan/ResumenDelPlan';
 
 export default function Show({ comercio, theme, catalogUrl, metricas, planes, actividad, resumenPlan, venceSugerido, solicitudDePlan }) {
@@ -63,7 +63,7 @@ export default function Show({ comercio, theme, catalogUrl, metricas, planes, ac
                                 <h2 className="truncate font-display text-xl font-semibold">
                                     {comercio.business_name || comercio.name}
                                 </h2>
-                                <Insignia estado={comercio.status} />
+                                <EstadoDeComercio estado={comercio.status} />
                             </div>
 
                             <p className="mt-1 truncate text-sm text-stone-500 dark:text-stone-400">
