@@ -135,6 +135,56 @@ class PaginasEnElManifiestoTest extends TestCase
     }
 
     /**
+     * Una etiqueta que no existe en ninguna parte.
+     *
+     * El reverso del caso anterior, y pasó también: una página usaba
+     * `<PagoEnDivisas>` y el componente solo quedó escrito en la otra. No
+     * es un error de compilación —un identificador suelto no lo es— así
+     * que el build pasa y la pantalla revienta al abrirla.
+     */
+    public function test_ninguna_pagina_usa_un_componente_que_no_existe(): void
+    {
+        $fantasmas = [];
+
+        foreach (File::allFiles(resource_path('js/Pages')) as $archivo) {
+            if ($archivo->getExtension() !== 'jsx') {
+                continue;
+            }
+
+            $codigo = (string) file_get_contents($archivo->getPathname());
+
+            // Lo que el archivo tiene a mano: definido aquí, importado, o
+            // recibido como prop. Un icono llega casi siempre así
+            // —`function Metrica({ Icono })`— y luego se pinta.
+            preg_match_all('/(?:function|const|let|class)\s+([A-Z]\w*)/', $codigo, $propios);
+            preg_match_all('/^import\s+(.+?)\s+from\s/ms', $codigo, $importes);
+            preg_match_all('/[{,]\s*([A-Z]\w*)\s*[,}=:]/', $codigo, $recibidos);
+
+            $aMano = [...$propios[1], ...$recibidos[1]];
+
+            foreach ($importes[1] as $lista) {
+                preg_match_all('/([A-Z]\w*)/', $lista, $nombres);
+                $aMano = [...$aMano, ...$nombres[1]];
+            }
+
+            // Las etiquetas que de verdad se pintan. `<Foo.Bar>` cuenta
+            // como `Foo`, que es lo que tiene que existir.
+            preg_match_all('/<([A-Z]\w*)/', $codigo, $usados);
+
+            foreach (array_unique($usados[1]) as $componente) {
+                if (! in_array($componente, $aMano, true)) {
+                    $fantasmas[] = $archivo->getFilename() . ' -> <' . $componente . '>';
+                }
+            }
+        }
+
+        $this->assertSame([], $fantasmas, implode("\n", [
+            'Estas páginas pintan un componente que no definen ni importan:',
+            ...$fantasmas,
+        ]));
+    }
+
+    /**
      * Las pantallas del admin abren de verdad.
      *
      * Son las que menos se prueban y las que más fácil se rompen así: cada

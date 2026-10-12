@@ -1707,8 +1707,8 @@ function PagoEnDivisas({ activo, onCambiar, items }) {
             <p className="text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
                 {activo
                     ? (conPromo > 0
-                        ? `${conPromo} ${conPromo === 1 ? 'rengl\u00f3n usa' : 'renglones usan'} su precio en divisas. Los dem\u00e1s no tienen promo y se cobran normal.`
-                        : 'Ning\u00fan rengl\u00f3n tiene precio en divisas: se cobran normal. Config\u00faralo en cada producto.')
+                        ? `${conPromo} ${conPromo === 1 ? 'renglón usa' : 'renglones usan'} su precio en divisas. Los demás no tienen promo y se cobran normal.`
+                        : 'Ningún renglón tiene precio en divisas: se cobran normal. Configúralo en cada producto.')
                     : 'Usa el precio especial en divisas de cada producto, cuando lo tenga.'}
             </p>
         </div>

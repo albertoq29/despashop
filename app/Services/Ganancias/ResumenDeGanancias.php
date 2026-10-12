@@ -121,6 +121,10 @@ class ResumenDeGanancias
                 'neto' => round($periodo['ganancia'] - $perdidas + $adicionales, 2),
             ],
 
+            // Las ventas cobradas en divisas, señaladas aparte. Ya van
+            // dentro del período: esto no suma, solo dice cuánto fue.
+            'divisas' => $this->divisas($comercioId, $inicio, $fin, $periodo['ingresos']),
+
             // Acumulado del inventario, no del período
             'inversion' => [
                 'en_stock' => round($filas->sum('inversion_stock'), 2),
@@ -386,6 +390,64 @@ class ResumenDeGanancias
             'envios' => round((float) $facturas->envios, 2),
             'facturas' => (int) $facturas->cuantas,
             'empaques' => round($empaques, 2),
+        ];
+    }
+
+    /**
+     * Lo que se cobró en divisas, contado aparte.
+     *
+     * La ganancia real de una venta en divisas no se puede calcular bien:
+     * el costo quedó registrado en su momento al cambio de ese día, y el
+     * precio en divisas no es una conversión del precio normal sino otro
+     * precio. Mezclar las dos cosas da un número con cara de exacto que no
+     * lo es.
+     *
+     * Así que se hace la misma cuenta que en una venta normal —precio
+     * menos costo— y se dice que es una estimación. Lo que sí es exacto es
+     * cuántas ventas fueron y cuánto se cobró, que es lo que el comercio
+     * necesita para cuadrar su efectivo.
+     *
+     * Estas ventas ya están dentro de los totales del período: esto no
+     * suma aparte, solo señala qué parte del total vino por aquí.
+     */
+    private function divisas(int $comercioId, ?Carbon $inicio, ?Carbon $fin, float $ingresosDelPeriodo): array
+    {
+        $items = FacturaItem::query()
+            ->join('facturas', 'facturas.id', '=', 'factura_items.factura_id')
+            ->where('facturas.user_id', $comercioId)
+            ->where('facturas.status', 'confirmed')
+            ->where('facturas.en_divisas', true)
+            ->when($inicio, fn ($q) => $q->where('facturas.confirmed_at', '>=', $inicio))
+            ->when($fin, fn ($q) => $q->where('facturas.confirmed_at', '<=', $fin))
+            ->selectRaw('COALESCE(SUM(factura_items.subtotal_usd), 0) as ingresos')
+            ->selectRaw('COALESCE(SUM(factura_items.cost_price * factura_items.qty), 0) as costo')
+            ->selectRaw('COALESCE(SUM(factura_items.profit_usd), 0) as ganancia')
+            ->selectRaw('COALESCE(SUM(factura_items.qty), 0) as unidades')
+            ->first();
+
+        $facturas = Factura::query()
+            ->where('user_id', $comercioId)
+            ->where('status', 'confirmed')
+            ->where('en_divisas', true)
+            ->when($inicio, fn ($q) => $q->where('confirmed_at', '>=', $inicio))
+            ->when($fin, fn ($q) => $q->where('confirmed_at', '<=', $fin))
+            ->selectRaw('COUNT(*) as cuantas, COALESCE(SUM(total_usd), 0) as cobrado')
+            ->first();
+
+        $ingresos = round((float) $items->ingresos, 2);
+
+        return [
+            'facturas' => (int) $facturas->cuantas,
+            'unidades' => (int) $items->unidades,
+            // Lo exacto: lo que entró en efectivo, con envíos incluidos
+            'cobrado' => round((float) $facturas->cobrado, 2),
+            'ingresos' => $ingresos,
+            'costo_ventas' => round((float) $items->costo, 2),
+            // Lo estimado: la misma cuenta de siempre, nada más
+            'ganancia_estimada' => round((float) $items->ganancia, 2),
+            'parte_de_las_ventas' => $ingresosDelPeriodo > 0
+                ? round(($ingresos / $ingresosDelPeriodo) * 100, 1)
+                : 0.0,
         ];
     }
 

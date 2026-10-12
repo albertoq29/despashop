@@ -19,7 +19,7 @@ const normalizeText = (str) => {
     return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 };
 
-/** Cada cu\u00e1nto renueva una suscripci\u00f3n. Mismas claves que Product::PERIODOS. */
+/** Cada cuánto renueva una suscripción. Mismas claves que Product::PERIODOS. */
 const PERIODOS_SUSCRIPCION = [
     ['mensual', 'Mensual'],
     ['trimestral', 'Trimestral'],
@@ -27,11 +27,11 @@ const PERIODOS_SUSCRIPCION = [
     ['anual', 'Anual'],
 ];
 
-/** D\u00f3nde se presta un servicio. Mismas claves que App\Models\Product. */
+/** Dónde se presta un servicio. Mismas claves que App\Models\Product. */
 const MODALIDADES_SERVICIO = {
     local: 'En nuestro local',
     domicilio: 'A domicilio',
-    remoto: 'En l\u00ednea',
+    remoto: 'En línea',
     acordar: 'A convenir',
 };
 

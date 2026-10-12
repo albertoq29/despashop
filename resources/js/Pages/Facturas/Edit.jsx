@@ -1802,3 +1802,45 @@ function RenovacionDelRenglon({ item, onCambiar }) {
         </div>
     );
 }
+
+/**
+ * Pagar en divisas: una decisión de la factura, no de cada renglón.
+ *
+ * El cliente paga todo en efectivo o no paga nada en efectivo, así que el
+ * interruptor es uno y vale para la factura entera. Cada renglón toma la
+ * promo de su propio nivel, y el que no tenga se cobra normal: por eso se
+ * dice cuántos cambiaron, para que nadie suponga que bajaron todos.
+ */
+function PagoEnDivisas({ activo, onCambiar, items }) {
+    const conPromo = items.filter((i) => {
+        const base = i._producto || i._combo;
+        const [, divisa] = CAMPOS_DE_PRECIO[i.price_type] ?? CAMPOS_DE_PRECIO.detal;
+
+        return base && base[divisa] && i.price_type !== 'custom';
+    }).length;
+
+    return (
+        <div className="mt-2 border-t border-stone-200 pt-3 dark:border-stone-800">
+            <label className="mb-1 flex cursor-pointer select-none items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={activo}
+                    onChange={(e) => onCambiar(e.target.checked)}
+                    className="h-4 w-4 rounded border-stone-300 text-marca-700 focus:ring-marca-600 focus:ring-opacity-25 dark:border-stone-700 dark:text-marca-400 dark:focus:ring-marca-400"
+                />
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700 dark:text-stone-300">
+                    <Banknote className="h-4 w-4" />
+                    Paga en divisas
+                </span>
+            </label>
+
+            <p className="text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
+                {activo
+                    ? (conPromo > 0
+                        ? `${conPromo} ${conPromo === 1 ? 'renglón usa' : 'renglones usan'} su precio en divisas. Los demás no tienen promo y se cobran normal.`
+                        : 'Ningún renglón tiene precio en divisas: se cobran normal. Configúralo en cada producto.')
+                    : 'Usa el precio especial en divisas de cada producto, cuando lo tenga.'}
+            </p>
+        </div>
+    );
+}

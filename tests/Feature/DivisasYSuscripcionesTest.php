@@ -166,6 +166,101 @@ class DivisasYSuscripcionesTest extends TestCase
         $this->assertSame(16.0, $factura->total_usd);
     }
 
+    /* ── El apartado del libro de ganancias ─────────────────────────────── */
+
+    /** Una venta confirmada, en divisas o no, con su costo. */
+    private function venta(User $comercio, bool $enDivisas, float $precio, float $costo): void
+    {
+        $this->comoTenant($comercio, function () use ($enDivisas, $precio, $costo) {
+            $producto = Product::create(['name' => 'Audífonos', 'price_usdt' => $precio, 'cost_price' => $costo, 'stock' => 9]);
+
+            $factura = Factura::create([
+                'client_name' => 'Cliente',
+                'status' => 'confirmed',
+                'confirmed_at' => now(),
+                'subtotal_usd' => $precio,
+                'total_usd' => $precio,
+                'bcv_rate' => 39,
+                'en_divisas' => $enDivisas,
+                'profit_usd' => $precio - $costo,
+            ]);
+
+            FacturaItem::create([
+                'factura_id' => $factura->id,
+                'product_id' => $producto->id,
+                'product_name' => 'Audífonos',
+                'price_type' => 'detal',
+                'unit_price_usd' => $precio,
+                'cost_price' => $costo,
+                'qty' => 1,
+                'subtotal_usd' => $precio,
+                'profit_usd' => $precio - $costo,
+            ]);
+        });
+    }
+
+    public function test_el_libro_cuenta_las_ventas_en_divisas_aparte(): void
+    {
+        $comercio = $this->comercio();
+        $this->venta($comercio, enDivisas: true, precio: 16, costo: 10);
+        $this->venta($comercio, enDivisas: true, precio: 8, costo: 5);
+        $this->venta($comercio, enDivisas: false, precio: 20, costo: 10);
+
+        $this->actingAs($comercio)
+            ->get(route('profits.index'))
+            ->assertOk()
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina
+                ->where('divisas.facturas', 2)
+                ->where('divisas.unidades', 2)
+                ->where('divisas.ingresos', 24)
+                ->where('divisas.costo_ventas', 15)
+                ->where('divisas.ganancia_estimada', 9)
+                // 24 de 44 vendidos en total
+                ->where('divisas.parte_de_las_ventas', 54.5));
+    }
+
+    /**
+     * Las ventas en divisas ya van dentro del período: el apartado señala,
+     * no suma aparte.
+     */
+    public function test_la_ganancia_en_divisas_tambien_esta_en_el_total(): void
+    {
+        $comercio = $this->comercio();
+        $this->venta($comercio, enDivisas: true, precio: 16, costo: 10);
+        $this->venta($comercio, enDivisas: false, precio: 20, costo: 10);
+
+        $this->actingAs($comercio)
+            ->get(route('profits.index'))
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina
+                ->where('periodo.ganancia_bruta', 16)
+                ->where('divisas.ganancia_estimada', 6));
+    }
+
+    public function test_sin_ventas_en_divisas_el_apartado_viene_en_cero(): void
+    {
+        $comercio = $this->comercio();
+        $this->venta($comercio, enDivisas: false, precio: 20, costo: 10);
+
+        $this->actingAs($comercio)
+            ->get(route('profits.index'))
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina
+                ->where('divisas.facturas', 0)
+                ->where('divisas.ganancia_estimada', 0)
+                ->where('divisas.parte_de_las_ventas', 0));
+    }
+
+    public function test_un_borrador_en_divisas_no_cuenta(): void
+    {
+        $comercio = $this->comercio();
+        $this->venta($comercio, enDivisas: true, precio: 16, costo: 10);
+
+        Factura::withoutGlobalScope('tenant')->sole()->update(['status' => 'draft']);
+
+        $this->actingAs($comercio)
+            ->get(route('profits.index'))
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina->where('divisas.facturas', 0));
+    }
+
     /* ── Suscripciones ──────────────────────────────────────────────────── */
 
     public function test_una_suscripcion_necesita_periodo_para_renovarse(): void

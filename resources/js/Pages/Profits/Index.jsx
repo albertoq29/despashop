@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Banknote } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import TextInput from '@/Components/TextInput';
@@ -31,6 +32,7 @@ export default function Index({
     sales,
     periodo,
     inversion,
+    divisas,
     allProducts,
     availableYears,
     gananciasStartDate = null,
@@ -557,6 +559,8 @@ export default function Index({
                                                 </span>
                                             </div>
                                         </div>
+
+                                        <VentasEnDivisas divisas={divisas} />
                                     </div>
 
                                     {/* Punto de Equilibrio & ROI */}
@@ -1271,5 +1275,83 @@ export default function Index({
             )}
 
         </AuthenticatedLayout>
+    );
+}
+
+
+/**
+ * Las ventas cobradas en divisas, señaladas aparte.
+ *
+ * La ganancia real de una venta en divisas no se puede calcular bien: el
+ * costo quedó registrado al cambio del día que se compró, y el precio en
+ * divisas no es una conversión del normal sino otro precio. Lo que se
+ * muestra es la misma cuenta de siempre —precio menos costo— y por eso
+ * se dice estimada, con el número exacto al lado: cuántas ventas fueron
+ * y cuánto efectivo entró, que es lo que de verdad se puede cuadrar.
+ *
+ * Estas ventas ya están dentro de los totales de arriba. El apartado no
+ * suma: dice qué parte del total vino por aquí.
+ */
+function VentasEnDivisas({ divisas }) {
+    if (!divisas || divisas.facturas === 0) {
+        return null;
+    }
+
+    return (
+        <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                    <Banknote className="h-4 w-4" />
+                    Ventas en divisas
+                </h4>
+                <span className="rounded-full bg-amber-200/70 px-2.5 py-0.5 text-[11px] font-black text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                    {divisas.parte_de_las_ventas}% de las ventas
+                </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-3 text-xs">
+                <Dato
+                    etiqueta="Ventas"
+                    valor={`${divisas.facturas} ${divisas.facturas === 1 ? 'factura' : 'facturas'}`}
+                    detalle={`${divisas.unidades} ${divisas.unidades === 1 ? 'unidad' : 'unidades'}`}
+                />
+                <Dato
+                    etiqueta="Efectivo cobrado"
+                    valor={`$${divisas.cobrado.toFixed(2)}`}
+                    detalle="Con envíos incluidos"
+                />
+                <Dato etiqueta="Costo de lo vendido" valor={`$${divisas.costo_ventas.toFixed(2)}`} />
+                <Dato
+                    etiqueta="Ganancia estimada"
+                    valor={`$${divisas.ganancia_estimada.toFixed(2)}`}
+                    destacado
+                />
+            </div>
+
+            <p className="mt-3 text-[10px] leading-relaxed text-amber-800 dark:text-amber-300">
+                <strong>Es una estimación.</strong> Se calcula igual que una venta normal, precio menos costo, pero el
+                costo se registró al cambio del día que compraste y el precio en divisas es otro precio, no una
+                conversión. Lo exacto son las ventas y el efectivo cobrado. Ya están sumadas arriba: esto no se
+                cuenta aparte.
+            </p>
+        </div>
+    );
+}
+
+function Dato({ etiqueta, valor, detalle, destacado = false }) {
+    return (
+        <div>
+            <p className="font-medium text-amber-700 dark:text-amber-400">{etiqueta}</p>
+            <p
+                className={`font-mono font-black ${
+                    destacado
+                        ? 'text-base text-amber-900 dark:text-amber-200'
+                        : 'text-sm text-amber-800 dark:text-amber-300'
+                }`}
+            >
+                {valor}
+            </p>
+            {detalle && <p className="text-[10px] text-amber-600 dark:text-amber-500">{detalle}</p>}
+        </div>
     );
 }
