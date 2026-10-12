@@ -79,6 +79,18 @@ function getSuggestedPrice(producto, priceType, enDivisas = false) {
     return isNaN(price) ? 0 : price;
 }
 
+/**
+ * Un servicio no se agota.
+ *
+ * No lleva existencias porque no hay nada que contar, así que su tope de
+ * cantidad es el que haga falta. Antes caía en la regla de los productos
+ * y, con el stock en cero que le toca por definición, no se podía ni
+ * agregar a una factura.
+ */
+const esServicio = (producto) => producto?.es_servicio === true;
+
+const stockDisponible = (producto) => (esServicio(producto) ? Infinity : parseInt(producto?.stock) || 0);
+
 let _uid = 0;
 const uid = () => ++_uid;
 
@@ -327,13 +339,13 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                 const variant = product.variants.find(v => v.id === item.product_variant_id);
                 return variant ? (parseInt(variant.stock) || 0) : 0;
             }
-            return parseInt(product.stock) || 0;
+            return stockDisponible(product);
         }
         return Infinity;
     };
 
     const addProduct = (producto) => {
-        const availableStock = parseInt(producto.stock) || 0;
+        const availableStock = stockDisponible(producto);
 
         if (availableStock <= 0) {
             Swal.fire({
@@ -385,7 +397,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
         const producto = item._producto;
         if (!producto) return;
 
-        const availableStock = parseInt(producto.stock) || 0;
+        const availableStock = stockDisponible(producto);
         if (availableStock <= 0) {
             Swal.fire({
                 icon: 'warning',
@@ -490,7 +502,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
         let ajustados = 0;
 
         seleccion.forEach(({ producto, qty }) => {
-            const stock = parseInt(producto.stock) || 0;
+            const stock = stockDisponible(producto);
             if (stock <= 0) return;
 
             const unitPrice = !isNaN(parseFloat(producto.price_usdt)) ? parseFloat(producto.price_usdt) : 0;
@@ -962,7 +974,8 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-semibold text-stone-800 dark:text-stone-200 truncate group-hover:text-marca-800 dark:group-hover:text-marca-300">{p.name}</p>
                                                         <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                                                            {p.price_usdt ? `$${parseFloat(p.price_usdt).toFixed(2)}` : 'A consultar'} · Stock: {p.stock}
+                                                            {p.price_usdt ? `$${parseFloat(p.price_usdt).toFixed(2)}` : 'A consultar'}
+                                                        {esServicio(p) ? ' · Servicio' : ` · Stock: ${p.stock}`}
                                                         </p>
                                                         {inCart > 0 && (
                                                             <p className="text-[10px] font-bold text-marca-700 dark:text-marca-400 mt-0.5">{inCart} en la factura</p>

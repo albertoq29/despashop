@@ -151,6 +151,70 @@ class ServiciosYCatalogoRapidoTest extends TestCase
                 ->where('productos.0.name', 'Corte de cabello'));
     }
 
+    /**
+     * La pantalla de la factura tiene que saber qué es un servicio.
+     *
+     * Sin este dato cae en la regla de los productos y, con el stock en
+     * cero que a un servicio le toca por definición, no se podía ni
+     * agregar a la factura: salía «Producto agotado».
+     */
+    public function test_la_factura_sabe_cual_producto_es_un_servicio(): void
+    {
+        $comercio = $this->comercio();
+
+        $this->comoTenant($comercio, function () {
+            Product::create(['name' => 'Corte', 'item_type' => Product::SERVICIO, 'price_usdt' => 8]);
+            Product::create(['name' => 'Cera', 'price_usdt' => 6, 'stock' => 4]);
+        });
+
+        $this->actingAs($comercio)
+            ->get(route('facturas.create'))
+            ->assertOk()
+            ->assertInertia(function (AssertableInertia $pagina) {
+                $productos = collect($pagina->toArray()['props']['productos']);
+
+                $this->assertTrue($productos->firstWhere('name', 'Corte')['es_servicio']);
+                $this->assertFalse($productos->firstWhere('name', 'Cera')['es_servicio']);
+            });
+    }
+
+    /** Un servicio se factura y se confirma con sus existencias en cero. */
+    public function test_un_servicio_se_factura_sin_tener_existencias(): void
+    {
+        $comercio = $this->comercio();
+
+        $servicio = $this->comoTenant($comercio, fn () => Product::create([
+            'name' => 'Corte de cabello',
+            'item_type' => Product::SERVICIO,
+            'price_usdt' => 8,
+        ]));
+
+        $this->assertSame(0, (int) $servicio->stock);
+
+        $this->actingAs($comercio)
+            ->post(route('facturas.store'), [
+                'status' => 'draft',
+                'items' => [[
+                    'product_id' => $servicio->id,
+                    'product_name' => 'Corte de cabello',
+                    'price_type' => 'detal',
+                    'unit_price_usd' => 8,
+                    'qty' => 3,
+                ]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $factura = Factura::withoutGlobalScope('tenant')->sole();
+
+        $this->actingAs($comercio)
+            ->post(route('facturas.confirmar', $factura->id))
+            ->assertSessionHasNoErrors()
+            ->assertSessionMissing('error');
+
+        $this->assertSame('confirmed', $factura->fresh()->status);
+        $this->assertSame(0, (int) $servicio->fresh()->stock);
+    }
+
     public function test_confirmar_una_factura_no_descuenta_existencias_de_un_servicio(): void
     {
         $comercio = $this->comercio();

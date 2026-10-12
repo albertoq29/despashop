@@ -65,6 +65,9 @@ class FacturaController extends Controller
                 'price_divisa_usdt'              => $p->price_divisa_usdt,
                 'price_mayor_divisa_usdt'        => $p->price_mayor_divisa_usdt,
                 'price_distribuidor_divisa_usdt' => $p->price_distribuidor_divisa_usdt,
+                // Un servicio no lleva existencias: la pantalla tiene que
+                // saberlo o le pedira stock que no existe
+                'es_servicio'             => $p->esServicio(),
                 'es_suscripcion'          => $p->esSuscripcion(),
                 'periodo_suscripcion'     => $p->periodo_suscripcion,
                 'cost_price'              => $p->cost_price,
@@ -494,6 +497,9 @@ class FacturaController extends Controller
                 'price_divisa_usdt'              => $p->price_divisa_usdt,
                 'price_mayor_divisa_usdt'        => $p->price_mayor_divisa_usdt,
                 'price_distribuidor_divisa_usdt' => $p->price_distribuidor_divisa_usdt,
+                // Un servicio no lleva existencias: la pantalla tiene que
+                // saberlo o le pedira stock que no existe
+                'es_servicio'             => $p->esServicio(),
                 'es_suscripcion'          => $p->esSuscripcion(),
                 'periodo_suscripcion'     => $p->periodo_suscripcion,
                 'cost_price'              => $p->cost_price,
