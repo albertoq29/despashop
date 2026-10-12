@@ -63,6 +63,12 @@ class ProductController extends Controller
                 'price_usdt'               => 'nullable|numeric|min:0',
                 'price_mayor_usdt'         => 'nullable|numeric|min:0.01',
                 'price_distribuidor_usdt'  => 'nullable|numeric|min:0.01',
+                // Promo para quien paga en divisas: uno por nivel, opcional
+                'price_divisa_usdt'              => 'nullable|numeric|min:0.01',
+                'price_mayor_divisa_usdt'        => 'nullable|numeric|min:0.01',
+                'price_distribuidor_divisa_usdt' => 'nullable|numeric|min:0.01',
+                'es_suscripcion'           => 'nullable|boolean',
+                'periodo_suscripcion'      => 'nullable|in:' . implode(',', array_keys(Product::PERIODOS)),
                 'cost_price'               => 'nullable|numeric|min:0',
                 // Un servicio no lleva existencias: solo se exigen a los productos
                 'stock'                    => 'required_unless:item_type,servicio|nullable|integer|min:0',
@@ -106,6 +112,7 @@ class ProductController extends Controller
                 'price_usdt'               => $request->price_usdt ?: null,
                 'price_mayor_usdt'         => $request->price_mayor_usdt,
                 'price_distribuidor_usdt'  => $request->price_distribuidor_usdt,
+                ...$this->divisasYSuscripcion($request),
                 'cost_price'               => $request->cost_price,
                 'stock'                    => $existencias,
                 'conditional_price'        => $request->conditional_price,
@@ -175,6 +182,12 @@ class ProductController extends Controller
                 'price_usdt'               => 'nullable|numeric|min:0',
                 'price_mayor_usdt'         => 'nullable|numeric|min:0.01',
                 'price_distribuidor_usdt'  => 'nullable|numeric|min:0.01',
+                // Promo para quien paga en divisas: uno por nivel, opcional
+                'price_divisa_usdt'              => 'nullable|numeric|min:0.01',
+                'price_mayor_divisa_usdt'        => 'nullable|numeric|min:0.01',
+                'price_distribuidor_divisa_usdt' => 'nullable|numeric|min:0.01',
+                'es_suscripcion'           => 'nullable|boolean',
+                'periodo_suscripcion'      => 'nullable|in:' . implode(',', array_keys(Product::PERIODOS)),
                 'cost_price'               => 'nullable|numeric|min:0',
                 'stock'                    => 'required_unless:item_type,servicio|nullable|integer|min:0',
                 'categories'               => 'nullable|array',
@@ -212,6 +225,7 @@ class ProductController extends Controller
             $data['service_mode'] = $esServicio ? $request->service_mode : null;
             $data['stock'] = $esServicio ? 0 : (int) $request->stock;
             $data['price_usdt']             = $request->price_usdt ?: null;
+            $data += $this->divisasYSuscripcion($request);
             $data['is_hidden']              = filter_var($request->input('is_hidden', false), FILTER_VALIDATE_BOOLEAN);
             $data['por_llegar']             = filter_var($request->input('por_llegar', false), FILTER_VALIDATE_BOOLEAN);
             $data['show_variants_in_store'] = filter_var($request->input('show_variants_in_store', true), FILTER_VALIDATE_BOOLEAN);
@@ -386,6 +400,34 @@ class ProductController extends Controller
             Log::error('Error al eliminar: ' . $e->getMessage());
             return redirect()->back()->withErrors(['error' => 'Error al eliminar']);
         }
+    }
+
+    /**
+     * Promo en divisas y suscripción: lo que store() y update() comparten.
+     *
+     * Un precio en divisas vacío se guarda como null y no como cero: cero
+     * sería regalar el producto a quien pague en efectivo, y lo que quiere
+     * decir el campo en blanco es «este nivel no tiene promo».
+     *
+     * El período solo se guarda si de verdad es una suscripción. Dejarlo
+     * puesto al apagar el interruptor haría que volviera a aparecer como
+     * renovable sin que nadie lo pidiera.
+     *
+     * @return array<string, mixed>
+     */
+    private function divisasYSuscripcion(Request $request): array
+    {
+        $esSuscripcion = filter_var($request->input('es_suscripcion', false), FILTER_VALIDATE_BOOLEAN);
+
+        return [
+            'price_divisa_usdt' => $request->price_divisa_usdt ?: null,
+            'price_mayor_divisa_usdt' => $request->price_mayor_divisa_usdt ?: null,
+            'price_distribuidor_divisa_usdt' => $request->price_distribuidor_divisa_usdt ?: null,
+            'es_suscripcion' => $esSuscripcion,
+            'periodo_suscripcion' => $esSuscripcion
+                ? ($request->input('periodo_suscripcion') ?: 'mensual')
+                : null,
+        ];
     }
 
     public function toggleHidden(Product $producto)

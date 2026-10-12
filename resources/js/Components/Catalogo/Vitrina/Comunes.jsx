@@ -76,10 +76,14 @@ export function PreciosPorVolumen({ articulo, donde = 'tarjeta' }) {
     }
 
     const escalones = [
-        ['Por mayor', articulo.price_mayor_usdt],
+        ['Por mayor', articulo.price_mayor_usdt, articulo.price_mayor_divisa_usdt],
         // El mismo precio se llama «distribuidor» o «gran mayor» según el
         // ramo del comercio, y el cliente reconoce solo el suyo.
-        [comercio.nombreDistribuidor || 'Distribuidor', articulo.price_distribuidor_usdt],
+        [
+            comercio.nombreDistribuidor || 'Distribuidor',
+            articulo.price_distribuidor_usdt,
+            articulo.price_distribuidor_divisa_usdt,
+        ],
     ].filter(([, precio]) => precio && Number(precio) > 0);
 
     if (escalones.length === 0) {
@@ -103,19 +107,54 @@ export function PreciosPorVolumen({ articulo, donde = 'tarjeta' }) {
             className="mt-4 overflow-hidden rounded-xl"
             style={{ background: 'color-mix(in srgb, var(--cat-primario) 7%, transparent)' }}
         >
-            {escalones.map(([etiqueta, precio], indice) => (
+            {escalones.map(([etiqueta, precio, enDivisas], indice) => (
                 <div
                     key={etiqueta}
                     className="flex items-baseline justify-between px-4 py-2.5"
                     style={{ borderTop: indice > 0 ? `1px solid ${BORDE_SUAVE}` : 'none' }}
                 >
                     <span className="text-sm" style={{ color: 'var(--cat-tenue)' }}>{etiqueta}</span>
-                    <span className="text-base font-bold" style={{ color: 'var(--cat-primario)' }}>
-                        ${Number(precio).toFixed(2)}
+                    <span className="flex items-baseline gap-2">
+                        {/* Pagando en divisas el nivel sale más barato */}
+                        {enDivisas && Number(enDivisas) > 0 && (
+                            <span className="text-xs font-semibold" style={{ color: 'var(--cat-acento)' }}>
+                                ${Number(enDivisas).toFixed(2)} en divisas
+                            </span>
+                        )}
+                        <span className="text-base font-bold" style={{ color: 'var(--cat-primario)' }}>
+                            ${Number(precio).toFixed(2)}
+                        </span>
                     </span>
                 </div>
             ))}
         </div>
+    );
+}
+
+/**
+ * La promo para quien paga en divisas.
+ *
+ * No es el precio en dólares convertido a bolívares: es otro precio, más
+ * bajo, que el comercio ofrece a quien paga en efectivo en divisas. Se
+ * anuncia porque es justo lo que hace que valga la pena escribirle.
+ */
+export function PromoEnDivisas({ articulo, className = '' }) {
+    const precio = articulo.price_divisa_usdt;
+
+    if (!precio || Number(precio) <= 0) {
+        return null;
+    }
+
+    return (
+        <span
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold leading-tight ${className}`}
+            style={{
+                background: 'color-mix(in srgb, var(--cat-acento) 16%, transparent)',
+                color: 'var(--cat-acento)',
+            }}
+        >
+            ${Number(precio).toFixed(2)} en divisas
+        </span>
     );
 }
 

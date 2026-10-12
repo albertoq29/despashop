@@ -5,6 +5,7 @@ import { Head, router } from '@inertiajs/react';
 import Swal from 'sweetalert2';
 import { buildHaystack, fuzzySearchList } from '@/utils/fuzzySearch';
 import AgregadoRapido from '@/Components/AgregadoRapido';
+import { Banknote, CalendarClock } from 'lucide-react';
 import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
 
 const PRICE_COLORS = {
@@ -56,14 +57,25 @@ const saveProductosOrden = (orden) => {
     }
 };
 
-// Devuelve el precio sugerido según tipo de precio y producto
-function getSuggestedPrice(producto, priceType) {
-    let price = 0;
-    switch (priceType) {
-        case 'mayor':        price = parseFloat(producto.price_mayor_usdt || producto.price_usdt); break;
-        case 'distribuidor': price = parseFloat(producto.price_distribuidor_usdt || producto.price_usdt); break;
-        default:             price = parseFloat(producto.price_usdt); break;
-    }
+/** Cada nivel con su columna normal y la de la promo en divisas. */
+const CAMPOS_DE_PRECIO = {
+    detal:        ['price_usdt', 'price_divisa_usdt'],
+    mayor:        ['price_mayor_usdt', 'price_mayor_divisa_usdt'],
+    distribuidor: ['price_distribuidor_usdt', 'price_distribuidor_divisa_usdt'],
+};
+
+/**
+ * El precio que toca: el del nivel, o el de divisas si se paga así.
+ *
+ * La promo en divisas es por nivel y opcional, así que un nivel sin ella
+ * se cobra normal. Y un nivel sin precio propio cae al de detal, como
+ * siempre: un producto sin precio al mayor no deja el renglón en cero.
+ */
+function getSuggestedPrice(producto, priceType, enDivisas = false) {
+    const [normal, divisa] = CAMPOS_DE_PRECIO[priceType] ?? CAMPOS_DE_PRECIO.detal;
+    const elegido = (enDivisas && producto[divisa]) || producto[normal] || producto.price_usdt;
+    const price = parseFloat(elegido);
+
     return isNaN(price) ? 0 : price;
 }
 
@@ -72,6 +84,8 @@ const uid = () => ++_uid;
 
 export default function Create({ auth, productos, combos = [], bcvRate, supplements = [], categorias = [] }) {
     const PRICE_LABELS = useEtiquetasDePrecio();
+    // Pagar en divisas tiene su propio precio por nivel
+    const [enDivisas, setEnDivisas] = useState(false);
     const [search, setSearch] = useState('');
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [activeTab, setActiveTab] = useState('productos'); // 'productos' or 'combos'
@@ -251,7 +265,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
             ));
             return;
         }
-        const unitPrice = !isNaN(parseFloat(producto.price_usdt)) ? parseFloat(producto.price_usdt) : 0;
+        const unitPrice = getSuggestedPrice(producto, item.price_type || 'detal', enDivisas);
         setItems(prev => [...prev, {
             _uid:               uid(),
             type:               'product',
@@ -314,7 +328,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
             comboProducts.forEach(p => {
                 const existingIdx = nextItems.findIndex(i => i.product_id === p.id && i.combo_id === combo.id);
                 const productPriceType = p.price_type || 'detal';
-                const unitPrice = getSuggestedPrice(p, productPriceType);
+                const unitPrice = getSuggestedPrice(p, productPriceType, enDivisas);
 
                 if (existingIdx > -1) {
                     const existingItem = nextItems[existingIdx];
@@ -439,6 +453,29 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
         });
     };
 
+    /**
+     * Cambiar la forma de pago repinta los precios.
+     *
+     * Los renglones que el comercio escribió a mano quedan como están: un
+     * precio acordado no se recalcula solo porque el cliente saque
+     * efectivo.
+     */
+    const cambiarDivisas = (valor) => {
+        setEnDivisas(valor);
+
+        setItems(prev => prev.map(item => {
+            const base = item._producto || item._combo;
+
+            if (!base || item.price_type === 'custom') {
+                return item;
+            }
+
+            const precio = getSuggestedPrice(base, item.price_type, valor);
+
+            return { ...item, unit_price: precio, subtotal: round2(precio * item.qty) };
+        }));
+    };
+
     // ── Actualizar un item ─────────────────────────────────────────────────────
     const updateItem = (_uid, field, value) => {
         setItems(prev => {
@@ -457,11 +494,11 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
 
                     if (field === 'price_type' && item._producto) {
                         if (value !== 'custom') {
-                            updated.unit_price = getSuggestedPrice(item._producto, value);
+                            updated.unit_price = getSuggestedPrice(item._producto, value, enDivisas);
                         }
                     } else if (field === 'price_type' && item._combo) {
                         if (value !== 'custom') {
-                            updated.unit_price = getSuggestedPrice(item._combo, value);
+                            updated.unit_price = getSuggestedPrice(item._combo, value, enDivisas);
                         }
                     }
 
@@ -656,6 +693,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
             delivery_point_b:  hasDelivery && tipoEntrega === 'delivery' && registrarPuntos ? puntoB : null,
             has_delivery_fee:  hasDeliveryFee,
             delivery_bs:       hasDeliveryFee ? (parseFloat(deliveryBs) || 0) : 0,
+            en_divisas: enDivisas,
             items: items.map(i => ({
                 product_id:         i.product_id,
                 product_variant_id: i.product_variant_id || null,
@@ -663,6 +701,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                 product_name:       i.product_name,
                 price_type:         i.price_type,
                 unit_price_usd:     parseFloat(i.unit_price) || 0,
+                renueva_el:         i.renueva_el || null,
                 qty:                parseInt(i.qty) || 1,
             })),
             supplements: appliedSupplements.map(s => ({
@@ -954,6 +993,12 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                         value={notes}
                                         onChange={e => setNotes(e.target.value)}
                                         className="w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none resize-none"
+                                    />
+
+                                    <PagoEnDivisas
+                                        activo={enDivisas}
+                                        onCambiar={cambiarDivisas}
+                                        items={items}
                                     />
 
                                     {/* Entrega Agendada */}
@@ -1386,6 +1431,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                 </div>
                                                                             </div>
                                                                         )}
+                                                                        <RenovacionDelRenglon item={item} onCambiar={updateItem} />
                                                                     </>
                                                                 )}
                                                             </div>
@@ -1624,5 +1670,96 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                 </div>
             </div>
         </AuthenticatedLayout>
+    );
+}
+
+/**
+ * Pagar en divisas: una decisión de la factura, no de cada renglón.
+ *
+ * El cliente paga todo en efectivo o no paga nada en efectivo, así que el
+ * interruptor es uno y vale para la factura entera. Cada renglón toma la
+ * promo de su propio nivel, y el que no tenga se cobra normal: por eso se
+ * dice cuántos cambiaron, para que nadie suponga que bajaron todos.
+ */
+function PagoEnDivisas({ activo, onCambiar, items }) {
+    const conPromo = items.filter((i) => {
+        const base = i._producto || i._combo;
+        const [, divisa] = CAMPOS_DE_PRECIO[i.price_type] ?? CAMPOS_DE_PRECIO.detal;
+
+        return base && base[divisa] && i.price_type !== 'custom';
+    }).length;
+
+    return (
+        <div className="mt-2 border-t border-stone-200 pt-3 dark:border-stone-800">
+            <label className="mb-1 flex cursor-pointer select-none items-center gap-2">
+                <input
+                    type="checkbox"
+                    checked={activo}
+                    onChange={(e) => onCambiar(e.target.checked)}
+                    className="h-4 w-4 rounded border-stone-300 text-marca-700 focus:ring-marca-600 focus:ring-opacity-25 dark:border-stone-700 dark:text-marca-400 dark:focus:ring-marca-400"
+                />
+                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700 dark:text-stone-300">
+                    <Banknote className="h-4 w-4" />
+                    Paga en divisas
+                </span>
+            </label>
+
+            <p className="text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
+                {activo
+                    ? (conPromo > 0
+                        ? `${conPromo} ${conPromo === 1 ? 'rengl\u00f3n usa' : 'renglones usan'} su precio en divisas. Los dem\u00e1s no tienen promo y se cobran normal.`
+                        : 'Ning\u00fan rengl\u00f3n tiene precio en divisas: se cobran normal. Config\u00faralo en cada producto.')
+                    : 'Usa el precio especial en divisas de cada producto, cuando lo tenga.'}
+            </p>
+        </div>
+    );
+}
+
+/**
+ * Cuándo renueva este cliente su suscripción.
+ *
+ * Va en el renglón y no en la factura porque dos clientes del mismo
+ * servicio no renuevan el mismo día, y una factura puede llevar un
+ * hosting mensual junto a un dominio anual.
+ *
+ * Se propone un período desde hoy para no obligar a calcularlo a mano, y
+ * se puede corregir: a veces se cobra con la fecha del mes pasado.
+ */
+function RenovacionDelRenglon({ item, onCambiar }) {
+    const producto = item._producto;
+
+    if (!producto?.es_suscripcion || item.combo_id) {
+        return null;
+    }
+
+    const proponer = () => {
+        const meses = { mensual: 1, trimestral: 3, semestral: 6, anual: 12 }[producto.periodo_suscripcion] ?? 1;
+        const fecha = new Date();
+
+        fecha.setMonth(fecha.getMonth() + meses);
+
+        return fecha.toISOString().slice(0, 10);
+    };
+
+    return (
+        <div className="flex w-full items-center gap-1.5 rounded-lg border border-dashed border-stone-300 px-2 py-1.5 dark:border-stone-700">
+            <CalendarClock className="h-3.5 w-3.5 shrink-0 text-stone-500 dark:text-stone-400" />
+            <span className="text-[11px] font-semibold text-stone-600 dark:text-stone-400">Renueva el</span>
+            <input
+                type="date"
+                value={item.renueva_el || ''}
+                onChange={(e) => onCambiar(item._uid, 'renueva_el', e.target.value)}
+                className="rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-marca-600 focus:ring-1 focus:ring-marca-600 dark:border-stone-800 dark:focus:border-marca-400 dark:focus:ring-marca-400"
+            />
+            {!item.renueva_el && (
+                <button
+                    type="button"
+                    onClick={() => onCambiar(item._uid, 'renueva_el', proponer())}
+                    className="pulsable rounded-lg border border-stone-300 px-2 py-1 text-[11px] font-semibold text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400 dark:hover:bg-stone-800"
+                >
+                    {producto.periodo_suscripcion === 'anual' ? 'En un año' : 'Siguiente período'}
+                </button>
+            )}
+        </div>
     );
 }

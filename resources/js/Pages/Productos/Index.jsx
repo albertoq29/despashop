@@ -9,6 +9,7 @@ import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
+import { Banknote } from 'lucide-react';
 import { hoyLocal } from '@/utils/fechas';
 import NombreDelPrecio from '@/Components/NombreDelPrecio';
 import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
@@ -17,6 +18,14 @@ const normalizeText = (str) => {
     if (!str) return '';
     return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 };
+
+/** Cada cu\u00e1nto renueva una suscripci\u00f3n. Mismas claves que Product::PERIODOS. */
+const PERIODOS_SUSCRIPCION = [
+    ['mensual', 'Mensual'],
+    ['trimestral', 'Trimestral'],
+    ['semestral', 'Semestral'],
+    ['anual', 'Anual'],
+];
 
 /** D\u00f3nde se presta un servicio. Mismas claves que App\Models\Product. */
 const MODALIDADES_SERVICIO = {
@@ -138,6 +147,8 @@ const VARIANT_TYPES = [
     const { data, setData, clearErrors, errors } = useForm({
         id: '', name: '', item_type: 'producto', service_duration: '', service_mode: 'local',
         price_usdt: '', price_mayor_usdt: '', price_distribuidor_usdt: '',
+        price_divisa_usdt: '', price_mayor_divisa_usdt: '', price_distribuidor_divisa_usdt: '',
+        es_suscripcion: false, periodo_suscripcion: 'mensual',
         cost_price: '', stock: 0, categories: [], conditional_price: '', conditional_min_quantity: '',
         notes: '', description: '', image: null, photos: [], is_hidden: false, por_llegar: false, show_variants_in_store: true, last_units: false, _method: 'POST'
     });
@@ -157,6 +168,8 @@ const VARIANT_TYPES = [
     const freshForm = (method = 'POST') => ({
         id: '', name: '', item_type: 'producto', service_duration: '', service_mode: 'local',
         price_usdt: '', price_mayor_usdt: '', price_distribuidor_usdt: '',
+        price_divisa_usdt: '', price_mayor_divisa_usdt: '', price_distribuidor_divisa_usdt: '',
+        es_suscripcion: false, periodo_suscripcion: 'mensual',
         cost_price: '', stock: 0, categories: [], conditional_price: '', conditional_min_quantity: '',
         notes: '', description: '', image: null, photos: [], is_hidden: false, por_llegar: false, show_variants_in_store: true, last_units: false, _method: method
     });
@@ -186,6 +199,11 @@ const VARIANT_TYPES = [
             service_mode: prod.service_mode || 'local',
             price_usdt: prod.price_usdt || '',
             price_mayor_usdt: prod.price_mayor_usdt || '', price_distribuidor_usdt: prod.price_distribuidor_usdt || '',
+            price_divisa_usdt: prod.price_divisa_usdt || '',
+            price_mayor_divisa_usdt: prod.price_mayor_divisa_usdt || '',
+            price_distribuidor_divisa_usdt: prod.price_distribuidor_divisa_usdt || '',
+            es_suscripcion: prod.es_suscripcion || false,
+            periodo_suscripcion: prod.periodo_suscripcion || 'mensual',
             cost_price: prod.cost_price || '', stock: prod.stock || 0,
             categories: prod.categories ? prod.categories.map(c => c.id.toString()) : [],
             conditional_price: prod.conditional_price || '', conditional_min_quantity: prod.conditional_min_quantity || '',
@@ -237,6 +255,11 @@ const VARIANT_TYPES = [
         formData.append('price_usdt', data.price_usdt || '');
         formData.append('price_mayor_usdt', data.price_mayor_usdt || '');
         formData.append('price_distribuidor_usdt', data.price_distribuidor_usdt || '');
+        formData.append('price_divisa_usdt', data.price_divisa_usdt || '');
+        formData.append('price_mayor_divisa_usdt', data.price_mayor_divisa_usdt || '');
+        formData.append('price_distribuidor_divisa_usdt', data.price_distribuidor_divisa_usdt || '');
+        formData.append('es_suscripcion', data.es_suscripcion ? '1' : '0');
+        formData.append('periodo_suscripcion', data.periodo_suscripcion || 'mensual');
         formData.append('cost_price', data.cost_price || '');
         formData.append('stock', data.stock);
         formData.append('conditional_price', data.conditional_price || '');
@@ -627,61 +650,111 @@ const VARIANT_TYPES = [
                             ayuda="Deja vacío el precio al detal si prefieres que digan Consultar."
                         />
 
-                        {(() => {
-                            const costNum = parseFloat(data.cost_price);
-                            const hasCost = !isNaN(costNum) && costNum > 0;
-                            const gainDetal = hasCost && data.price_usdt ? (parseFloat(data.price_usdt) - costNum).toFixed(2) : null;
-                            const gainMayor = hasCost && data.price_mayor_usdt ? (parseFloat(data.price_mayor_usdt) - costNum).toFixed(2) : null;
-                            const gainDistribuidor = hasCost && data.price_distribuidor_usdt ? (parseFloat(data.price_distribuidor_usdt) - costNum).toFixed(2) : null;
-                            return (
-                                <div className={`grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${TARJETA}`}>
-                                    <div>
-                                        <InputLabel htmlFor="cost_price" value="Costo Unitario / Compra (USD - Opcional)" />
-                                        <div className="relative mt-1"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-500 dark:text-stone-400 font-bold">$</span>
-                                            <TextInput id="cost_price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.cost_price} onChange={e => setData('cost_price', e.target.value)} />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <InputLabel htmlFor="price" value="Precio Al Detal (dejar vacío = Consultar)" />
-                                        <div className="relative mt-1"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-500 dark:text-stone-400 font-bold">$</span>
-                                            <TextInput id="price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.price_usdt} onChange={e => setData('price_usdt', e.target.value)} />
-                                        </div>
-                                        {!data.price_usdt && <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold block mt-1 bg-amber-50 dark:bg-amber-950/50 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-900">Sin precio → "Consultar" en tienda</span>}
-                                        {gainDetal !== null && <span className="text-xs text-marca-700 dark:text-marca-400 font-bold block mt-1 bg-marca-50 dark:bg-marca-950/40 px-2 py-0.5 rounded border border-marca-200 dark:border-marca-900">Ganancia: ${gainDetal} ({costNum > 0 ? ((gainDetal / costNum) * 100).toFixed(0) : 0}%)</span>}
-                                        <InputError message={errors.price_usdt} className="mt-2" />
-                                    </div>
-                                    {esServicio ? (
-                                        <div className="rounded-xl border border-dashed border-stone-300 p-3 text-xs text-stone-500 dark:border-stone-700 dark:text-stone-400">
-                                            Un servicio no lleva existencias: no se agota ni se descuenta al facturar.
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <InputLabel htmlFor="stock" value={isEditing ? 'Stock Disponible (corregir conteo)' : 'Stock Disponible'} />
-                                            <TextInput id="stock" type="number" step="1" className="mt-1 block w-full" value={data.stock} onChange={e => setData('stock', e.target.value)} required />
-                                            <InputError message={errors.stock} className="mt-2" />
-                                        </div>
-                                    )}
-                                    <div>
-                                        <InputLabel htmlFor="price_mayor" value="Precio Mayor (Opcional)" />
-                                        <div className="relative mt-1"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-500 dark:text-stone-400 font-bold">$</span>
-                                            <TextInput id="price_mayor" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.price_mayor_usdt} onChange={e => setData('price_mayor_usdt', e.target.value)} />
-                                        </div>
-                                        {gainMayor !== null && <span className="text-xs text-marca-700 dark:text-marca-400 font-bold block mt-1 bg-marca-50 dark:bg-marca-950/40 px-2 py-0.5 rounded border border-marca-200 dark:border-marca-900">Ganancia: ${gainMayor} ({costNum > 0 ? ((gainMayor / costNum) * 100).toFixed(0) : 0}%)</span>}
-                                    </div>
-                                    <div>
-                                        <InputLabel htmlFor="price_distribuidor" value={`Precio ${nombreDistribuidor} (Opcional)`} />
-                                        <div className="relative mt-1"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-500 dark:text-stone-400 font-bold">$</span>
-                                            <TextInput id="price_distribuidor" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.price_distribuidor_usdt} onChange={e => setData('price_distribuidor_usdt', e.target.value)} />
-                                        </div>
-                                        {gainDistribuidor !== null && <span className="text-xs text-marca-700 dark:text-marca-400 font-bold block mt-1 bg-marca-50 dark:bg-marca-950/40 px-2 py-0.5 rounded border border-marca-200 dark:border-marca-900">Ganancia: ${gainDistribuidor} ({costNum > 0 ? ((gainDistribuidor / costNum) * 100).toFixed(0) : 0}%)</span>}
-                                    </div>
+                        <div className={`grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${TARJETA}`}>
+                            <div>
+                                <InputLabel htmlFor="cost_price" value="Costo Unitario / Compra (USD - Opcional)" />
+                                <div className="relative mt-1">
+                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 font-bold text-stone-500 dark:text-stone-400">$</span>
+                                    <TextInput id="cost_price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.cost_price} onChange={(e) => setData('cost_price', e.target.value)} />
                                 </div>
-                            );
-                        })()}
+                            </div>
+
+                            <NivelDePrecio
+                                id="price"
+                                etiqueta="Precio Al Detal (dejar vacío = Consultar)"
+                                campo="price_usdt"
+                                campoDivisa="price_divisa_usdt"
+                                data={data}
+                                setData={setData}
+                                costo={data.cost_price}
+                                error={errors.price_usdt}
+                                avisoSinPrecio
+                            />
+
+                            {esServicio ? (
+                                <div className="rounded-xl border border-dashed border-stone-300 p-3 text-xs text-stone-500 dark:border-stone-700 dark:text-stone-400">
+                                    Un servicio no lleva existencias: no se agota ni se descuenta al facturar.
+                                </div>
+                            ) : (
+                                <div>
+                                    <InputLabel htmlFor="stock" value={isEditing ? 'Stock Disponible (corregir conteo)' : 'Stock Disponible'} />
+                                    <TextInput id="stock" type="number" step="1" className="mt-1 block w-full" value={data.stock} onChange={(e) => setData('stock', e.target.value)} required />
+                                    <InputError message={errors.stock} className="mt-2" />
+                                </div>
+                            )}
+
+                            <NivelDePrecio
+                                id="price_mayor"
+                                etiqueta="Precio Mayor (Opcional)"
+                                campo="price_mayor_usdt"
+                                campoDivisa="price_mayor_divisa_usdt"
+                                data={data}
+                                setData={setData}
+                                costo={data.cost_price}
+                                error={errors.price_mayor_usdt}
+                            />
+
+                            <NivelDePrecio
+                                id="price_distribuidor"
+                                etiqueta={`Precio ${nombreDistribuidor} (Opcional)`}
+                                campo="price_distribuidor_usdt"
+                                campoDivisa="price_distribuidor_divisa_usdt"
+                                data={data}
+                                setData={setData}
+                                costo={data.cost_price}
+                                error={errors.price_distribuidor_usdt}
+                            />
+                        </div>
+
+                        <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                            El precio <strong>en divisas</strong> es opcional y no es el precio en dólares convertido a
+                            bolívares: es otro precio, normalmente más bajo, para quien paga en efectivo en divisas. En
+                            tu catálogo sale como <strong>promo en divisas</strong>.
+                        </p>
+
 
                         {/* Justo debajo de los precios: es viendo el campo donde se
                             nota que «Distribuidor» no es la palabra del negocio. */}
                         <NombreDelPrecio />
+
+                        {/* Un hosting o un mantenimiento mensual no se factura una
+                            vez: se renueva, y hay que saber a quién le toca. */}
+                        <div className={TARJETA}>
+                            <Interruptor
+                                etiqueta="¿Aplica modelo de pago por suscripción?"
+                                ayuda="Al facturarlo podrás anotar cuándo renueva cada cliente, y aparecerá en Renovaciones."
+                                valor={data.es_suscripcion}
+                                onCambiar={(v) => setData('es_suscripcion', v)}
+                            />
+
+                            {data.es_suscripcion && (
+                                <div className="mt-4">
+                                    <InputLabel value="Cada cuánto se renueva" />
+                                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                        {PERIODOS_SUSCRIPCION.map(([valor, etiqueta]) => (
+                                            <button
+                                                key={valor}
+                                                type="button"
+                                                onClick={() => setData('periodo_suscripcion', valor)}
+                                                aria-pressed={data.periodo_suscripcion === valor}
+                                                className={`pulsable rounded-lg border px-3 py-2 text-sm font-semibold ${
+                                                    data.periodo_suscripcion === valor
+                                                        ? 'border-marca-600 bg-marca-50 text-marca-800 dark:border-marca-500 dark:bg-marca-950/40 dark:text-marca-300'
+                                                        : 'border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400 dark:hover:bg-stone-800'
+                                                }`}
+                                            >
+                                                {etiqueta}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="mt-2 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                                        Al marcar una renovación como hecha, la fecha salta sola al siguiente período. No
+                                        factura nada: cobrar sigue siendo tu decisión.
+                                    </p>
+                                    <InputError message={errors.periodo_suscripcion} className="mt-2" />
+                                </div>
+                            )}
+                        </div>
 
                         {/* Reponer escribiendo el stock a mano sale mal cuando la
                             mercancia cambio de precio: el libro de compras la valora
@@ -1304,6 +1377,85 @@ function Resumen({ titulo, valor }) {
  * parejo del cuerpo, el título quedaba a la misma distancia del grupo que
  * encabeza y del anterior, y no se entendía a cuál pertenecía.
  */
+/**
+ * Un nivel de precio con su promo en divisas debajo.
+ *
+ * Van juntos y no en celdas aparte porque son el mismo precio con dos
+ * formas de pago: separarlos dejaba ocho campos sueltos donde nadie
+ * recordaba cuál de divisas correspondía a cuál nivel.
+ */
+function NivelDePrecio({ id, etiqueta, campo, campoDivisa, data, setData, costo, error, avisoSinPrecio = false }) {
+    const costoNum = parseFloat(costo);
+    const hayCosto = !isNaN(costoNum) && costoNum > 0;
+
+    const ganancia = (valor) => {
+        if (!hayCosto || !valor) {
+            return null;
+        }
+
+        const resta = parseFloat(valor) - costoNum;
+
+        return { monto: resta.toFixed(2), porcentaje: ((resta / costoNum) * 100).toFixed(0) };
+    };
+
+    const normal = ganancia(data[campo]);
+    const divisa = ganancia(data[campoDivisa]);
+
+    return (
+        <div>
+            <InputLabel htmlFor={id} value={etiqueta} />
+            <div className="relative mt-1">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3 font-bold text-stone-500 dark:text-stone-400">$</span>
+                <TextInput
+                    id={id}
+                    type="number"
+                    step="0.01"
+                    className="mt-1 block w-full pl-7"
+                    value={data[campo]}
+                    onChange={(e) => setData(campo, e.target.value)}
+                />
+            </div>
+
+            {avisoSinPrecio && !data[campo] && (
+                <span className="mt-1 block rounded border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-600 dark:border-amber-900 dark:bg-amber-950/50 dark:text-amber-400">
+                    Sin precio → "Consultar" en tienda
+                </span>
+            )}
+
+            {normal && <Ganancia {...normal} />}
+
+            <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 p-2 dark:border-stone-800 dark:bg-stone-950/60">
+                <label htmlFor={`${id}_divisa`} className="flex items-center gap-1.5 text-[11px] font-semibold text-stone-600 dark:text-stone-400">
+                    <Banknote className="h-3.5 w-3.5" />
+                    En divisas (opcional)
+                </label>
+                <div className="relative mt-1">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 font-bold text-stone-500 dark:text-stone-400">$</span>
+                    <TextInput
+                        id={`${id}_divisa`}
+                        type="number"
+                        step="0.01"
+                        className="block w-full pl-7 text-sm"
+                        value={data[campoDivisa]}
+                        onChange={(e) => setData(campoDivisa, e.target.value)}
+                    />
+                </div>
+                {divisa && <Ganancia {...divisa} />}
+            </div>
+
+            <InputError message={error} className="mt-2" />
+        </div>
+    );
+}
+
+function Ganancia({ monto, porcentaje }) {
+    return (
+        <span className="mt-1 block rounded border border-marca-200 bg-marca-50 px-2 py-0.5 text-xs font-bold text-marca-700 dark:border-marca-900 dark:bg-marca-950/40 dark:text-marca-400">
+            Ganancia: ${monto} ({porcentaje}%)
+        </span>
+    );
+}
+
 function SeccionModal({ titulo, ayuda }) {
     return (
         <div className="-mb-2 flex items-start gap-2.5">

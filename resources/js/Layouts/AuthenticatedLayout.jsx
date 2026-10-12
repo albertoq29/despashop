@@ -18,6 +18,7 @@ import {
     Package,
     Palette,
     Receipt,
+    Repeat,
     ShieldCheck,
     ShoppingCart,
     Tags,
@@ -261,6 +262,13 @@ function BarraLateral({ abierta, onCerrar, user, marca, respuestas }) {
                             Icono={Truck}
                         >
                             Entregas
+                        </Enlace>
+                        <Enlace
+                            href={route('renovaciones.index')}
+                            activo={route().current('renovaciones.*')}
+                            Icono={Repeat}
+                        >
+                            Renovaciones
                         </Enlace>
                     </Grupo>
 

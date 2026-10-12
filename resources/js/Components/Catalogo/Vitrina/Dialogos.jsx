@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MessageCircle, X } from 'lucide-react';
-import { BotonCatalogo, PreciosPorVolumen, useVitrina } from './Comunes';
+import { BotonCatalogo, PreciosPorVolumen, PromoEnDivisas, useVitrina } from './Comunes';
 import { BORDE_SUAVE, enlaceWhatsapp, formatoBs, SOMBRAS } from './estilos';
 import { BotonAgregarALaConsulta } from './Seleccion';
 
@@ -204,6 +204,8 @@ export function DetalleDeProducto({ articulo }) {
                                 Consultar precio
                             </p>
                         )}
+
+                        <PromoEnDivisas articulo={articulo} className="mt-3" />
 
                         <PreciosPorVolumen articulo={articulo} donde="modal" />
 

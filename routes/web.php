@@ -15,6 +15,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ComboController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
+use App\Http\Controllers\RenovacionController;
 use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\ExportacionController;
 use App\Http\Controllers\FacturaController;
@@ -177,6 +178,11 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
     // Entregas agendadas
     Route::get('entregas', [DeliveryController::class, 'index'])->name('deliveries.index');
     Route::post('entregas/{delivery}/posponer', [DeliveryController::class, 'postpone'])->name('deliveries.postpone');
+
+    // Servicios por suscripción: a quién le toca pagar y cuándo
+    Route::get('renovaciones', [RenovacionController::class, 'index'])->name('renovaciones.index');
+    Route::patch('renovaciones/{renovacion}', [RenovacionController::class, 'renovar'])->name('renovaciones.renovar');
+    Route::delete('renovaciones/{renovacion}', [RenovacionController::class, 'destroy'])->name('renovaciones.destroy');
 });
 
 // ── Administración de la plataforma ────────────────────────────────────────────

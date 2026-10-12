@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { router } from '@inertiajs/react';
 import { ArrowRight, ArrowUpDown, ChevronLeft, ChevronRight, Clock, MessageCircle, Plus, Search, X } from 'lucide-react';
-import { BotonCatalogo, EncabezadoSeccion, Imagen, irASeccion, PreciosPorVolumen, SinContenido, useVitrina } from './Comunes';
+import { BotonCatalogo, EncabezadoSeccion, Imagen, irASeccion, PreciosPorVolumen, PromoEnDivisas, SinContenido, useVitrina } from './Comunes';
 import {
     aire,
     BORDE_SUAVE,
@@ -140,6 +140,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                                 <p className={`mt-1 ${ESTILO_PRECIO[theme.price_style] ?? ESTILO_PRECIO.normal}`}>
                                     ${Number(precio).toFixed(2)}
                                 </p>
+                                <PromoEnDivisas articulo={articulo} className="mt-1" />
                                 <PreciosPorVolumen articulo={articulo} />
                             </>
                         )}
@@ -215,6 +216,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                                             Bs. {formatoBs(Number(precio) * bcvRate)}
                                         </p>
                                     )}
+                                    <PromoEnDivisas articulo={articulo} />
                                     <span className="w-full"><PreciosPorVolumen articulo={articulo} /></span>
                                 </div>
                             ) : (

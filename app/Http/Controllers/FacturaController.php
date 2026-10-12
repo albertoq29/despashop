@@ -61,6 +61,12 @@ class FacturaController extends Controller
                 'price_usdt'              => $p->price_usdt,
                 'price_mayor_usdt'        => $p->price_mayor_usdt,
                 'price_distribuidor_usdt' => $p->price_distribuidor_usdt,
+                // La promo en divisas de cada nivel, y si el servicio se renueva
+                'price_divisa_usdt'              => $p->price_divisa_usdt,
+                'price_mayor_divisa_usdt'        => $p->price_mayor_divisa_usdt,
+                'price_distribuidor_divisa_usdt' => $p->price_distribuidor_divisa_usdt,
+                'es_suscripcion'          => $p->esSuscripcion(),
+                'periodo_suscripcion'     => $p->periodo_suscripcion,
                 'cost_price'              => $p->cost_price,
                 'stock'                   => $p->stock,
                 'image_path'              => $p->image_path,
@@ -131,6 +137,10 @@ class FacturaController extends Controller
             'items.*.price_type'       => 'required|in:detal,mayor,distribuidor,custom',
             'items.*.unit_price_usd'   => 'required|numeric|min:0',
             'items.*.qty'              => 'required|integer|min:1',
+            // Solo lo traen los renglones de un servicio por suscripción
+            'items.*.renueva_el'       => 'nullable|date',
+            // Pagar en efectivo en divisas tiene su propio precio por nivel
+            'en_divisas'               => 'nullable|boolean',
             'total_bs'                 => 'nullable|numeric|min:0',
             'has_delivery'             => 'nullable|boolean',
             'delivery_date'            => 'nullable|date',
@@ -222,6 +232,7 @@ class FacturaController extends Controller
                 'has_delivery_fee'         => $request->has_delivery_fee ? true : false,
                 'delivery_bs'              => (float)($request->delivery_bs ?? 0),
                 'show_variants_in_receipt' => $request->has('show_variants_in_receipt') ? (bool)$request->show_variants_in_receipt : true,
+                'en_divisas'               => $request->boolean('en_divisas'),
             ]);
 
             foreach ($request->items as $item) {
@@ -254,6 +265,7 @@ class FacturaController extends Controller
                     'qty'                => $item['qty'],
                     'subtotal_usd'       => round($item['unit_price_usd'] * $item['qty'], 2),
                     'profit_usd'         => round(($item['unit_price_usd'] - $adjustedCostPrice) * $item['qty'], 2),
+                    'renueva_el'         => $this->fechaDeRenovacion($item),
                 ]);
             }
 
@@ -314,6 +326,26 @@ class FacturaController extends Controller
         ]);
 
         return redirect()->back();
+    }
+
+    /**
+     * La fecha de renovación de un renglón, si de verdad le toca una.
+     *
+     * Se comprueba contra el producto y no se cree lo que manda el
+     * navegador: una fecha en un renglón que no es suscripción ensuciaría
+     * el listado de renovaciones con cosas que nadie renueva.
+     *
+     * @param  array<string, mixed>  $item
+     */
+    private function fechaDeRenovacion(array $item): ?string
+    {
+        if (empty($item['renueva_el']) || empty($item['product_id'])) {
+            return null;
+        }
+
+        $producto = Product::find($item['product_id']);
+
+        return $producto?->esSuscripcion() ? Carbon::parse($item['renueva_el'])->toDateString() : null;
     }
 
     // ── Confirmar y descontar stock ───────────────────────────────────────────
@@ -458,6 +490,12 @@ class FacturaController extends Controller
                 'price_usdt'              => $p->price_usdt,
                 'price_mayor_usdt'        => $p->price_mayor_usdt,
                 'price_distribuidor_usdt' => $p->price_distribuidor_usdt,
+                // La promo en divisas de cada nivel, y si el servicio se renueva
+                'price_divisa_usdt'              => $p->price_divisa_usdt,
+                'price_mayor_divisa_usdt'        => $p->price_mayor_divisa_usdt,
+                'price_distribuidor_divisa_usdt' => $p->price_distribuidor_divisa_usdt,
+                'es_suscripcion'          => $p->esSuscripcion(),
+                'periodo_suscripcion'     => $p->periodo_suscripcion,
                 'cost_price'              => $p->cost_price,
                 'stock'                   => $p->stock,
                 'image_path'              => $p->image_path,
@@ -571,6 +609,10 @@ class FacturaController extends Controller
             'items.*.price_type'       => 'required|in:detal,mayor,distribuidor,custom',
             'items.*.unit_price_usd'   => 'required|numeric|min:0',
             'items.*.qty'              => 'required|integer|min:1',
+            // Solo lo traen los renglones de un servicio por suscripción
+            'items.*.renueva_el'       => 'nullable|date',
+            // Pagar en efectivo en divisas tiene su propio precio por nivel
+            'en_divisas'               => 'nullable|boolean',
             'total_bs'                 => 'nullable|numeric|min:0',
             'has_delivery'             => 'nullable|boolean',
             'delivery_date'            => 'nullable|date',
@@ -654,6 +696,7 @@ class FacturaController extends Controller
                 'has_delivery_fee'         => $request->has_delivery_fee ? true : false,
                 'delivery_bs'              => (float)($request->delivery_bs ?? 0),
                 'show_variants_in_receipt' => $request->has('show_variants_in_receipt') ? (bool)$request->show_variants_in_receipt : $factura->show_variants_in_receipt,
+                'en_divisas'               => $request->boolean('en_divisas'),
             ]);
 
             if ($request->has_delivery && $request->filled('delivery_date')) {
@@ -698,6 +741,7 @@ class FacturaController extends Controller
                     'qty'                => $item['qty'],
                     'subtotal_usd'       => round($item['unit_price_usd'] * $item['qty'], 2),
                     'profit_usd'         => round(($item['unit_price_usd'] - $adjustedCostPrice) * $item['qty'], 2),
+                    'renueva_el'         => $this->fechaDeRenovacion($item),
                 ]);
             }
 

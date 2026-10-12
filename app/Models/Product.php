@@ -52,6 +52,11 @@ class Product extends Model
         'price_usdt',
         'price_mayor_usdt',
         'price_distribuidor_usdt',
+        'price_divisa_usdt',
+        'price_mayor_divisa_usdt',
+        'price_distribuidor_divisa_usdt',
+        'es_suscripcion',
+        'periodo_suscripcion',
         'cost_price',
         'inversion_historica',
         'stock',
@@ -73,7 +78,30 @@ class Product extends Model
         'por_llegar'             => 'boolean',
         'show_variants_in_store' => 'boolean',
         'last_units'             => 'boolean',
+        'es_suscripcion'         => 'boolean',
         'inversion_historica'    => 'float',
+    ];
+
+    /**
+     * Los niveles de precio, cada uno con su versión en divisas.
+     *
+     * La de divisas no es el precio convertido: es otro precio, más bajo,
+     * para quien paga en efectivo en divisas. Quien compra al mayor y paga
+     * así tampoco paga lo mismo que quien compra al mayor en bolívares, de
+     * ahí que haya uno por nivel.
+     */
+    public const NIVELES = [
+        'detal' => ['price_usdt', 'price_divisa_usdt'],
+        'mayor' => ['price_mayor_usdt', 'price_mayor_divisa_usdt'],
+        'distribuidor' => ['price_distribuidor_usdt', 'price_distribuidor_divisa_usdt'],
+    ];
+
+    /** Cada cuánto se renueva una suscripción, en meses. */
+    public const PERIODOS = [
+        'mensual' => 1,
+        'trimestral' => 3,
+        'semestral' => 6,
+        'anual' => 12,
     ];
 
     protected $appends = ['image_url', 'thumb_url', 'price_bs', 'price_mayor_bs', 'price_distribuidor_bs', 'price_ref', 'conditional_price_bs'];
@@ -122,6 +150,46 @@ class Product extends Model
     public function getPriceRefAttribute()
     {
         return $this->price_usdt;
+    }
+
+    // ── Precios por nivel y en divisas ─────────────────────────────────────────
+
+    /**
+     * El precio de un nivel, en divisas si se pide y lo tiene.
+     *
+     * Un nivel sin precio en divisas se cobra normal: la promo es opcional
+     * y por nivel, así que pedirla no puede dejar el renglón sin precio.
+     */
+    public function precioDe(string $nivel, bool $enDivisas = false): ?float
+    {
+        [$normal, $divisa] = self::NIVELES[$nivel] ?? self::NIVELES['detal'];
+
+        if ($enDivisas && $this->{$divisa} !== null) {
+            return (float) $this->{$divisa};
+        }
+
+        return $this->{$normal} === null ? null : (float) $this->{$normal};
+    }
+
+    /** Si este nivel tiene promo en divisas. */
+    public function tienePromoEnDivisas(string $nivel = 'detal'): bool
+    {
+        [, $divisa] = self::NIVELES[$nivel] ?? self::NIVELES['detal'];
+
+        return $this->{$divisa} !== null;
+    }
+
+    // ── Suscripciones ──────────────────────────────────────────────────────────
+
+    /** Un servicio por suscripción tiene período; sin él no se puede renovar. */
+    public function esSuscripcion(): bool
+    {
+        return (bool) $this->es_suscripcion && $this->mesesDelPeriodo() > 0;
+    }
+
+    public function mesesDelPeriodo(): int
+    {
+        return self::PERIODOS[$this->periodo_suscripcion] ?? 0;
     }
 
     // ── Servicios ──────────────────────────────────────────────────────────────

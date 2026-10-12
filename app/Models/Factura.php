@@ -14,7 +14,7 @@ class Factura extends Model
         'user_id', 'client_name', 'client_phone', 'status',
         'subtotal_usd', 'discount_usd', 'shipping_usd', 'total_usd', 'total_bs',
         'bcv_rate', 'notes', 'confirmed_at', 'profit_usd', 'has_delivery',
-        'show_variants_in_receipt', 'has_delivery_fee', 'delivery_bs',
+        'show_variants_in_receipt', 'has_delivery_fee', 'delivery_bs', 'en_divisas',
     ];
 
     protected $casts = [
@@ -30,6 +30,7 @@ class Factura extends Model
         'show_variants_in_receipt' => 'boolean',
         'has_delivery_fee'         => 'boolean',
         'delivery_bs'              => 'float',
+        'en_divisas'               => 'boolean',
     ];
 
     public function user()

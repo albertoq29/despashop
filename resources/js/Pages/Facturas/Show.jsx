@@ -7,6 +7,13 @@ import { Check, Download, Eye, EyeOff, Pencil, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
 
+/** Una fecha del servidor como se lee aquí: día primero. */
+function fechaCorta(iso) {
+    const [anio, mes, dia] = String(iso).slice(0, 10).split('-');
+
+    return dia ? `${dia}/${mes}/${anio}` : '';
+}
+
 const PRINT_STYLE = `
 @media print {
     body * { visibility: hidden !important; }
@@ -423,6 +430,17 @@ export default function Show({ auth, factura, plantilla }) {
                                                                     {PRICE_LABELS[item.price_type] || item.price_type}
                                                                 </span>
                                                             )}
+                                                            {factura.en_divisas && !isComboItem && (
+                                                                <span className="inline-block rounded border border-marca-200 bg-marca-50 px-1.5 py-0.5 text-[9px] font-bold text-marca-700 dark:border-marca-900 dark:bg-marca-950/50 dark:text-marca-400 sm:text-[10px]">
+                                                                    En divisas
+                                                                </span>
+                                                            )}
+                                                            {/* Un servicio por suscripción: cuándo vuelve a tocar */}
+                                                            {item.renueva_el && (
+                                                                <span className="inline-block w-full text-[9px] text-stone-500 dark:text-stone-400 sm:text-[10px]">
+                                                                    Renueva el {fechaCorta(item.renueva_el)}
+                                                                </span>
+                                                            )}
                                                         </div>
                                                     </td>
                                                     <td className="py-2.5 sm:py-3 px-1 text-right font-mono text-xs sm:text-sm">{qty}</td>
@@ -464,6 +482,14 @@ export default function Show({ auth, factura, plantilla }) {
                                         <span>TOTAL</span>
                                         <span className="font-mono">${parseFloat(factura.total_usd).toFixed(2)}</span>
                                     </div>
+
+                                    {/* Que el recibo diga con qué precio se cobró: a los
+                                        tres meses nadie se acuerda de por qué fue más barato */}
+                                    {factura.en_divisas && (
+                                        <p className="text-center text-xs font-semibold text-marca-700 dark:text-marca-400">
+                                            Precio especial por pago en divisas
+                                        </p>
+                                    )}
                                     <div className="flex justify-between text-sm sm:text-base font-bold text-marca-800 dark:text-marca-300 bg-marca-50 dark:bg-marca-950/40 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
                                         <span>Total en Bolívares</span>
                                         <span className="font-mono">Bs. {parseFloat(factura.total_bs).toFixed(2)}</span>

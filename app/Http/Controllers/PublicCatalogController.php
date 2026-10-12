@@ -43,7 +43,7 @@ class PublicCatalogController extends Controller
     /** Columnas que necesita el catálogo. El costo y las notas nunca salen de aquí. */
     private const COLUMNAS = [
         'id', 'user_id', 'name', 'description', 'item_type', 'service_duration', 'service_mode',
-        'price_usdt', 'conditional_price', 'conditional_min_quantity',
+        'price_usdt', 'price_divisa_usdt', 'conditional_price', 'conditional_min_quantity',
         'stock', 'por_llegar', 'last_units', 'image_path', 'show_variants_in_store', 'display_order',
     ];
 
@@ -272,7 +272,11 @@ class PublicCatalogController extends Controller
     private function columnas(): array
     {
         return $this->mostrarPreciosPorVolumen()
-            ? [...self::COLUMNAS, 'price_mayor_usdt', 'price_distribuidor_usdt']
+            ? [
+                ...self::COLUMNAS,
+                'price_mayor_usdt', 'price_distribuidor_usdt',
+                'price_mayor_divisa_usdt', 'price_distribuidor_divisa_usdt',
+            ]
             : self::COLUMNAS;
     }
 
@@ -317,9 +321,14 @@ class PublicCatalogController extends Controller
             'esServicio' => $esServicio,
             'detalle' => $producto->detalleDelServicio(),
             'price_usdt' => $producto->price_usdt,
+            // La promo en divisas del detal se anuncia siempre que exista:
+            // es lo que hace que valga la pena pagar en efectivo
+            'price_divisa_usdt' => $producto->price_divisa_usdt,
             ...($this->mostrarPreciosPorVolumen() ? [
                 'price_mayor_usdt' => $producto->price_mayor_usdt,
                 'price_distribuidor_usdt' => $producto->price_distribuidor_usdt,
+                'price_mayor_divisa_usdt' => $producto->price_mayor_divisa_usdt,
+                'price_distribuidor_divisa_usdt' => $producto->price_distribuidor_divisa_usdt,
             ] : []),
             'conditional_price' => $producto->conditional_price,
             'conditional_min_quantity' => $producto->conditional_min_quantity,
