@@ -376,7 +376,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             ));
             return;
         }
-        const unitPrice = getSuggestedPrice(producto, item.price_type || 'detal', enDivisas);
+        const unitPrice = getSuggestedPrice(producto, 'detal', enDivisas);
         setItems(prev => [...prev, {
             _uid:               uid(),
             type:               'product',
@@ -407,7 +407,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             return;
         }
 
-        const unitPrice = !isNaN(parseFloat(producto.price_usdt)) ? parseFloat(producto.price_usdt) : 0;
+        const unitPrice = getSuggestedPrice(producto, item.price_type || 'detal', enDivisas);
         setItems(prev => [...prev, {
             _uid:               uid(),
             type:               'product',
@@ -505,7 +505,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
             const stock = stockDisponible(producto);
             if (stock <= 0) return;
 
-            const unitPrice = !isNaN(parseFloat(producto.price_usdt)) ? parseFloat(producto.price_usdt) : 0;
+            const unitPrice = getSuggestedPrice(producto, 'detal', enDivisas);
             const idx = siguientes.findIndex(i =>
                 i.type === 'product' && i.product_id === producto.id && !i.product_variant_id && !i.combo_id
             );
