@@ -14,6 +14,7 @@ import {
     Palette,
     Redo2,
     Save,
+    Settings2,
     Share2,
     Sparkles,
     Smartphone,
@@ -26,6 +27,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import AsistenteIa from '@/Components/Catalogo/Editor/AsistenteIa';
 import { Lienzo, useVistaPrevia } from '@/Components/Catalogo/Editor/Lienzo';
 import PanelEstilo from '@/Components/Catalogo/Editor/PanelEstilo';
+import PanelFacil from '@/Components/Catalogo/Editor/PanelFacil';
 import PanelSecciones from '@/Components/Catalogo/Editor/PanelSecciones';
 import { PanelBanners, PanelCompartir, PanelMarca, PanelModales } from '@/Components/Catalogo/Editor/PanelesDeContenido';
 import { useHistorial } from '@/Components/Catalogo/Editor/useHistorial';
@@ -62,13 +64,17 @@ const SALIDA = [0.23, 1, 0.32, 1];
  * un iframe que recibe el borrador en cada cambio. Nada se publica hasta
  * guardar, y todo se puede deshacer mientras tanto.
  */
-export default function Personalizar({ theme, banners, modals, catalogUrl, limites, fuentes, categorias, vistaPreviaUrl, nombreComercio, ia }) {
+export default function Personalizar({ theme, banners, modals, catalogUrl, limites, fuentes, categorias, inventario, vistaPreviaUrl, nombreComercio, ia }) {
     const pagina = usePage();
     const { flash } = pagina.props;
     const form = useForm(datosIniciales(theme));
     const formulario = useRef(form);
     formulario.current = form;
 
+    // Se entra por el modo fácil: lo que de verdad cambia el aspecto, en una
+    // sola lista. El avanzado queda a un toque y recuerda la última elección,
+    // porque quien ya lo conoce no quiere volver a pasar por la puerta.
+    const [modo, setModo] = useState(() => (leerPreferencia('catalogo-modo', 'facil') === 'avanzado' ? 'avanzado' : 'facil'));
     const [pestana, setPestana] = useState('secciones');
     const [seleccion, setSeleccion] = useState(null);
     const [dispositivo, setDispositivo] = useState(() => leerPreferencia('catalogo-dispositivo', 'escritorio'));
@@ -142,11 +148,19 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
 
     const conDeshacer = { texto: 'Deshacer', ejecutar: () => historialActual.current.deshacer() };
 
+    /** Cualquier cosa que pida un control concreto sale del modo fácil. */
+    const irAlEditorCompleto = (id) => {
+        setModo('avanzado');
+        setPestana(id);
+    };
+
     /* ── Vista previa ───────────────────────────────────────────────────── */
 
     const vista = useVistaPrevia((mensaje) => {
         if (mensaje.tipo === MENSAJES.seleccionar) {
-            setPestana('secciones');
+            // Tocar un bloque en la vista previa es pedir sus controles, y
+            // esos viven en el editor completo
+            irAlEditorCompleto('secciones');
             setSeleccion(mensaje.id);
         } else if (mensaje.tipo === MENSAJES.mover) {
             moverSeccion(mensaje.id, mensaje.direccion, true);
@@ -260,6 +274,7 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
         banners,
         modals,
         categorias,
+        inventario,
         fuentes,
         limites,
         catalogUrl,
@@ -275,9 +290,9 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
             })),
 
         seleccionar,
-        irAPestana: (id) => setPestana(id),
+        irAPestana: irAlEditorCompleto,
         editarSeccion: (id) => {
-            setPestana('secciones');
+            irAlEditorCompleto('secciones');
             seleccionar(id, { enfocar: true });
         },
 
@@ -509,6 +524,10 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
         guardarPreferencia('catalogo-dispositivo', dispositivo);
     }, [dispositivo]);
 
+    useEffect(() => {
+        guardarPreferencia('catalogo-modo', modo);
+    }, [modo]);
+
     // Al cambiar de pestaña se vuelve arriba del todo, salvo cuando se llegó
     // pidiendo algo concreto del panel: entonces la vista va al panel y no a
     // los avisos que lo preceden.
@@ -519,7 +538,7 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
         } else {
             panel.current?.scrollTo({ top: 0 });
         }
-    }, [pestana]);
+    }, [pestana, modo]);
 
     const Panel = PANELES[pestana];
 
@@ -537,7 +556,9 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                 <aside className="flex min-h-[calc(100dvh-4rem)] flex-col bg-white dark:bg-stone-900 lg:min-h-0 lg:border-r lg:border-stone-200 lg:dark:border-stone-800">
                     {usoIa.disponible && <BotonIa uso={usoIa} onAbrir={() => setIaAbierta(true)} />}
 
-                    <Pestanas activa={pestana} onCambiar={setPestana} />
+                    <SelectorDeModo modo={modo} onCambiar={setModo} />
+
+                    {modo === 'avanzado' && <Pestanas activa={pestana} onCambiar={setPestana} />}
 
                     <div ref={panel} className="scrollbar-slim flex-1 pb-24 lg:min-h-0 lg:overflow-y-auto lg:pb-0">
                         {!esEscritorio && avisoPc && (
@@ -549,11 +570,14 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                             />
                         )}
 
-                        {avisoAyuda && (
+                        {/* En el modo fácil el aviso sobraría: el panel entero
+                            es el atajo del que habla */}
+                        {modo === 'avanzado' && avisoAyuda && (
                             <AvisoDeAyuda
                                 conIa={usoIa.disponible}
                                 onTemas={verTemas}
                                 onIa={() => setIaAbierta(true)}
+                                onFacil={() => setModo('facil')}
                                 onCerrar={() => {
                                     setAvisoAyuda(false);
                                     guardarPreferencia('catalogo-aviso-ayuda', 'no');
@@ -565,12 +589,16 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
 
                         <motion.div
                             ref={contenido}
-                            key={pestana}
+                            key={modo === 'facil' ? 'facil' : pestana}
                             initial={{ opacity: 0, y: 8 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.22, ease: SALIDA }}
                         >
-                            <Panel editor={editor} />
+                            {modo === 'facil' ? (
+                                <PanelFacil editor={editor} conIa={usoIa.disponible} onIa={() => setIaAbierta(true)} />
+                            ) : (
+                                <Panel editor={editor} />
+                            )}
                         </motion.div>
                     </div>
 
@@ -633,7 +661,7 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                     onCerrar={() => setIaAbierta(false)}
                     uso={usoIa}
                     onUso={setUsoIa}
-                    limites={{ minimo: ia.minimo, maximo: ia.maximo }}
+                    limites={{ minimo: ia.minimo, maximo: ia.maximo, maximoIndicaciones: ia.maximo_indicaciones }}
                     onAplicar={aplicarPropuesta}
                     onInventarioCreado={inventarioCreado}
                 />
@@ -643,6 +671,61 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
 }
 
 /* ── Piezas del editor ──────────────────────────────────────────────────── */
+
+const MODOS = [
+    { id: 'facil', etiqueta: 'Fácil', Icono: Wand2, ayuda: 'Lo esencial, en una sola lista' },
+    { id: 'avanzado', etiqueta: 'Avanzado', Icono: Settings2, ayuda: 'Todos los controles, por pestañas' },
+];
+
+/**
+ * Las dos maneras de personalizar.
+ *
+ * Va encima de las pestañas y no dentro de ellas a propósito: no es otra
+ * sección del editor, es cuánto editor se muestra.
+ *
+ * No queda fija al desplazar aunque las pestañas sí: dos barras pegadas al
+ * mismo borde se solaparían, y en un teléfono se comerían un tercio de la
+ * pantalla. Abajo del panel fácil hay otra puerta al editor completo.
+ */
+function SelectorDeModo({ modo, onCambiar }) {
+    return (
+        <div
+            role="radiogroup"
+            aria-label="Nivel de personalización"
+            className="flex gap-1 border-b border-stone-200 p-2 dark:border-stone-800"
+        >
+            {MODOS.map(({ id, etiqueta, Icono, ayuda }) => {
+                const esActivo = modo === id;
+
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        role="radio"
+                        aria-checked={esActivo}
+                        title={ayuda}
+                        onClick={() => onCambiar(id)}
+                        className={`pulsable relative inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-semibold transition-colors duration-150 ${
+                            esActivo
+                                ? 'text-white dark:text-stone-950'
+                                : 'text-stone-600 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800'
+                        }`}
+                    >
+                        {esActivo && (
+                            <motion.span
+                                layoutId="modo-activo"
+                                className="absolute inset-0 rounded-lg bg-stone-900 dark:bg-stone-100"
+                                transition={{ type: 'spring', duration: 0.3, bounce: 0.12 }}
+                            />
+                        )}
+                        <Icono className="relative h-4 w-4" />
+                        <span className="relative">{etiqueta}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
 
 function Pestanas({ activa, onCambiar }) {
     return (
@@ -728,7 +811,7 @@ function AvisoDeComputadora({ onCerrar }) {
  * negocio, y la IA propone el catálogo entero. Están repartidos por el
  * editor, así que este aviso los junta donde se ven al entrar.
  */
-function AvisoDeAyuda({ conIa, onTemas, onIa, onCerrar }) {
+function AvisoDeAyuda({ conIa, onTemas, onIa, onFacil, onCerrar }) {
     const boton =
         'pulsable inline-flex w-full items-center justify-center gap-1.5 rounded-lg px-3.5 py-2.5 text-sm font-semibold sm:w-auto';
 
@@ -743,9 +826,9 @@ function AvisoDeAyuda({ conIa, onTemas, onIa, onCerrar }) {
                     <p className="min-w-0 flex-1 text-sm leading-relaxed text-marca-900 dark:text-marca-200">
                         <strong className="block font-semibold">¿Se te complica el diseño?</strong>
                         <span className="mt-0.5 block">
-                            No tienes que armarlo a mano. Un tema rápido cambia colores, letras y formas de una
-                            vez, y el botón de la paleta toma los colores de tu logo
-                            {conIa ? '. Y si prefieres, nuestra IA te propone el catálogo entero' : ''}.
+                            No tienes que armarlo a mano. El modo fácil deja a la vista lo que de verdad cambia
+                            cómo se ve tu catálogo, un tema rápido cambia colores, letras y formas de una vez
+                            {conIa ? ', y nuestra IA te propone el catálogo entero' : ''}.
                         </span>
                     </p>
 
@@ -762,8 +845,17 @@ function AvisoDeAyuda({ conIa, onTemas, onIa, onCerrar }) {
                 <div className="mt-3 flex flex-col gap-2 sm:flex-row">
                     <button
                         type="button"
-                        onClick={onTemas}
+                        onClick={onFacil}
                         className={`${boton} boton-elevado bg-marca-700 text-white hover:bg-marca-600 dark:bg-marca-500 dark:text-stone-950`}
+                    >
+                        <Wand2 className="h-4 w-4" />
+                        Modo fácil
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={onTemas}
+                        className={`${boton} border border-marca-300 text-marca-900 hover:bg-white/70 dark:border-marca-800 dark:text-marca-200 dark:hover:bg-stone-900/70`}
                     >
                         <Palette className="h-4 w-4" />
                         Temas y colores

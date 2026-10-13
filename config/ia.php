@@ -24,6 +24,10 @@ return [
     'minimo_caracteres' => 20,
     'maximo_caracteres' => 600,
 
+    // Las indicaciones de diseño, que van aparte de la descripción y son
+    // opcionales: colores que quiere, qué destacar, qué evitar.
+    'maximo_indicaciones' => 400,
+
     // Cuánto inventario de ejemplo puede proponer en una sola creación
     'maximo_categorias' => 8,
     'maximo_productos' => 12,

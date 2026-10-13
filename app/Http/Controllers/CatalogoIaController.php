@@ -28,17 +28,29 @@ class CatalogoIaController extends Controller
 
     public function generar(Request $request): JsonResponse
     {
+        $preferencias = GeneradorDeCatalogo::preferencias();
+
         $datos = $request->validate([
             'descripcion' => ['required', 'string', 'min:' . config('ia.minimo_caracteres'), 'max:' . config('ia.maximo_caracteres')],
+            // Lo que el comercio pide a mano: colores, lo que quiere destacar,
+            // qué evitar. Es opcional; la descripción sigue siendo lo mínimo.
+            'indicaciones' => ['nullable', 'string', 'max:' . config('ia.maximo_indicaciones')],
             'tono' => ['required', Rule::in(array_keys(GeneradorDeCatalogo::TONOS))],
             'incluir' => ['required', 'array'],
             'incluir.diseno' => ['boolean'],
             'incluir.textos' => ['boolean'],
             'incluir.inventario' => ['boolean'],
+            'extras' => ['nullable', 'array'],
+            'extras.*' => [Rule::in(GeneradorDeCatalogo::EXTRAS)],
+            'preferencias' => ['nullable', 'array'],
+            'preferencias.estilo' => ['nullable', Rule::in($preferencias['estilo'])],
+            'preferencias.fondo' => ['nullable', Rule::in($preferencias['fondo'])],
+            'preferencias.letras' => ['nullable', Rule::in($preferencias['letras'])],
         ], [
             'descripcion.required' => 'Describe tu negocio para que la IA pueda proponerte algo.',
             'descripcion.min' => 'Cuéntanos un poco más: al menos :min caracteres sobre qué vendes y cómo quieres que se vea.',
             'descripcion.max' => 'La descripción puede tener hasta :max caracteres.',
+            'indicaciones.max' => 'Las indicaciones pueden tener hasta :max caracteres.',
         ]);
 
         $incluir = [
@@ -53,6 +65,13 @@ class CatalogoIaController extends Controller
             return $this->error($comercio, 'Elige al menos una cosa para que la IA proponga.', 422);
         }
 
+        // Los extras son bloques de la página y las preferencias son de
+        // diseño: no se piden si no se pidió lo que les corresponde.
+        $incluir['extras'] = $incluir['textos'] ? array_values(array_unique($datos['extras'] ?? [])) : [];
+        $incluir['preferencias'] = $incluir['diseno']
+            ? array_filter(array_intersect_key($datos['preferencias'] ?? [], $preferencias))
+            : [];
+
         try {
             $generacion = $this->asistente->crear(
                 $comercio,
@@ -60,6 +79,7 @@ class CatalogoIaController extends Controller
                 $datos['descripcion'],
                 $datos['tono'],
                 $incluir,
+                (string) ($datos['indicaciones'] ?? ''),
             );
         } catch (ErrorDeIa $e) {
             return $this->error($comercio, $e->getMessage(), $e->estadoHttp);

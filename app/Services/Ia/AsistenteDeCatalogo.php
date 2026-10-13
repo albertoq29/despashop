@@ -36,11 +36,13 @@ class AsistenteDeCatalogo
     }
 
     /**
-     * @param  array{diseno: bool, textos: bool, inventario: bool}  $incluir
+     * @param  array{diseno: bool, textos: bool, inventario: bool, extras: list<string>, preferencias: array<string, string>}  $incluir
      */
-    public function crear(User $comercio, ?User $solicitante, string $descripcion, string $tono, array $incluir): AiGeneration
+    public function crear(User $comercio, ?User $solicitante, string $descripcion, string $tono, array $incluir, string $indicaciones = ''): AiGeneration
     {
-        $descripcion = trim(preg_replace('/\s+/u', ' ', strip_tags($descripcion)));
+        $limpiar = fn (string $texto) => trim(preg_replace('/\s+/u', ' ', strip_tags($texto)));
+        $descripcion = $limpiar($descripcion);
+        $indicaciones = $limpiar($indicaciones);
 
         $this->limites->verificar($comercio);
 
@@ -52,7 +54,7 @@ class AsistenteDeCatalogo
         }
 
         try {
-            return $this->procesar($comercio, $solicitante, $descripcion, $tono, $incluir);
+            return $this->procesar($comercio, $solicitante, $descripcion, $tono, $incluir, $indicaciones);
         } finally {
             $candado->release();
         }
@@ -127,23 +129,27 @@ class AsistenteDeCatalogo
         return ['categorias' => $creadas, 'productos' => $productos->count(), 'omitidos' => $omitidos];
     }
 
-    private function procesar(User $comercio, ?User $solicitante, string $descripcion, string $tono, array $incluir): AiGeneration
+    private function procesar(User $comercio, ?User $solicitante, string $descripcion, string $tono, array $incluir, string $indicaciones): AiGeneration
     {
         $registro = [
             'requested_by' => $solicitante?->id,
             'prompt' => $descripcion,
-            'options' => ['tono' => $tono, 'incluir' => $incluir],
+            'options' => ['tono' => $tono, 'incluir' => $incluir, 'indicaciones' => $indicaciones],
         ];
 
+        // Las indicaciones también las escribe el comercio y también acaban
+        // en el prompt: pasan por los mismos filtros que la descripción.
+        $aRevisar = trim($descripcion . "\n" . $indicaciones);
+
         // 1. Filtro local: gratis, y no gasta cupo del comercio
-        if ($categoria = $this->moderador->terminoProhibido($descripcion)) {
+        if ($categoria = $this->moderador->terminoProhibido($aRevisar)) {
             $this->registrar($registro + ['status' => AiGeneration::BLOQUEADA, 'reason' => $categoria]);
 
             throw new ErrorDeIa($this->mensajeDeRechazo($categoria), 422);
         }
 
         // 2. Clasificador de seguridad
-        $moderacion = $this->moderador->evaluar($descripcion);
+        $moderacion = $this->moderador->evaluar($aRevisar);
 
         if ($moderacion['categoria']) {
             $this->registrar($registro + [
@@ -163,8 +169,8 @@ class AsistenteDeCatalogo
 
         try {
             $respuesta = $this->cliente->completar(
-                $this->generador->mensajes($descripcion, $tono, $incluir, $contexto),
-                $this->generador->opciones($incluir),
+                $this->generador->mensajes($descripcion, $tono, $incluir, $contexto, $indicaciones),
+                $this->generador->opciones($incluir, $contexto),
             );
         } catch (ErrorDeIa $e) {
             $this->registrar($registro + ['status' => AiGeneration::FALLIDA, 'reason' => mb_substr($e->getMessage(), 0, 190)]);
@@ -215,13 +221,20 @@ class AsistenteDeCatalogo
     /** Lo que la IA necesita saber del comercio. Nunca precios, costos ni datos de clientes. */
     private function contexto(User $comercio, ?CatalogTheme $tema): array
     {
+        $categorias = Category::orderBy('name')->limit(15)->pluck('name', 'id');
+
         return [
             'nombre' => $comercio->business_name ?: $comercio->name,
-            'categorias' => Category::orderBy('name')->limit(15)->pluck('name')->all(),
+            'categorias' => $categorias->values()->all(),
+            // Para atar el bloque de categoría destacada: la IA responde con
+            // un nombre y aquí se busca a qué id corresponde
+            'categorias_con_id' => $categorias->all(),
             'productos' => Product::latest('id')->limit(25)->pluck('name')->all(),
             'productos_totales' => Product::count(),
             'banners' => CatalogBanner::count(),
             'combos' => Combo::where('is_hidden', false)->count(),
+            // Una portada con fondo de imagen sin imagen queda en degradado
+            'tiene_portada' => (bool) $tema?->cover_path,
             // Un comercio que ya subió su logo tiene su marca decidida: la IA
             // propone alrededor de esos colores en vez de inventar otros.
             'colores_del_logo' => $this->coloresDelLogo($tema),

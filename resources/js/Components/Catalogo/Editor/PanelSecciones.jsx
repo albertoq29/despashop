@@ -484,6 +484,9 @@ function EditorDeSeccion({ seccion, editor }) {
                 </>
             );
 
+        case 'services':
+            return <EditorDeServicios seccion={seccion} editor={editor} propio={propio} />;
+
         case 'category':
             return (
                 <>
@@ -582,6 +585,66 @@ function EditorDeSeccion({ seccion, editor }) {
         default:
             return null;
     }
+}
+
+/**
+ * El bloque de servicios.
+ *
+ * Estaba sin controles: al abrirlo no había nada que tocar. Lleva lo mismo
+ * que los demás bloques de artículos (título, subtítulo, presentación) y
+ * dos cosas que solo tienen sentido aquí: el texto que explica cómo se
+ * contrata y un botón propio a WhatsApp, porque un servicio no se agrega a
+ * un pedido como un producto, se acuerda hablando.
+ */
+function EditorDeServicios({ editor, propio }) {
+    const cuantos = editor.inventario?.servicios ?? 0;
+
+    return (
+        <>
+            {cuantos === 0 && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2.5 text-xs leading-relaxed text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                    Todavía no tienes servicios. En Inventario, al crear o editar un artículo, elige
+                    «Servicio» en vez de «Producto»: los que marques aparecen en este bloque.
+                </p>
+            )}
+
+            <Texto etiqueta="Título" {...propio('title')} placeholder="Nuestros servicios" maximo={120} />
+            <Texto etiqueta="Subtítulo" {...propio('subtitle')} maximo={200} filas={2} />
+
+            <Texto
+                etiqueta="Cómo se contrata"
+                {...propio('text')}
+                placeholder="Atendemos con cita previa, de lunes a sábado. Escríbenos y cuadramos el día."
+                maximo={1500}
+                filas={3}
+                ayuda="Opcional. Va debajo del título: horarios, si hay que pedir cita, qué incluye."
+            />
+
+            <Segmentado
+                etiqueta="Presentación"
+                {...propio('style')}
+                opciones={[
+                    { valor: 'grid', texto: 'Cuadrícula' },
+                    { valor: 'carousel', texto: 'Fila deslizable' },
+                ]}
+                ayuda="Con pocos servicios la cuadrícula se ve mejor; con muchos, la fila."
+            />
+
+            <Texto
+                etiqueta="Botón de WhatsApp"
+                {...propio('button_text')}
+                placeholder="Agendar una cita"
+                maximo={40}
+                ayuda="Opcional. Aparece debajo de los servicios y abre tu WhatsApp. Déjalo vacío para no mostrarlo."
+            />
+
+            {cuantos > 0 && (
+                <p className="text-[11px] text-stone-500 dark:text-stone-400">
+                    {cuantos === 1 ? 'Se muestra 1 servicio visible.' : `Se muestran ${cuantos} servicios visibles.`}
+                </p>
+            )}
+        </>
+    );
 }
 
 function EditorDeProductos({ editor, c, campo, propio }) {

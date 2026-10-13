@@ -114,6 +114,74 @@ class PersonalizarCatalogoTest extends TestCase
         $this->assertSame('split', $this->tema($usuario)->hero_layout);
     }
 
+    /**
+     * El bloque de servicios no tenía controles y, de paso, tampoco dónde
+     * guardar lo que ahora se le puede escribir.
+     */
+    public function test_el_bloque_de_servicios_guarda_su_texto_y_su_boton(): void
+    {
+        $usuario = $this->comercio();
+
+        $secciones = collect($this->tema($usuario)->sections)
+            ->map(fn ($seccion) => $seccion['id'] === 'services'
+                ? [
+                    ...$seccion,
+                    'visible' => true,
+                    'title' => 'Lo que hacemos',
+                    'subtitle' => 'Cortes y barba.',
+                    'text' => 'Atendemos con cita previa, de lunes a sábado.',
+                    'button_text' => 'Agendar una cita',
+                    'style' => 'carousel',
+                ]
+                : $seccion)
+            ->all();
+
+        $this->actingAs($usuario)
+            ->put(route('catalogo.personalizar.update'), $this->datosDelEditor($usuario, ['sections' => $secciones]))
+            ->assertSessionHasNoErrors();
+
+        $guardado = collect($this->tema($usuario)->sections)->firstWhere('id', 'services');
+
+        $this->assertSame('Lo que hacemos', $guardado['title']);
+        $this->assertSame('Cortes y barba.', $guardado['subtitle']);
+        $this->assertSame('Atendemos con cita previa, de lunes a sábado.', $guardado['text']);
+        $this->assertSame('Agendar una cita', $guardado['button_text']);
+        $this->assertSame('carousel', $guardado['style']);
+    }
+
+    public function test_el_bloque_de_servicios_no_acepta_una_presentacion_inventada(): void
+    {
+        $usuario = $this->comercio();
+
+        $secciones = collect($this->tema($usuario)->sections)
+            ->map(fn ($seccion) => $seccion['id'] === 'services' ? [...$seccion, 'style' => 'mosaico'] : $seccion)
+            ->all();
+
+        $this->actingAs($usuario)
+            ->put(route('catalogo.personalizar.update'), $this->datosDelEditor($usuario, ['sections' => $secciones]))
+            ->assertSessionHasNoErrors();
+
+        // El primero de la lista: cuadrícula
+        $this->assertSame('grid', collect($this->tema($usuario)->sections)->firstWhere('id', 'services')['style']);
+    }
+
+    public function test_el_editor_sabe_cuantos_servicios_y_combos_hay(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, function () {
+            Product::create(['name' => 'Corte', 'item_type' => Product::SERVICIO, 'price_usdt' => 8]);
+            Product::create(['name' => 'Barba', 'item_type' => Product::SERVICIO, 'price_usdt' => 5]);
+            Product::create(['name' => 'Cera', 'price_usdt' => 6, 'stock' => 3]);
+        });
+
+        $this->actingAs($usuario)
+            ->get(route('catalogo.personalizar'))
+            ->assertInertia(fn (AssertableInertia $pagina) => $pagina
+                ->where('inventario.servicios', 2)
+                ->where('inventario.productos', 1)
+                ->where('inventario.combos', 0));
+    }
+
     public function test_ocultar_un_bloque_apaga_su_bandera_heredada(): void
     {
         $usuario = $this->comercio();

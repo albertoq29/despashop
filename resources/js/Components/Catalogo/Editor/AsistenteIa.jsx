@@ -14,6 +14,55 @@ const QUE_PROPONER = [
     { clave: 'inventario', titulo: 'Productos de ejemplo', texto: 'Categorías y borradores', Icono: Package },
 ];
 
+/**
+ * Preferencias de diseño, como las entiende el servidor.
+ *
+ * Los valores tienen que coincidir con GeneradorDeCatalogo::preferencias():
+ * uno que no esté en esa lista lo rechaza la validación. El vacío es
+ * «que decida la IA», y es lo que viene marcado.
+ */
+const PREFERENCIAS = [
+    {
+        clave: 'estilo',
+        etiqueta: 'Estilo',
+        opciones: [
+            { valor: '', texto: 'Que decida' },
+            { valor: 'minimalista', texto: 'Minimalista' },
+            { valor: 'llamativo', texto: 'Llamativo' },
+            { valor: 'elegante', texto: 'Elegante' },
+            { valor: 'divertido', texto: 'Divertido' },
+            { valor: 'artesanal', texto: 'Artesanal' },
+        ],
+    },
+    {
+        clave: 'fondo',
+        etiqueta: 'Fondo',
+        opciones: [
+            { valor: '', texto: 'Que decida' },
+            { valor: 'claro', texto: 'Claro' },
+            { valor: 'oscuro', texto: 'Oscuro' },
+        ],
+    },
+    {
+        clave: 'letras',
+        etiqueta: 'Letras',
+        opciones: [
+            { valor: '', texto: 'Que decida' },
+            { valor: 'modernas', texto: 'Modernas' },
+            { valor: 'clasicas', texto: 'Clásicas' },
+            { valor: 'redondeadas', texto: 'Redondeadas' },
+            { valor: 'marcadas', texto: 'Marcadas' },
+        ],
+    },
+];
+
+/** Bloques que la IA solo arma si se le piden. Igual: los valida el servidor. */
+const EXTRAS = [
+    { clave: 'faq', etiqueta: 'Preguntas frecuentes', ayuda: 'Tres preguntas con su respuesta, de lo que cuentes de tu negocio' },
+    { clave: 'categoria', etiqueta: 'Categoría destacada', ayuda: 'Una fila con los productos de una de tus categorías' },
+    { clave: 'separadores', etiqueta: 'Separadores', ayuda: 'Una figura decorativa entre dos bloques' },
+];
+
 const PASOS_DE_ESPERA = [
     'Leyendo la descripción de tu negocio',
     'Eligiendo colores que combinen',
@@ -33,8 +82,11 @@ const PASOS_DE_ESPERA = [
 export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, onAplicar, onInventarioCreado }) {
     const [paso, setPaso] = useState('escribir');
     const [descripcion, setDescripcion] = useState('');
+    const [indicaciones, setIndicaciones] = useState('');
     const [tono, setTono] = useState('cercano');
     const [incluir, setIncluir] = useState({ diseno: true, textos: true, inventario: false });
+    const [preferencias, setPreferencias] = useState({ estilo: '', fondo: '', letras: '' });
+    const [extras, setExtras] = useState([]);
     const [error, setError] = useState(null);
     const [resultado, setResultado] = useState(null);
     const [elegidos, setElegidos] = useState({ categorias: [], productos: [] });
@@ -68,7 +120,14 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
         setPaso('generando');
 
         try {
-            const { data } = await axios.post(route('catalogo.ia.generar'), { descripcion, tono, incluir });
+            const { data } = await axios.post(route('catalogo.ia.generar'), {
+                descripcion,
+                indicaciones,
+                tono,
+                incluir,
+                preferencias,
+                extras,
+            });
 
             // Si cerró la ventana o pidió otra propuesta mientras tanto, esta ya no importa
             if (id !== peticion.current) {
@@ -216,10 +275,16 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
                                         <Escribir
                                             descripcion={descripcion}
                                             onDescripcion={setDescripcion}
+                                            indicaciones={indicaciones}
+                                            onIndicaciones={setIndicaciones}
                                             tono={tono}
                                             onTono={setTono}
                                             incluir={incluir}
                                             onIncluir={setIncluir}
+                                            preferencias={preferencias}
+                                            onPreferencias={setPreferencias}
+                                            extras={extras}
+                                            onExtras={setExtras}
                                             limites={limites}
                                             error={error}
                                         />
@@ -302,9 +367,25 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
 
 /* ── Paso 1: la descripción ─────────────────────────────────────────────── */
 
-function Escribir({ descripcion, onDescripcion, tono, onTono, incluir, onIncluir, limites, error }) {
+function Escribir({
+    descripcion,
+    onDescripcion,
+    indicaciones,
+    onIndicaciones,
+    tono,
+    onTono,
+    incluir,
+    onIncluir,
+    preferencias,
+    onPreferencias,
+    extras,
+    onExtras,
+    limites,
+    error,
+}) {
     const campo = useRef(null);
     const largo = descripcion.trim().length;
+    const maximoIndicaciones = limites.maximoIndicaciones ?? 400;
 
     useEffect(() => {
         campo.current?.focus({ preventScroll: true });
@@ -386,17 +467,105 @@ function Escribir({ descripcion, onDescripcion, tono, onTono, incluir, onIncluir
                 </div>
             </div>
 
-            <Segmentado
-                etiqueta="Tono de los textos"
-                valor={tono}
-                onCambiar={onTono}
-                opciones={[
-                    { valor: 'cercano', texto: 'Cercano' },
-                    { valor: 'profesional', texto: 'Profesional' },
-                    { valor: 'alegre', texto: 'Alegre' },
-                    { valor: 'elegante', texto: 'Elegante' },
-                ]}
-            />
+            {incluir.textos && (
+                <Segmentado
+                    etiqueta="Tono de los textos"
+                    valor={tono}
+                    onCambiar={onTono}
+                    opciones={[
+                        { valor: 'cercano', texto: 'Cercano' },
+                        { valor: 'profesional', texto: 'Profesional' },
+                        { valor: 'alegre', texto: 'Alegre' },
+                        { valor: 'elegante', texto: 'Elegante' },
+                    ]}
+                />
+            )}
+
+            {incluir.diseno && (
+                <div className="space-y-4 rounded-xl border border-stone-200 p-3.5 dark:border-stone-800">
+                    <p className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                        Preferencias de diseño
+                        <span className="ml-1.5 font-normal text-stone-400 dark:text-stone-500">opcional</span>
+                    </p>
+
+                    {/* En fila de píldoras y no en un segmentado: «Redondeadas»
+                        junto a cuatro más no cabe en la pantalla de un teléfono */}
+                    {PREFERENCIAS.map(({ clave, etiqueta, opciones }) => (
+                        <div key={clave}>
+                            <p className="mb-1.5 text-xs font-medium text-stone-600 dark:text-stone-400">{etiqueta}</p>
+                            <div role="radiogroup" aria-label={etiqueta} className="flex flex-wrap gap-1.5">
+                                {opciones.map(({ valor, texto }) => (
+                                    <Pildora
+                                        key={valor || 'libre'}
+                                        activa={preferencias[clave] === valor}
+                                        papel="radio"
+                                        onClick={() => onPreferencias((anterior) => ({ ...anterior, [clave]: valor }))}
+                                    >
+                                        {texto}
+                                    </Pildora>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {incluir.textos && (
+                <div>
+                    <p className="mb-2 text-sm font-medium text-stone-800 dark:text-stone-200">
+                        Bloques extra
+                        <span className="ml-1.5 font-normal text-stone-400 dark:text-stone-500">opcional</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {EXTRAS.map(({ clave, etiqueta, ayuda }) => (
+                            <Pildora
+                                key={clave}
+                                activa={extras.includes(clave)}
+                                papel="checkbox"
+                                titulo={ayuda}
+                                onClick={() =>
+                                    onExtras((anterior) =>
+                                        anterior.includes(clave)
+                                            ? anterior.filter((uno) => uno !== clave)
+                                            : [...anterior, clave],
+                                    )
+                                }
+                            >
+                                {etiqueta}
+                            </Pildora>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <div>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                    <label htmlFor="indicaciones-ia" className="text-sm font-medium text-stone-800 dark:text-stone-200">
+                        ¿Algo más que quieras pedirle?
+                        <span className="ml-1.5 font-normal text-stone-400 dark:text-stone-500">opcional</span>
+                    </label>
+                    <span
+                        className={`text-[11px] tabular-nums ${
+                            indicaciones.length > maximoIndicaciones ? 'text-red-600' : 'text-stone-400 dark:text-stone-500'
+                        }`}
+                    >
+                        {indicaciones.length}/{maximoIndicaciones}
+                    </span>
+                </div>
+                <textarea
+                    id="indicaciones-ia"
+                    rows={3}
+                    maxLength={maximoIndicaciones}
+                    value={indicaciones}
+                    onChange={(e) => onIndicaciones(e.target.value)}
+                    placeholder="Ej.: usa azul marino y dorado, nada de rosado. Que se note que hacemos tortas por encargo. Letras grandes, mi clientela es mayor."
+                    className="w-full resize-y rounded-xl border-stone-300 bg-white px-3.5 py-3 text-sm leading-relaxed text-stone-900 placeholder:text-stone-400 focus:border-marca-600 focus:ring-marca-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-600"
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-stone-500 dark:text-stone-400">
+                    Colores que quieres o que no, qué destacar, cómo hablarle a tus clientes. Lo que pidas manda,
+                    salvo si nos obliga a inventar datos de tu negocio.
+                </p>
+            </div>
 
             <p className="rounded-xl bg-stone-100 px-3.5 py-3 text-[11px] leading-relaxed text-stone-500 dark:bg-stone-800/60 dark:text-stone-400">
                 Tu descripción y los nombres de tus productos se envían a un servicio externo de IA. Nunca tus precios,
@@ -603,6 +772,27 @@ function MuestraDePortada({ tema, textos }) {
                 </span>
             </div>
         </div>
+    );
+}
+
+/** Una opción en fila, que se puede envolver sin romperse. */
+function Pildora({ activa, papel, titulo, onClick, children }) {
+    return (
+        <button
+            type="button"
+            role={papel}
+            aria-checked={activa}
+            title={titulo}
+            onClick={onClick}
+            className={`pulsable inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium ${
+                activa
+                    ? 'border-marca-600 bg-marca-50 text-marca-900 dark:border-marca-500 dark:bg-marca-950/60 dark:text-marca-200'
+                    : 'border-stone-200 text-stone-600 hover:border-stone-300 dark:border-stone-700 dark:text-stone-300 dark:hover:border-stone-600'
+            }`}
+        >
+            {activa && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+            {children}
+        </button>
     );
 }
 

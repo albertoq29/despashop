@@ -119,7 +119,16 @@ class SeccionesDelCatalogo
         return $base + match ($tipo) {
             'featured' => ['title' => 'Novedades', 'subtitle' => 'Lo último que llegó a la tienda.', 'style' => 'carousel', 'limit' => 8],
             'combos' => ['title' => 'Combos', 'subtitle' => 'Llévate más por menos.', 'style' => 'carousel'],
-            'services' => ['title' => 'Nuestros servicios', 'subtitle' => 'Lo que hacemos por ti.', 'style' => 'grid'],
+            // Un servicio no se despacha: se acuerda. De ahí el texto de
+            // apoyo (cómo se reserva, qué incluye) y el botón a WhatsApp,
+            // que en un bloque de productos no harían falta.
+            'services' => [
+                'title' => 'Nuestros servicios',
+                'subtitle' => 'Lo que hacemos por ti.',
+                'text' => '',
+                'button_text' => '',
+                'style' => 'grid',
+            ],
             'products' => ['title' => 'Nuestros productos', 'subtitle' => ''],
             'contact' => [
                 'title' => '¿Tienes alguna pregunta?',

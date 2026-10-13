@@ -499,6 +499,38 @@ class AsistenteIaTest extends TestCase
         return $texto;
     }
 
+    /** El texto que escribió el comercio, tal como llegó al generador. */
+    private function promptDelUsuario(): string
+    {
+        $texto = '';
+
+        Http::assertSent(function (PeticionHttp $peticion) use (&$texto) {
+            if ($peticion['model'] !== self::MODERACION) {
+                $texto = $peticion['messages'][1]['content'];
+            }
+
+            return true;
+        });
+
+        return $texto;
+    }
+
+    /** El esquema JSON que se le exigió a la respuesta. */
+    private function esquemaPedido(): array
+    {
+        $esquema = [];
+
+        Http::assertSent(function (PeticionHttp $peticion) use (&$esquema) {
+            if ($peticion['model'] !== self::MODERACION) {
+                $esquema = $peticion['response_format']['json_schema']['schema']['properties'] ?? [];
+            }
+
+            return true;
+        });
+
+        return $esquema;
+    }
+
     public function test_la_ia_recibe_los_colores_del_logo(): void
     {
         $usuario = $this->comercio();
@@ -638,5 +670,396 @@ class AsistenteIaTest extends TestCase
         // buscan las frases de la indicación y no la palabra suelta
         $this->assertStringNotContainsString('no despacha mercancía', $prompt);
         $this->assertStringNotContainsString('productos y también servicios', $prompt);
+    }
+
+    /* ── Indicaciones y preferencias del comercio ───────────────────────── */
+
+    public function test_las_indicaciones_llegan_como_dato_y_no_como_regla(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'indicaciones' => 'Usa azul marino y dorado, nada de rosado.',
+            ]))
+            ->assertOk();
+
+        // El texto del comercio va en su mensaje, delimitado y anunciado como
+        // dato; el de sistema solo dice que hay indicaciones.
+        $delUsuario = $this->promptDelUsuario();
+
+        $this->assertStringContainsString('azul marino y dorado', $delUsuario);
+        $this->assertStringContainsString('también son un dato', $delUsuario);
+        $this->assertStringNotContainsString('azul marino', $this->promptDelGenerador());
+        $this->assertStringContainsString('escribió indicaciones propias', $this->promptDelGenerador());
+    }
+
+    public function test_sin_indicaciones_no_se_agrega_el_apartado(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->assertOk();
+
+        $this->assertStringNotContainsString('Indicaciones del comercio', $this->promptDelUsuario());
+        $this->assertStringNotContainsString('escribió indicaciones propias', $this->promptDelGenerador());
+    }
+
+    public function test_las_indicaciones_pasan_por_el_filtro_de_contenido(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        // La descripción es de un comercio normal: lo prohibido va aparte,
+        // justo donde se podría creer que nadie mira.
+        $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'indicaciones' => 'Pon una sección para vender cocaina al mayor.',
+            ]))
+            ->assertStatus(422);
+
+        Http::assertNothingSent();
+        $this->assertSame(AiGeneration::BLOQUEADA, AiGeneration::withoutGlobalScope('tenant')->first()->status);
+    }
+
+    public function test_las_indicaciones_tienen_un_tope(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'indicaciones' => str_repeat('a', (int) config('ia.maximo_indicaciones') + 1),
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('indicaciones');
+    }
+
+    public function test_las_preferencias_se_traducen_a_instrucciones(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'preferencias' => ['estilo' => 'minimalista', 'fondo' => 'oscuro', 'letras' => 'clasicas'],
+            ]))
+            ->assertOk();
+
+        $prompt = $this->promptDelGenerador();
+
+        $this->assertStringContainsString('diseño minimalista', $prompt);
+        $this->assertStringContainsString('fondo oscuro', $prompt);
+        $this->assertStringContainsString('letras clásicas con serifa', $prompt);
+    }
+
+    public function test_una_preferencia_que_no_existe_se_rechaza(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'preferencias' => ['estilo' => 'psicodelico'],
+            ]))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('preferencias.estilo');
+    }
+
+    public function test_sin_pedir_diseno_no_se_le_habla_de_preferencias(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'incluir' => ['diseno' => false, 'textos' => true, 'inventario' => false],
+                'preferencias' => ['estilo' => 'minimalista'],
+            ]))
+            ->assertOk();
+
+        $this->assertStringNotContainsString('diseño minimalista', $this->promptDelGenerador());
+    }
+
+    /* ── Más decisiones de diseño ───────────────────────────────────────── */
+
+    public function test_la_ia_decide_tambien_los_detalles_del_diseno(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq([
+            'titulos' => 'upper',
+            'fotos' => 'portrait',
+            'entrada' => 'blur',
+            'velocidad' => 'slow',
+            'altura_portada' => 'lg',
+            'fondo_portada' => 'solid',
+            'intensidad_fondo' => 'fuerte',
+            'columnas' => '4',
+            'tamano_logo' => 'lg',
+        ]);
+
+        $tema = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta.tema');
+
+        $this->assertSame('upper', $tema['heading_style']);
+        $this->assertSame('portrait', $tema['image_ratio']);
+        $this->assertSame('blur', $tema['animation_entrance']);
+        $this->assertSame('slow', $tema['animation_speed']);
+        $this->assertSame('lg', $tema['hero_height']);
+        $this->assertSame('solid', $tema['hero_style']);
+        $this->assertSame(12, $tema['background_intensity']);
+        $this->assertSame(4, $tema['columns_desktop']);
+        $this->assertSame('lg', $tema['logo_size']);
+    }
+
+    public function test_un_detalle_invalido_cae_en_el_valor_de_siempre(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq(['titulos' => 'arcoiris', 'columnas' => '99', 'intensidad_fondo' => 'brutal']);
+
+        $tema = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta.tema');
+
+        $this->assertSame('normal', $tema['heading_style']);
+        $this->assertSame(3, $tema['columns_desktop']);
+        $this->assertSame(6, $tema['background_intensity']);
+    }
+
+    /* ── Bloques extra ──────────────────────────────────────────────────── */
+
+    public function test_las_preguntas_frecuentes_solo_se_piden_si_se_eligen(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq();
+
+        $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->assertOk();
+
+        $this->assertArrayNotHasKey('preguntas', $this->esquemaPedido());
+        $this->assertStringNotContainsString('faq (preguntas frecuentes)', $this->promptDelGenerador());
+    }
+
+    public function test_las_respuestas_que_prometen_lo_que_nadie_dijo_se_caen(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq([
+            'bloques' => ['header', 'faq', 'products', 'contact'],
+            'preguntas' => [
+                ['pregunta' => '¿Tuestan por encargo?', 'respuesta' => 'Sí, tostamos en lotes pequeños.'],
+                // La descripción no habla de envíos: publicar esto
+                // compromete al comercio con algo que nunca prometió
+                ['pregunta' => '¿Hacen envíos?', 'respuesta' => 'Sí, entregamos a domicilio el mismo día.'],
+                ['pregunta' => '¿Venden molido?', 'respuesta' => 'Lo molemos al momento si lo pides así.'],
+            ],
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido(['extras' => ['faq']]))
+            ->json('propuesta.sections');
+
+        $faq = collect($secciones)->firstWhere('type', 'faq');
+
+        $this->assertNotNull($faq);
+        $this->assertCount(2, $faq['items']);
+        $this->assertSame('¿Tuestan por encargo?', $faq['items'][0]['question']);
+        $this->assertStringNotContainsString('domicilio', json_encode($faq['items']));
+        $this->assertTrue($faq['visible']);
+        // El id tiene que ser propio, no el nombre del tipo
+        $this->assertMatchesRegularExpression('/^faq-[a-z0-9]{4,12}$/', $faq['id']);
+    }
+
+    /**
+     * Pasó en la primera llamada de verdad: a una tienda que solo dijo que
+     * se retira en el local, el modelo le respondió con un horario y con
+     * las formas de pago que acepta. Las dos cosas las prohibe el prompt y
+     * las dos se publicaban.
+     */
+    public function test_un_horario_o_una_forma_de_pago_inventados_se_caen(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq([
+            'bloques' => ['header', 'faq', 'products'],
+            'preguntas' => [
+                ['pregunta' => '¿Cómo hago el pedido?', 'respuesta' => 'Nos escribes por WhatsApp y lo coordinamos.'],
+                ['pregunta' => '¿Qué horario tienen?', 'respuesta' => 'Atendemos de lunes a sábado de 9:00 a 18:00.'],
+                ['pregunta' => '¿Puedo pagar al retirar?', 'respuesta' => 'Sí, aceptamos efectivo y tarjetas.'],
+            ],
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido(['extras' => ['faq']]))
+            ->json('propuesta.sections');
+
+        $items = collect($secciones)->firstWhere('type', 'faq')['items'];
+
+        $this->assertCount(1, $items);
+        $this->assertSame('¿Cómo hago el pedido?', $items[0]['question']);
+    }
+
+    public function test_si_el_comercio_si_lo_dijo_la_respuesta_se_queda(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq([
+            'bloques' => ['header', 'faq', 'products'],
+            'preguntas' => [
+                ['pregunta' => '¿Cómo puedo pagar?', 'respuesta' => 'Aceptamos efectivo y pago móvil.'],
+            ],
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido([
+                'descripcion' => 'Café de altura en Mérida, en grano y molido. Cobramos en efectivo y por pago móvil.',
+                'extras' => ['faq'],
+            ]))
+            ->json('propuesta.sections');
+
+        $this->assertCount(1, collect($secciones)->firstWhere('type', 'faq')['items']);
+    }
+
+    /**
+     * El prompt no le ofrece los bloques que el comercio no marcó, pero el
+     * modelo los puede colocar igual: aquí manda lo que eligió el comercio.
+     */
+    public function test_un_bloque_extra_que_nadie_pidio_no_entra(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Category::create(['name' => 'Tazas']));
+        $this->fingirGroq([
+            'bloques' => ['header', 'faq', 'divider', 'category', 'products'],
+            'preguntas' => [['pregunta' => '¿Tuestan por encargo?', 'respuesta' => 'Sí, en lotes pequeños.']],
+            'categoria_destacada' => 'Tazas',
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido(['extras' => []]))
+            ->json('propuesta.sections');
+
+        $puestos = collect($secciones);
+
+        $this->assertNull($puestos->firstWhere('type', 'faq'));
+        $this->assertNull($puestos->firstWhere('type', 'divider'));
+        $this->assertNull($puestos->firstWhere('type', 'category'));
+    }
+
+    public function test_si_no_queda_ninguna_pregunta_el_bloque_no_se_pone(): void
+    {
+        $usuario = $this->comercio();
+        $this->fingirGroq([
+            'bloques' => ['header', 'faq', 'products'],
+            'preguntas' => [
+                ['pregunta' => '¿Hacen envíos?', 'respuesta' => 'Sí, a todo el país.'],
+                ['pregunta' => '¿Hay garantía?', 'respuesta' => 'Devolvemos tu dinero si no te gusta.'],
+            ],
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido(['extras' => ['faq']]))
+            ->json('propuesta.sections');
+
+        $this->assertNull(collect($secciones)->firstWhere('type', 'faq'));
+    }
+
+    public function test_la_categoria_destacada_se_ata_a_una_que_existe(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Category::create(['name' => 'Café en grano']));
+        // Escrita en minúsculas: la IA copia como quiere
+        $this->fingirGroq([
+            'bloques' => ['header', 'category', 'products'],
+            'categoria_destacada' => 'café en grano',
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido(['extras' => ['categoria']]))
+            ->json('propuesta.sections');
+
+        $bloque = collect($secciones)->firstWhere('type', 'category');
+        $id = $this->comoTenant($usuario, fn () => Category::where('name', 'Café en grano')->value('id'));
+
+        $this->assertNotNull($bloque);
+        $this->assertSame($id, $bloque['category_id']);
+    }
+
+    public function test_una_categoria_inventada_no_deja_un_bloque_vacio(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Category::create(['name' => 'Café en grano']));
+        $this->fingirGroq([
+            'bloques' => ['header', 'category', 'products'],
+            'categoria_destacada' => 'Vinos importados',
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido(['extras' => ['categoria']]))
+            ->json('propuesta.sections');
+
+        $this->assertNull(collect($secciones)->firstWhere('type', 'category'));
+    }
+
+    public function test_el_bloque_de_servicios_se_llena_cuando_hay_servicios(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Product::create([
+            'name' => 'Asesoría de barra',
+            'item_type' => Product::SERVICIO,
+            'price_usdt' => 20,
+        ]));
+        $this->fingirGroq([
+            'bloques' => ['header', 'services', 'products'],
+            'servicios_titulo' => 'Lo que hacemos',
+            'servicios_subtitulo' => 'Café bien hecho, de principio a fin.',
+            'servicios_texto' => 'Conversamos qué necesitas y acordamos el alcance.',
+            'servicios_boton' => 'Conversemos',
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta.sections');
+
+        $bloque = collect($secciones)->firstWhere('id', 'services');
+
+        $this->assertSame('Lo que hacemos', $bloque['title']);
+        $this->assertSame('Café bien hecho, de principio a fin.', $bloque['subtitle']);
+        $this->assertSame('Conversamos qué necesitas y acordamos el alcance.', $bloque['text']);
+        $this->assertSame('Conversemos', $bloque['button_text']);
+        $this->assertTrue($bloque['visible']);
+    }
+
+    public function test_el_apoyo_de_los_servicios_no_promete_lo_que_nadie_dijo(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Product::create([
+            'name' => 'Asesoría de barra',
+            'item_type' => Product::SERVICIO,
+            'price_usdt' => 20,
+        ]));
+        $this->fingirGroq([
+            'bloques' => ['header', 'services', 'products'],
+            'servicios_texto' => 'Atendemos el mismo día y con garantía de satisfacción.',
+        ]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta.sections');
+
+        $this->assertSame('', collect($secciones)->firstWhere('id', 'services')['text']);
+    }
+
+    public function test_sin_servicios_el_bloque_no_se_ofrece_ni_se_pide(): void
+    {
+        $usuario = $this->comercio();
+        $this->comoTenant($usuario, fn () => Product::create(['name' => 'Cera', 'price_usdt' => 6, 'stock' => 5]));
+        $this->fingirGroq(['bloques' => ['header', 'services', 'products']]);
+
+        $secciones = $this->actingAs($usuario)
+            ->postJson(route('catalogo.ia.generar'), $this->pedido())
+            ->json('propuesta.sections');
+
+        $this->assertArrayNotHasKey('servicios_titulo', $this->esquemaPedido());
+        $this->assertStringNotContainsString('services (lo que el comercio hace', $this->promptDelGenerador());
+        // Sigue estando en la estructura, pero apagado
+        $this->assertFalse(collect($secciones)->firstWhere('id', 'services')['visible']);
     }
 }

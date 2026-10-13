@@ -224,7 +224,7 @@ function BarraLateral({ abierta, onCerrar, user, marca, respuestas }) {
 
                     <Grupo titulo="Inventario">
                         <Enlace href={route('productos.index')} activo={route().current('productos.*')} Icono={Package}>
-                            Productos
+                            Productos y servicios
                         </Enlace>
                         <Enlace href={route('categorias.index')} activo={route().current('categorias.*')} Icono={Tags}>
                             Categorías

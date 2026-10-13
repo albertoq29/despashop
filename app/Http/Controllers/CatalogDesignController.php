@@ -7,6 +7,8 @@ use App\Models\CatalogBanner;
 use App\Models\CatalogModal;
 use App\Models\CatalogTheme;
 use App\Models\Category;
+use App\Models\Combo;
+use App\Models\Product;
 use App\Services\CatalogProvisioner;
 use App\Services\Ia\LimitesDeIa;
 use App\Services\PaletteExtractor;
@@ -50,11 +52,19 @@ class CatalogDesignController extends Controller
             'fuentes' => $this->fonts(),
             'nombreComercio' => $comercio->business_name ?: $comercio->name,
             'categorias' => Category::orderBy('name')->get(['id', 'name']),
+            // Un bloque puede estar encendido y vacío: el editor avisa de eso
+            // en vez de dejar que el comercio publique un hueco sin saberlo.
+            'inventario' => [
+                'productos' => Product::productos()->count(),
+                'servicios' => Product::servicios()->count(),
+                'combos' => Combo::where('is_hidden', false)->count(),
+            ],
             'vistaPreviaUrl' => route('catalogo.vista-previa'),
             'ia' => [
                 ...$limitesDeIa->estado($comercio),
                 'minimo' => config('ia.minimo_caracteres'),
                 'maximo' => config('ia.maximo_caracteres'),
+                'maximo_indicaciones' => config('ia.maximo_indicaciones'),
             ],
         ]);
     }

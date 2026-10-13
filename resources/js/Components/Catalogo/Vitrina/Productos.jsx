@@ -374,7 +374,7 @@ function VerTodo({ onClick }) {
 
 /* ── Bloques de productos ───────────────────────────────────────────────── */
 
-function BloqueDeArticulos({ seccion, articulos, vacio, alVerTodo }) {
+function BloqueDeArticulos({ seccion, articulos, vacio, alVerTodo, nota = null, pie = null }) {
     const { theme } = useVitrina();
 
     if (articulos.length === 0) {
@@ -389,7 +389,15 @@ function BloqueDeArticulos({ seccion, articulos, vacio, alVerTodo }) {
                 accion={alVerTodo && <VerTodo onClick={alVerTodo} />}
             />
 
+            {nota && (
+                <p className="-mt-2 mb-6 max-w-[70ch] whitespace-pre-line text-pretty text-sm leading-relaxed sm:text-base" style={{ color: 'var(--cat-tenue)' }}>
+                    {nota}
+                </p>
+            )}
+
             {seccion.style === 'grid' ? <Rejilla articulos={articulos} /> : <FilaDeslizable articulos={articulos} />}
+
+            {pie && <div className="mt-8 flex justify-center">{pie}</div>}
         </section>
     );
 }
@@ -419,15 +427,36 @@ export function Combos({ seccion }) {
     );
 }
 
-/** Lo que el comercio hace, no lo que entrega: cortes, arreglos, asesorías. */
+/**
+ * Lo que el comercio hace, no lo que entrega: cortes, arreglos, asesorías.
+ *
+ * A diferencia de un producto, un servicio no se mete en un carrito: se
+ * pregunta y se acuerda. Por eso el bloque admite un texto de apoyo (cómo
+ * se reserva, qué incluye, horarios) y un botón propio a WhatsApp.
+ */
 export function Servicios({ seccion }) {
-    const { datos } = useVitrina();
+    const { theme, comercio, datos } = useVitrina();
+    const conBoton = Boolean(seccion.button_text && comercio.whatsapp);
 
     return (
         <BloqueDeArticulos
             seccion={seccion}
             articulos={datos.servicios ?? []}
             vacio="Servicios: marca un artículo como servicio en Productos para que aparezca aquí."
+            nota={seccion.text || null}
+            pie={
+                conBoton ? (
+                    <BotonCatalogo
+                        href={enlaceWhatsapp(comercio, null, theme.whatsapp_message)}
+                        externo
+                        brillo
+                        className="px-7 py-3.5 text-base"
+                    >
+                        <MessageCircle className="h-5 w-5" />
+                        {seccion.button_text}
+                    </BotonCatalogo>
+                ) : null
+            }
         />
     );
 }
