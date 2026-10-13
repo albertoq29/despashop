@@ -13,6 +13,7 @@ import { Banknote } from 'lucide-react';
 import { hoyLocal } from '@/utils/fechas';
 import NombreDelPrecio from '@/Components/NombreDelPrecio';
 import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
+import { admiteFraccion, conUnidad, pasoDeCantidad, unidadCorta } from '@/utils/unidades';
 
 const normalizeText = (str) => {
     if (!str) return '';
@@ -35,29 +36,52 @@ const MODALIDADES_SERVICIO = {
     acordar: 'A convenir',
 };
 
-export default function Index({ auth, productos, categories }) {
-    const nombreDistribuidor = useNombreDistribuidor();
-    const [showModal, setShowModal] = useState(false);
-    const [isEditing, setIsEditing] = useState(false);
-    const [previewImage, setPreviewImage] = useState(null);
-    const [extraPhotos, setExtraPhotos] = useState([]);
-    const [existingPhotos, setExistingPhotos] = useState([]);
-    const [modalKey, setModalKey] = useState(0);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+/**
+ * Las pestañas del formulario.
+ *
+ * Antes era una sola columna con diez apartados seguidos: para cambiar un
+ * precio había que pasar por las variantes, y para subir una foto había que
+ * bajar hasta el final. Agrupadas, cada cosa está donde uno la busca.
+ */
+const PESTANAS_DEL_PRODUCTO = [
+    { id: 'basico', texto: 'Básico' },
+    { id: 'precios', texto: 'Precios' },
+    { id: 'inventario', texto: 'Existencias', soloProducto: true },
+    { id: 'fotos', texto: 'Fotos' },
+    { id: 'catalogo', texto: 'Catálogo' },
+];
 
-    // ── Reposicion: entro mercancia y se registra con su costo ──
-    const [reponiendo, setReponiendo] = useState(null);
-    const [prodEditado, setProdEditado] = useState(null);
+/** En qué pestaña vive cada campo, para llevar allí el primer error. */
+const PESTANA_DEL_CAMPO = {
+    name: 'basico',
+    description: 'basico',
+    notes: 'basico',
+    categories: 'basico',
+    service_duration: 'basico',
+    service_mode: 'basico',
+    cost_price: 'precios',
+    price_usdt: 'precios',
+    price_mayor_usdt: 'precios',
+    price_distribuidor_usdt: 'precios',
+    price_divisa_usdt: 'precios',
+    price_mayor_divisa_usdt: 'precios',
+    price_distribuidor_divisa_usdt: 'precios',
+    conditional_price: 'precios',
+    conditional_min_quantity: 'precios',
+    periodo_suscripcion: 'precios',
+    stock: 'inventario',
+    unidad: 'inventario',
+    image: 'fotos',
+    photos: 'fotos',
+    private_photos: 'fotos',
+};
 
-    // ── Variantes (color, talla, modelo) ──
-    const [newVariants, setNewVariants] = useState([]);      // variantes a agregar
-    const [existingVariants, setExistingVariants] = useState([]); // variantes ya guardadas
+/** Lo que se ve en el modo simple: un error en otro campo lo tiene que apagar. */
+const CAMPOS_SIMPLES = ['name', 'description', 'price_usdt', 'price_divisa_usdt', 'stock', 'unidad', 'image', 'item_type'];
 
-    // ── Fichero de fotos privadas del producto ──
-    const [newPrivatePhotos, setNewPrivatePhotos] = useState([]);           // { file, name, preview }
-    const [existingPrivatePhotos, setExistingPrivatePhotos] = useState([]); // ya guardadas en el fichero
+const PREFERENCIA_SIMPLE = 'productos.modoSimple';
 
-    /**
+/**
  * Clases de los campos escritos a mano dentro del modal.
  *
  * Los `<textarea>`, `<select>` e `<input>` sueltos no heredan nada: sin un
@@ -70,15 +94,76 @@ const CAMPO =
     'dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-600 ' +
     'dark:focus:border-marca-400 dark:focus:ring-marca-400';
 
+/** Un campo de archivo: el navegador no le hereda nada al botón. */
+const ARCHIVO =
+    'block w-full text-sm text-stone-500 file:mr-4 file:rounded-full file:border-0 file:bg-marca-50 ' +
+    'file:px-4 file:py-2 file:text-sm file:font-semibold file:text-marca-800 hover:file:bg-marca-200 ' +
+    'dark:text-stone-400 dark:file:bg-marca-950 dark:file:text-marca-300 dark:hover:file:bg-marca-900';
+
 /** Caja de una sección del formulario: separa los grupos de campos. */
 const TARJETA =
     'rounded-xl border border-stone-200 bg-stone-50/70 p-4 dark:border-stone-800 dark:bg-stone-950/40 sm:p-5';
 
 const VARIANT_TYPES = [
-        { value: 'color', label: 'Color' },
-        { value: 'talla', label: 'Talla o medida' },
-        { value: 'tipo',  label: 'Modelo o presentación' },
-    ];
+    { value: 'color', label: 'Color' },
+    { value: 'talla', label: 'Talla o medida' },
+    { value: 'tipo', label: 'Modelo o presentación' },
+];
+
+export default function Index({ auth, productos, categories, unidades }) {
+    const nombreDistribuidor = useNombreDistribuidor();
+    const [showModal, setShowModal] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [previewImage, setPreviewImage] = useState(null);
+    const [extraPhotos, setExtraPhotos] = useState([]);
+    const [existingPhotos, setExistingPhotos] = useState([]);
+    const [modalKey, setModalKey] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // El formulario abre por pestañas, y el modo simple se recuerda: quien lo
+    // prefiere no tiene que encenderlo cada vez que crea algo.
+    const [pestana, setPestana] = useState('basico');
+    const [simple, setSimple] = useState(() => leerPreferencia(PREFERENCIA_SIMPLE) === 'si');
+
+    const cambiarSimple = (valor) => {
+        setSimple(valor);
+        guardarPreferencia(PREFERENCIA_SIMPLE, valor ? 'si' : 'no');
+    };
+
+    /**
+     * Un error en un campo que no está en pantalla no se ve.
+     *
+     * El servidor valida todo el producto, así que el error puede caer en una
+     * pestaña cerrada o, en modo simple, en un campo que no se muestra: en
+     * ese caso se abre lo que haga falta para que se lea.
+     */
+    const mostrarDondeFalla = (errores) => {
+        const clave = Object.keys(errores ?? {})[0];
+
+        if (!clave) {
+            return;
+        }
+
+        const campo = clave.split('.')[0];
+
+        if (simple && !CAMPOS_SIMPLES.includes(campo)) {
+            cambiarSimple(false);
+        }
+
+        setPestana(PESTANA_DEL_CAMPO[campo] ?? 'basico');
+    };
+
+    // ── Reposicion: entro mercancia y se registra con su costo ──
+    const [reponiendo, setReponiendo] = useState(null);
+    const [prodEditado, setProdEditado] = useState(null);
+
+    // ── Variantes (color, talla, modelo) ──
+    const [newVariants, setNewVariants] = useState([]);      // variantes a agregar
+    const [existingVariants, setExistingVariants] = useState([]); // variantes ya guardadas
+
+    // ── Fichero de fotos privadas del producto ──
+    const [newPrivatePhotos, setNewPrivatePhotos] = useState([]);           // { file, name, preview }
+    const [existingPrivatePhotos, setExistingPrivatePhotos] = useState([]); // ya guardadas en el fichero
 
     const recalculateTotalStock = (existList, newList) => {
         const hasVariants = (existList && existList.length > 0) || (newList && newList.length > 0);
@@ -149,7 +234,7 @@ const VARIANT_TYPES = [
         price_usdt: '', price_mayor_usdt: '', price_distribuidor_usdt: '',
         price_divisa_usdt: '', price_mayor_divisa_usdt: '', price_distribuidor_divisa_usdt: '',
         es_suscripcion: false, periodo_suscripcion: 'mensual',
-        cost_price: '', stock: 0, categories: [], conditional_price: '', conditional_min_quantity: '',
+        cost_price: '', stock: 0, unidad: 'unidad', categories: [], conditional_price: '', conditional_min_quantity: '',
         notes: '', description: '', image: null, photos: [], is_hidden: false, por_llegar: false, show_variants_in_store: true, last_units: false, _method: 'POST'
     });
 
@@ -170,7 +255,7 @@ const VARIANT_TYPES = [
         price_usdt: '', price_mayor_usdt: '', price_distribuidor_usdt: '',
         price_divisa_usdt: '', price_mayor_divisa_usdt: '', price_distribuidor_divisa_usdt: '',
         es_suscripcion: false, periodo_suscripcion: 'mensual',
-        cost_price: '', stock: 0, categories: [], conditional_price: '', conditional_min_quantity: '',
+        cost_price: '', stock: 0, unidad: 'unidad', categories: [], conditional_price: '', conditional_min_quantity: '',
         notes: '', description: '', image: null, photos: [], is_hidden: false, por_llegar: false, show_variants_in_store: true, last_units: false, _method: method
     });
 
@@ -178,7 +263,8 @@ const VARIANT_TYPES = [
         setIsEditing(false); setPreviewImage(null); setExtraPhotos([]); setExistingPhotos([]);
         setNewVariants([]); setExistingVariants([]);
         setNewPrivatePhotos([]); setExistingPrivatePhotos([]);
-        setCategorySearch(''); setModalKey(prev => prev + 1); setData(freshForm()); clearErrors(); setShowModal(true);
+        setCategorySearch(''); setModalKey(prev => prev + 1); setData(freshForm()); clearErrors();
+        setPestana('basico'); setShowModal(true);
     };
 
     const abrirReposicion = (prod) => {
@@ -205,6 +291,7 @@ const VARIANT_TYPES = [
             es_suscripcion: prod.es_suscripcion || false,
             periodo_suscripcion: prod.periodo_suscripcion || 'mensual',
             cost_price: prod.cost_price || '', stock: prod.stock || 0,
+            unidad: prod.unidad || 'unidad',
             categories: prod.categories ? prod.categories.map(c => c.id.toString()) : [],
             conditional_price: prod.conditional_price || '', conditional_min_quantity: prod.conditional_min_quantity || '',
             notes: prod.notes || '', description: prod.description || '',
@@ -212,7 +299,7 @@ const VARIANT_TYPES = [
             show_variants_in_store: prod.show_variants_in_store ?? true,
             last_units: prod.last_units || false, _method: 'PATCH'
         });
-        clearErrors(); setShowModal(true);
+        clearErrors(); setPestana('basico'); setShowModal(true);
     };
 
     const handleDelete = (id) => {
@@ -262,6 +349,7 @@ const VARIANT_TYPES = [
         formData.append('periodo_suscripcion', data.periodo_suscripcion || 'mensual');
         formData.append('cost_price', data.cost_price || '');
         formData.append('stock', data.stock);
+        formData.append('unidad', data.unidad || 'unidad');
         formData.append('conditional_price', data.conditional_price || '');
         formData.append('conditional_min_quantity', data.conditional_min_quantity || '');
         formData.append('notes', data.notes || '');
@@ -302,10 +390,13 @@ const VARIANT_TYPES = [
                 setIsSubmitting(false); setShowModal(false);
                 setNewVariants([]); setExistingVariants([]);
                 setNewPrivatePhotos([]); setExistingPrivatePhotos([]);
-                Swal.fire({ position: 'top-end', icon: 'success', title: isEditing ? 'Producto actualizado' : 'Producto creado', showConfirmButton: false, timer: 1500, toast: true });
+                const nombre = data.item_type === 'servicio' ? 'Servicio' : 'Producto';
+                Swal.fire({ position: 'top-end', icon: 'success', title: isEditing ? `${nombre} actualizado` : `${nombre} creado`, showConfirmButton: false, timer: 1500, toast: true });
             },
             onError: (errs) => {
                 setIsSubmitting(false);
+                // El error puede estar en una pestaña cerrada: se abre
+                mostrarDondeFalla(errs);
                 Swal.fire({ icon: 'error', title: 'Error al guardar', text: Object.values(errs).flat().join(' | ') });
             },
         });
@@ -392,8 +483,8 @@ const VARIANT_TYPES = [
     };
 
     return (
-        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-stone-800 dark:text-stone-200">Catálogo de Productos</h2>}>
-            <Head title="Productos" />
+        <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-stone-800 dark:text-stone-200">Productos y servicios</h2>}>
+            <Head title="Productos y servicios" />
             <div className="py-8">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
@@ -410,7 +501,7 @@ const VARIANT_TYPES = [
                                 <SecondaryButton onClick={() => router.visit(route('productos.reorder-page'))} className="w-full sm:w-auto justify-center flex items-center gap-1.5">
                                     <span>↕️ Ordenar Catálogo</span>
                                 </SecondaryButton>
-                                <PrimaryButton onClick={openCreate} className="w-full sm:w-auto justify-center">+ Nuevo Producto</PrimaryButton>
+                                <PrimaryButton onClick={openCreate} className="w-full sm:w-auto justify-center">+ Nuevo</PrimaryButton>
                             </div>
                         </div>
 
@@ -436,7 +527,7 @@ const VARIANT_TYPES = [
                                 }`}
                                 title="Ordenar productos mostrando primero los de menor stock"
                             >
-                                <span>{sortByStock ? '✓ Ordenado por Menor Stock' : 'Ordenar por Poco Stock'}</span>
+                                <span>{sortByStock ? '✓ Ordenado por menos existencias' : 'Ordenar por pocas existencias'}</span>
                             </button>
 
                             <span className="ml-auto text-xs text-stone-400 dark:text-stone-500 font-medium">{productosFiltrados.length} resultado{productosFiltrados.length !== 1 ? 's' : ''}</span>
@@ -521,8 +612,8 @@ const VARIANT_TYPES = [
                                                 </>
                                             ) : (
                                                 <>
-                                                    <span className="text-stone-600 dark:text-stone-400">Stock Total:</span>
-                                                    <span className={`font-bold ${prod.stock > 10 ? 'text-green-600 dark:text-green-400' : prod.stock > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{prod.stock} uds.</span>
+                                                    <span className="text-stone-600 dark:text-stone-400">Existencias:</span>
+                                                    <span className={`font-bold ${prod.stock > 10 ? 'text-green-600 dark:text-green-400' : prod.stock > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}`}>{conUnidad(prod.stock, prod)}</span>
                                                 </>
                                             )}
                                         </div>
@@ -530,7 +621,7 @@ const VARIANT_TYPES = [
                                             <button
                                                 type="button"
                                                 onClick={(e) => { e.stopPropagation(); abrirReposicion(prod); }}
-                                                title="Entro mercancia: registra cuantas unidades y a que costo"
+                                                title="Entró mercancía: registra cuánto y a qué costo"
                                                 className="pulsable mt-1 flex w-full items-center justify-center gap-1.5 rounded-lg border border-marca-200 bg-marca-50 px-3 py-1.5 text-xs font-bold text-marca-700 transition hover:bg-marca-100 dark:border-marca-900 dark:bg-marca-950/40 dark:text-marca-400 dark:hover:bg-marca-950"
                                             >
                                                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -542,7 +633,7 @@ const VARIANT_TYPES = [
                                                 {prod.variants.map(v => (
                                                     <span key={v.id} className="text-[10px] bg-stone-50 dark:bg-stone-900 text-stone-700 dark:text-stone-300 px-2 py-0.5 rounded border border-stone-200 dark:border-stone-800 flex items-center gap-1">
                                                         <span className="font-semibold">{v.label}:</span>
-                                                        <span className={`font-bold ${v.stock > 0 ? 'text-marca-700 dark:text-marca-400' : 'text-red-500 dark:text-red-400'}`}>{v.stock} uds.</span>
+                                                        <span className={`font-bold ${v.stock > 0 ? 'text-marca-700 dark:text-marca-400' : 'text-red-500 dark:text-red-400'}`}>{v.stock}</span>
                                                     </span>
                                                 ))}
                                             </div>
@@ -564,299 +655,407 @@ const VARIANT_TYPES = [
                 </div>
             </div>
 
-            {/* Modal */}
+            {/* El formulario: por pestañas, y con un modo simple para quien
+                solo quiere nombre, foto, descripción y precio */}
             <Modal show={showModal} onClose={() => setShowModal(false)} maxWidth="4xl">
-                <form key={modalKey} onSubmit={submit} className="flex flex-col max-h-[90vh]">
+                <form key={modalKey} onSubmit={submit} className="flex max-h-[90vh] flex-col">
 
-                    {/* Header */}
-                    <div className="shrink-0 border-b border-stone-200 bg-stone-50 px-6 py-4 dark:border-stone-800 dark:bg-stone-950/70">
-                        <h2 className="font-display text-lg font-semibold text-stone-900 dark:text-stone-100">{isEditing ? 'Editar producto' : 'Nuevo producto'}</h2>
-                        <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
-                            Solo el nombre y el stock son obligatorios. El resto lo puedes completar después.
-                        </p>
+                    <div className="shrink-0 border-b border-stone-200 bg-stone-50 px-5 py-4 dark:border-stone-800 dark:bg-stone-950/70 sm:px-6">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <h2 className="font-display text-lg font-semibold text-stone-900 dark:text-stone-100">
+                                    {isEditing ? (esServicio ? 'Editar servicio' : 'Editar producto') : (esServicio ? 'Nuevo servicio' : 'Nuevo producto')}
+                                </h2>
+                                <p className="mt-0.5 text-sm text-stone-500 dark:text-stone-400">
+                                    {simple
+                                        ? 'Lo imprescindible. Apaga el modo simple para ver todo lo demás.'
+                                        : 'Solo el nombre y las existencias son obligatorios. El resto lo completas cuando quieras.'}
+                                </p>
+                            </div>
+
+                            <div className="shrink-0 rounded-xl border border-stone-200 bg-white px-3 py-2 dark:border-stone-700 dark:bg-stone-900">
+                                <Interruptor
+                                    etiqueta="Modo simple"
+                                    valor={simple}
+                                    onCambiar={cambiarSimple}
+                                />
+                            </div>
+                        </div>
+
+                        {!simple && (
+                            <PestanasDelProducto
+                                activa={pestana}
+                                onCambiar={setPestana}
+                                esServicio={esServicio}
+                                errores={errors}
+                            />
+                        )}
                     </div>
 
                     {/* Cuerpo */}
                     <div className="flex-1 space-y-6 overflow-y-auto p-5 sm:p-6">
 
-                        <SeccionModal titulo={esServicio ? 'Datos del servicio' : 'Datos del producto'} />
+                        {/* ── Simple: nombre, foto, descripción y precio ───── */}
+                        {simple && (
+                            <>
+                                <TipoDeFicha valor={data.item_type} onCambiar={(v) => setData('item_type', v)} />
 
-                        {/* Producto o servicio: cambia qué campos tienen sentido */}
-                        <div className={`space-y-5 ${TARJETA}`}>
-                        <div className="grid grid-cols-2 gap-3">
-                            {[
-                                { valor: 'producto', titulo: 'Producto', texto: 'Algo que entregas y tiene existencias.' },
-                                { valor: 'servicio', titulo: 'Servicio', texto: 'Algo que haces: no se agota ni se descuenta.' },
-                            ].map(({ valor, titulo, texto }) => (
-                                <button
-                                    key={valor}
-                                    type="button"
-                                    onClick={() => setData('item_type', valor)}
-                                    aria-pressed={data.item_type === valor}
-                                    className={`rounded-xl border p-3 text-left transition-colors duration-150 ${
-                                        data.item_type === valor
-                                            ? 'border-marca-600 bg-marca-50 dark:border-marca-500 dark:bg-marca-950/40'
-                                            : 'border-stone-200 hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800'
-                                    }`}
-                                >
-                                    <span className="block text-sm font-bold">{titulo}</span>
-                                    <span className="mt-0.5 block text-xs text-stone-500 dark:text-stone-400">{texto}</span>
-                                </button>
-                            ))}
-                        </div>
-
-                        <div>
-                            <InputLabel htmlFor="name" value={esServicio ? 'Nombre del servicio' : 'Nombre del Producto'} />
-                            <TextInput id="name" type="text" className="mt-1 block w-full" value={data.name} onChange={e => setData('name', e.target.value)} required />
-                            <InputError message={errors.name} className="mt-2" />
-                        </div>
-
-                        {esServicio && (
-                            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                 <div>
-                                    <InputLabel htmlFor="service_duration" value="Cuánto dura (opcional)" />
-                                    <TextInput
-                                        id="service_duration"
-                                        type="text"
-                                        maxLength={40}
-                                        placeholder="45 min, 2 horas, 3 días…"
-                                        className="mt-1 block w-full"
-                                        value={data.service_duration}
-                                        onChange={e => setData('service_duration', e.target.value)}
+                                    <InputLabel htmlFor="name_simple" value={esServicio ? 'Nombre del servicio' : 'Nombre del producto'} />
+                                    <TextInput id="name_simple" type="text" className="mt-1 block w-full" value={data.name} onChange={e => setData('name', e.target.value)} required />
+                                    <InputError message={errors.name} className="mt-2" />
+                                </div>
+
+                                <div>
+                                    <InputLabel htmlFor="image_simple" value="Foto" />
+                                    {previewImage && (
+                                        <img src={previewImage} alt="" className="mt-2 h-24 w-24 rounded-lg border border-stone-200 bg-stone-50 object-contain dark:border-stone-800 dark:bg-stone-900" />
+                                    )}
+                                    <input id="image_simple" type="file" accept="image/*" onChange={handleImageChange} className={`mt-2 ${ARCHIVO}`} />
+                                    <InputError message={errors.image} className="mt-2" />
+                                </div>
+
+                                <div>
+                                    <InputLabel htmlFor="description_simple" value="Descripción" />
+                                    <textarea id="description_simple" rows="3" className={`mt-1 ${CAMPO}`}
+                                        value={data.description} onChange={e => setData('description', e.target.value)}
+                                        placeholder={esServicio ? 'Qué incluye, cuánto dura, cómo se acuerda…' : 'Qué es, para qué sirve, medidas o presentación…'} />
+                                </div>
+
+                                <div className="grid gap-5 sm:grid-cols-2">
+                                    <NivelDePrecio
+                                        id="price_simple"
+                                        etiqueta="Precio"
+                                        campo="price_usdt"
+                                        campoDivisa="price_divisa_usdt"
+                                        data={data}
+                                        setData={setData}
+                                        costo={data.cost_price}
+                                        error={errors.price_usdt}
+                                        avisoSinPrecio
+                                        sufijo={esServicio ? null : unidadCorta({ unidad: data.unidad })}
                                     />
-                                    <InputError message={errors.service_duration} className="mt-2" />
+
+                                    {!esServicio && (
+                                        <CampoDeExistencias
+                                            data={data}
+                                            setData={setData}
+                                            unidades={unidades}
+                                            isEditing={isEditing}
+                                            error={errors.stock}
+                                        />
+                                    )}
                                 </div>
-                                <div>
-                                    <InputLabel htmlFor="service_mode" value="Dónde se presta" />
-                                    <select
-                                        id="service_mode"
-                                        value={data.service_mode}
-                                        onChange={e => setData('service_mode', e.target.value)}
-                                        className={`mt-1 text-sm ${CAMPO}`}
-                                    >
-                                        <option value="local">En nuestro local</option>
-                                        <option value="domicilio">A domicilio</option>
-                                        <option value="remoto">En línea</option>
-                                        <option value="acordar">A convenir</option>
-                                    </select>
-                                    <InputError message={errors.service_mode} className="mt-2" />
-                                </div>
-                            </div>
+
+                                <p className="rounded-xl bg-stone-100 px-3.5 py-3 text-xs leading-relaxed text-stone-500 dark:bg-stone-800/60 dark:text-stone-400">
+                                    Lo demás —costo, precios al mayor, categorías, variantes, galería y visibilidad— sigue
+                                    donde estaba: apaga el modo simple cuando lo necesites.
+                                </p>
+                            </>
                         )}
-                        </div>
 
-                        <SeccionModal
-                            titulo="Precios y costo"
-                            ayuda="Deja vacío el precio al detal si prefieres que digan Consultar."
-                        />
+                        {/* ── Básico ───────────────────────────────────────── */}
+                        {!simple && pestana === 'basico' && (
+                            <>
+                                <TipoDeFicha valor={data.item_type} onCambiar={(v) => setData('item_type', v)} />
 
-                        <div className={`grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 ${TARJETA}`}>
-                            <div>
-                                <InputLabel htmlFor="cost_price" value="Costo Unitario / Compra (USD - Opcional)" />
-                                <div className="relative mt-1">
-                                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 font-bold text-stone-500 dark:text-stone-400">$</span>
-                                    <TextInput id="cost_price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.cost_price} onChange={(e) => setData('cost_price', e.target.value)} />
+                                <div className={`space-y-5 ${TARJETA}`}>
+                                    <div>
+                                        <InputLabel htmlFor="name" value={esServicio ? 'Nombre del servicio' : 'Nombre del producto'} />
+                                        <TextInput id="name" type="text" className="mt-1 block w-full" value={data.name} onChange={e => setData('name', e.target.value)} required />
+                                        <InputError message={errors.name} className="mt-2" />
+                                    </div>
+
+                                    {esServicio && (
+                                        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                            <div>
+                                                <InputLabel htmlFor="service_duration" value="Cuánto dura (opcional)" />
+                                                <TextInput
+                                                    id="service_duration"
+                                                    type="text"
+                                                    maxLength={40}
+                                                    placeholder="45 min, 2 horas, 3 días…"
+                                                    className="mt-1 block w-full"
+                                                    value={data.service_duration}
+                                                    onChange={e => setData('service_duration', e.target.value)}
+                                                />
+                                                <InputError message={errors.service_duration} className="mt-2" />
+                                            </div>
+                                            <div>
+                                                <InputLabel htmlFor="service_mode" value="Dónde se presta" />
+                                                <select
+                                                    id="service_mode"
+                                                    value={data.service_mode}
+                                                    onChange={e => setData('service_mode', e.target.value)}
+                                                    className={`mt-1 text-sm ${CAMPO}`}
+                                                >
+                                                    {Object.entries(MODALIDADES_SERVICIO).map(([valor, texto]) => (
+                                                        <option key={valor} value={valor}>{texto}</option>
+                                                    ))}
+                                                </select>
+                                                <InputError message={errors.service_mode} className="mt-2" />
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div>
+                                        <InputLabel htmlFor="description" value="Descripción (se ve en tu catálogo)" />
+                                        <textarea id="description" className={`mt-1 ${CAMPO}`} rows="4"
+                                            value={data.description} onChange={e => setData('description', e.target.value)}
+                                            placeholder={esServicio ? 'Qué incluye, cuánto dura, cómo se acuerda…' : 'Qué es, para qué sirve, medidas o presentación…'} />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <NivelDePrecio
-                                id="price"
-                                etiqueta="Precio Al Detal (dejar vacío = Consultar)"
-                                campo="price_usdt"
-                                campoDivisa="price_divisa_usdt"
-                                data={data}
-                                setData={setData}
-                                costo={data.cost_price}
-                                error={errors.price_usdt}
-                                avisoSinPrecio
-                            />
+                                <SeccionModal titulo="Categorías y notas" ayuda="Las categorías ordenan tu catálogo; las notas son solo para ti." />
 
-                            {esServicio ? (
-                                <div className="rounded-xl border border-dashed border-stone-300 p-3 text-xs text-stone-500 dark:border-stone-700 dark:text-stone-400">
-                                    Un servicio no lleva existencias: no se agota ni se descuenta al facturar.
+                                <div className={`grid grid-cols-1 gap-5 md:grid-cols-2 ${TARJETA}`}>
+                                    <div className="flex h-full flex-col">
+                                        <InputLabel value="Categorías" />
+                                        <div className="mt-1 flex flex-1 flex-col overflow-hidden rounded-md border border-stone-300 shadow-sm dark:border-stone-700">
+                                            <div className="border-b border-stone-200 bg-stone-50 p-2 dark:border-stone-800 dark:bg-stone-900">
+                                                <input type="text" placeholder="Buscar categoría..."
+                                                    className={`py-1.5 text-sm ${CAMPO}`}
+                                                    value={categorySearch} onChange={e => setCategorySearch(e.target.value)} />
+                                            </div>
+                                            <div className="flex h-32 flex-col gap-2 overflow-y-auto bg-white p-2 dark:bg-stone-900">
+                                                {categories?.filter(cat => cat.name.toLowerCase().includes(categorySearch.toLowerCase())).map(cat => (
+                                                    <label key={cat.id} className="flex cursor-pointer items-center gap-2 rounded p-1 transition-colors hover:bg-marca-50 dark:hover:bg-marca-950/40">
+                                                        <input type="checkbox" className="rounded border-stone-300 bg-white text-marca-700 shadow-sm focus:ring-marca-600 dark:border-stone-700 dark:bg-stone-950 dark:text-marca-400 dark:focus:ring-marca-400"
+                                                            checked={data.categories.includes(cat.id.toString())}
+                                                            onChange={e => {
+                                                                const idStr = cat.id.toString();
+                                                                setData('categories', e.target.checked
+                                                                    ? [...data.categories, idStr]
+                                                                    : data.categories.filter(id => id !== idStr));
+                                                            }} />
+                                                        <span className="text-sm text-stone-700 dark:text-stone-300">{cat.name}</span>
+                                                    </label>
+                                                ))}
+                                                {categories?.length === 0 && (
+                                                    <p className="text-xs text-stone-400 dark:text-stone-500">Todavía no tienes categorías.</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <InputLabel htmlFor="notes" value="Notas privadas" />
+                                        <textarea id="notes" className={`mt-1 ${CAMPO}`} rows="3"
+                                            value={data.notes} onChange={e => setData('notes', e.target.value)}
+                                            placeholder="Tallas, colores o cualquier aclaratoria para ti" />
+                                        <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+                                            Nadie más las ve: no salen en tu catálogo ni en las facturas.
+                                        </p>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+
+                        {/* ── Precios ──────────────────────────────────────── */}
+                        {!simple && pestana === 'precios' && (
+                            <>
+                                <SeccionModal
+                                    titulo="Precios y costo"
+                                    ayuda="Deja vacío el precio al detal si prefieres que digan Consultar."
+                                />
+
+                                <div className={TARJETA}>
+                                    <div className="max-w-xs">
+                                        <InputLabel htmlFor="cost_price" value="Lo que te cuesta (opcional)" />
+                                        <div className="relative mt-1">
+                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 font-bold text-stone-500 dark:text-stone-400">$</span>
+                                            <TextInput id="cost_price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.cost_price} onChange={(e) => setData('cost_price', e.target.value)} />
+                                        </div>
+                                        <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+                                            Con el costo puesto, cada precio te muestra tu ganancia.
+                                        </p>
+                                    </div>
+
+                                    <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-3">
+                                        <NivelDePrecio
+                                            id="price"
+                                            etiqueta="Al detal"
+                                            campo="price_usdt"
+                                            campoDivisa="price_divisa_usdt"
+                                            data={data}
+                                            setData={setData}
+                                            costo={data.cost_price}
+                                            error={errors.price_usdt}
+                                            avisoSinPrecio
+                                            sufijo={esServicio ? null : unidadCorta({ unidad: data.unidad })}
+                                        />
+
+                                        <NivelDePrecio
+                                            id="price_mayor"
+                                            etiqueta="Al mayor (opcional)"
+                                            campo="price_mayor_usdt"
+                                            campoDivisa="price_mayor_divisa_usdt"
+                                            data={data}
+                                            setData={setData}
+                                            costo={data.cost_price}
+                                            error={errors.price_mayor_usdt}
+                                            sufijo={esServicio ? null : unidadCorta({ unidad: data.unidad })}
+                                        />
+
+                                        <NivelDePrecio
+                                            id="price_distribuidor"
+                                            etiqueta={`${nombreDistribuidor} (opcional)`}
+                                            campo="price_distribuidor_usdt"
+                                            campoDivisa="price_distribuidor_divisa_usdt"
+                                            data={data}
+                                            setData={setData}
+                                            costo={data.cost_price}
+                                            error={errors.price_distribuidor_usdt}
+                                            sufijo={esServicio ? null : unidadCorta({ unidad: data.unidad })}
+                                        />
+                                    </div>
+
+                                    <p className="mt-4 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                                        El precio <strong>en divisas</strong> es opcional y no es el precio en dólares convertido a
+                                        bolívares: es otro precio, normalmente más bajo, para quien paga en efectivo en divisas. En
+                                        tu catálogo sale como <strong>promo en divisas</strong>.
+                                    </p>
+
+                                    {/* Es viendo el campo donde se nota que
+                                        «Distribuidor» no es la palabra del negocio */}
+                                    <div className="mt-4">
+                                        <NombreDelPrecio />
+                                    </div>
+                                </div>
+
+                                <SeccionModal
+                                    titulo="Precio por cantidad"
+                                    ayuda="Un precio distinto al llevar varias unidades."
+                                />
+
+                                <div className={`grid grid-cols-1 gap-5 ${TARJETA} md:grid-cols-2`}>
+                                    <div>
+                                        <InputLabel htmlFor="conditional_price" value="Precio promocional" />
+                                        <div className="relative mt-1">
+                                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 font-bold text-stone-500 dark:text-stone-400">$</span>
+                                            <TextInput id="conditional_price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.conditional_price} onChange={e => setData('conditional_price', e.target.value)} />
+                                        </div>
+                                        <InputError message={errors.conditional_price} className="mt-2" />
+                                    </div>
+                                    <div>
+                                        <InputLabel htmlFor="conditional_min_quantity" value="Desde cuántas" />
+                                        <TextInput id="conditional_min_quantity" type="number" step="1" className="mt-1 block w-full" value={data.conditional_min_quantity} onChange={e => setData('conditional_min_quantity', e.target.value)} />
+                                        <InputError message={errors.conditional_min_quantity} className="mt-2" />
+                                    </div>
+                                </div>
+
+                                {/* Un hosting o un mantenimiento mensual no se factura una
+                                    vez: se renueva, y hay que saber a quién le toca. */}
+                                <SeccionModal titulo="Cobro por suscripción" ayuda="Para lo que se paga cada cierto tiempo y no una sola vez." />
+
+                                <div className={TARJETA}>
+                                    <Interruptor
+                                        etiqueta="¿Aplica modelo de pago por suscripción?"
+                                        ayuda="Al facturarlo podrás anotar cuándo renueva cada cliente, y aparecerá en Renovaciones."
+                                        valor={data.es_suscripcion}
+                                        onCambiar={(v) => setData('es_suscripcion', v)}
+                                    />
+
+                                    {data.es_suscripcion && (
+                                        <div className="mt-4">
+                                            <InputLabel value="Cada cuánto se renueva" />
+                                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                                {PERIODOS_SUSCRIPCION.map(([valor, etiqueta]) => (
+                                                    <button
+                                                        key={valor}
+                                                        type="button"
+                                                        onClick={() => setData('periodo_suscripcion', valor)}
+                                                        aria-pressed={data.periodo_suscripcion === valor}
+                                                        className={`pulsable rounded-lg border px-3 py-2 text-sm font-semibold ${
+                                                            data.periodo_suscripcion === valor
+                                                                ? 'border-marca-600 bg-marca-50 text-marca-800 dark:border-marca-500 dark:bg-marca-950/40 dark:text-marca-300'
+                                                                : 'border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400 dark:hover:bg-stone-800'
+                                                        }`}
+                                                    >
+                                                        {etiqueta}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <p className="mt-2 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
+                                                Al marcar una renovación como hecha, la fecha salta sola al siguiente período. No
+                                                factura nada: cobrar sigue siendo tu decisión.
+                                            </p>
+                                            <InputError message={errors.periodo_suscripcion} className="mt-2" />
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
+                        {/* ── Existencias ──────────────────────────────────── */}
+                        {!simple && pestana === 'inventario' && (
+                            esServicio ? (
+                                <div className="rounded-xl border border-dashed border-stone-300 p-5 text-sm leading-relaxed text-stone-500 dark:border-stone-700 dark:text-stone-400">
+                                    Un servicio no lleva existencias: no se agota, no se descuenta al facturar y no tiene
+                                    variantes. Si esto sí se almacena, cámbialo a producto en la pestaña <strong>Básico</strong>.
                                 </div>
                             ) : (
-                                <div>
-                                    <InputLabel htmlFor="stock" value={isEditing ? 'Stock Disponible (corregir conteo)' : 'Stock Disponible'} />
-                                    <TextInput id="stock" type="number" step="1" className="mt-1 block w-full" value={data.stock} onChange={(e) => setData('stock', e.target.value)} required />
-                                    <InputError message={errors.stock} className="mt-2" />
-                                </div>
-                            )}
+                                <>
+                                    <SeccionModal
+                                        titulo="Existencias"
+                                        ayuda="En qué unidad lo mides y cuánto tienes."
+                                    />
 
-                            <NivelDePrecio
-                                id="price_mayor"
-                                etiqueta="Precio Mayor (Opcional)"
-                                campo="price_mayor_usdt"
-                                campoDivisa="price_mayor_divisa_usdt"
-                                data={data}
-                                setData={setData}
-                                costo={data.cost_price}
-                                error={errors.price_mayor_usdt}
-                            />
+                                    <div className={TARJETA}>
+                                        <CampoDeExistencias
+                                            data={data}
+                                            setData={setData}
+                                            unidades={unidades}
+                                            isEditing={isEditing}
+                                            error={errors.stock}
+                                        />
+                                        <InputError message={errors.unidad} className="mt-2" />
+                                    </div>
 
-                            <NivelDePrecio
-                                id="price_distribuidor"
-                                etiqueta={`Precio ${nombreDistribuidor} (Opcional)`}
-                                campo="price_distribuidor_usdt"
-                                campoDivisa="price_distribuidor_divisa_usdt"
-                                data={data}
-                                setData={setData}
-                                costo={data.cost_price}
-                                error={errors.price_distribuidor_usdt}
-                            />
-                        </div>
-
-                        <p className="text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-                            El precio <strong>en divisas</strong> es opcional y no es el precio en dólares convertido a
-                            bolívares: es otro precio, normalmente más bajo, para quien paga en efectivo en divisas. En
-                            tu catálogo sale como <strong>promo en divisas</strong>.
-                        </p>
-
-
-                        {/* Justo debajo de los precios: es viendo el campo donde se
-                            nota que «Distribuidor» no es la palabra del negocio. */}
-                        <NombreDelPrecio />
-
-                        {/* Un hosting o un mantenimiento mensual no se factura una
-                            vez: se renueva, y hay que saber a quién le toca. */}
-                        <div className={TARJETA}>
-                            <Interruptor
-                                etiqueta="¿Aplica modelo de pago por suscripción?"
-                                ayuda="Al facturarlo podrás anotar cuándo renueva cada cliente, y aparecerá en Renovaciones."
-                                valor={data.es_suscripcion}
-                                onCambiar={(v) => setData('es_suscripcion', v)}
-                            />
-
-                            {data.es_suscripcion && (
-                                <div className="mt-4">
-                                    <InputLabel value="Cada cuánto se renueva" />
-                                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                                        {PERIODOS_SUSCRIPCION.map(([valor, etiqueta]) => (
+                                    {/* Reponer escribiendo el stock a mano sale mal cuando la
+                                        mercancia cambio de precio: el libro de compras la valora
+                                        al costo de hoy. Por eso se empuja la reposicion. */}
+                                    {isEditing && (
+                                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">¿Entró mercancía nueva?</p>
+                                                <p className="mt-0.5 text-xs leading-snug text-amber-800 dark:text-amber-300">
+                                                    Cambiar las existencias aquí arriba es para <strong>arreglar un error de conteo</strong>: lo que agregues se valora
+                                                    al costo que el producto tiene hoy. Si compraste más, regístralo como reposición con el costo que
+                                                    pagaste y tus ganancias quedan bien separadas entre lo viejo y lo nuevo.
+                                                </p>
+                                            </div>
                                             <button
-                                                key={valor}
                                                 type="button"
-                                                onClick={() => setData('periodo_suscripcion', valor)}
-                                                aria-pressed={data.periodo_suscripcion === valor}
-                                                className={`pulsable rounded-lg border px-3 py-2 text-sm font-semibold ${
-                                                    data.periodo_suscripcion === valor
-                                                        ? 'border-marca-600 bg-marca-50 text-marca-800 dark:border-marca-500 dark:bg-marca-950/40 dark:text-marca-300'
-                                                        : 'border-stone-300 text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-400 dark:hover:bg-stone-800'
-                                                }`}
+                                                onClick={() => prodEditado && abrirReposicion(prodEditado)}
+                                                className="pulsable shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-amber-700"
                                             >
-                                                {etiqueta}
+                                                Registrar reposición
                                             </button>
-                                        ))}
-                                    </div>
-                                    <p className="mt-2 text-xs leading-relaxed text-stone-500 dark:text-stone-400">
-                                        Al marcar una renovación como hecha, la fecha salta sola al siguiente período. No
-                                        factura nada: cobrar sigue siendo tu decisión.
-                                    </p>
-                                    <InputError message={errors.periodo_suscripcion} className="mt-2" />
-                                </div>
-                            )}
-                        </div>
+                                        </div>
+                                    )}
 
-                        {/* Reponer escribiendo el stock a mano sale mal cuando la
-                            mercancia cambio de precio: el libro de compras la valora
-                            al costo de hoy. Por eso se empuja la reposicion. */}
-                        {isEditing && !esServicio && (
-                            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40">
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-amber-900 dark:text-amber-200">¿Entró mercancía nueva?</p>
-                                    <p className="mt-0.5 text-xs leading-snug text-amber-800 dark:text-amber-300">
-                                        Cambiar el stock aquí arriba es para <strong>arreglar un error de conteo</strong>: lo que agregues se valora
-                                        al costo que el producto tiene hoy. Si compraste más, regístralo como reposición con el costo que
-                                        pagaste y tus ganancias quedan bien separadas entre lo viejo y lo nuevo.
-                                    </p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => prodEditado && abrirReposicion(prodEditado)}
-                                    className="pulsable shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-xs font-bold uppercase tracking-wide text-white transition hover:bg-amber-700"
-                                >
-                                    Registrar reposición
-                                </button>
-                            </div>
-                        )}
+                                    <SeccionModal
+                                        titulo="Variantes"
+                                        ayuda="Colores, tallas, modelos o sabores, cada uno con su existencia y su foto."
+                                    />
 
-                        <SeccionModal
-                            titulo="Precio por cantidad"
-                            ayuda="Un precio distinto al llevar varias unidades."
-                        />
+                                    <div className={TARJETA}>
+                                        <div className="mb-3 flex items-center justify-end">
+                                            <button type="button" onClick={addVariant}
+                                                className="pulsable flex items-center gap-1.5 rounded-full border border-stone-200 bg-marca-50 px-3 py-1.5 text-xs font-bold text-marca-700 transition-colors hover:bg-marca-100 dark:border-stone-800 dark:bg-marca-950/40 dark:text-marca-400 dark:hover:bg-marca-950/60">
+                                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
+                                                Agregar variante
+                                            </button>
+                                        </div>
 
-                        <div className="grid grid-cols-1 gap-5 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/40 sm:p-5 md:grid-cols-2">
-                            <div>
-                                <InputLabel htmlFor="conditional_price" value="Precio Condicionado Promocional (Opcional)" />
-                                <div className="relative mt-1"><span className="absolute inset-y-0 left-0 flex items-center pl-3 text-stone-500 dark:text-stone-400 font-bold">$</span>
-                                    <TextInput id="conditional_price" type="number" step="0.01" className="mt-1 block w-full pl-7" value={data.conditional_price} onChange={e => setData('conditional_price', e.target.value)} />
-                                </div>
-                            </div>
-                            <div>
-                                <InputLabel htmlFor="conditional_min_quantity" value="Unds. Mínimas p/ Precio Condicionado" />
-                                <TextInput id="conditional_min_quantity" type="number" step="1" className="mt-1 block w-full" value={data.conditional_min_quantity} onChange={e => setData('conditional_min_quantity', e.target.value)} />
-                            </div>
-                        </div>
+                                        {data.unidad !== 'unidad' && (existingVariants.length > 0 || newVariants.length > 0) && (
+                                            <p className="mb-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                                                Las variantes se cuentan por piezas enteras, aunque el producto se venda
+                                                por {unidadCorta({ unidad: data.unidad })}.
+                                            </p>
+                                        )}
 
-                        <SeccionModal titulo="Notas y categorías" />
-
-                        <div className={`grid grid-cols-1 gap-5 md:grid-cols-2 ${TARJETA}`}>
-                            <div>
-                                <InputLabel htmlFor="notes" value="Notas (Ej: Quedan disponibles N unidades de cada color)" />
-                                <textarea id="notes" className={`mt-1 ${CAMPO}`} rows="3"
-                                    value={data.notes} onChange={e => setData('notes', e.target.value)}
-                                    placeholder="Tallas, colores o cualquier aclaratoria para ti" />
-                            </div>
-                            <div className="flex flex-col h-full">
-                                <InputLabel value="Categorías" />
-                                <div className="border border-stone-300 dark:border-stone-700 rounded-md overflow-hidden mt-1 shadow-sm flex-1 flex flex-col">
-                                    <div className="bg-stone-50 dark:bg-stone-900 p-2 border-b border-stone-200 dark:border-stone-800">
-                                        <input type="text" placeholder="Buscar categoría..."
-                                            className={`py-1.5 text-sm ${CAMPO}`}
-                                            value={categorySearch} onChange={e => setCategorySearch(e.target.value)} />
-                                    </div>
-                                    <div className="h-32 overflow-y-auto p-2 bg-white dark:bg-stone-900 flex flex-col gap-2">
-                                        {categories?.filter(cat => cat.name.toLowerCase().includes(categorySearch.toLowerCase())).map(cat => (
-                                            <label key={cat.id} className="flex items-center gap-2 cursor-pointer hover:bg-marca-50 dark:hover:bg-marca-950/40 rounded p-1 transition-colors">
-                                                <input type="checkbox" className="rounded border-stone-300 bg-white text-marca-700 shadow-sm focus:ring-marca-600 dark:border-stone-700 dark:bg-stone-950 dark:text-marca-400 dark:focus:ring-marca-400"
-                                                    checked={data.categories.includes(cat.id.toString())}
-                                                    onChange={e => {
-                                                        const idStr = cat.id.toString();
-                                                        setData('categories', e.target.checked
-                                                            ? [...data.categories, idStr]
-                                                            : data.categories.filter(id => id !== idStr));
-                                                    }} />
-                                                <span className="text-sm text-stone-700 dark:text-stone-300">{cat.name}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <SeccionModal titulo="Descripción para el catálogo" />
-
-                        <div className={TARJETA}>
-                            <InputLabel htmlFor="description" value="Descripción del Producto (visible en el catálogo)" />
-                            <textarea id="description" className={`mt-1 ${CAMPO}`} rows="4"
-                                value={data.description} onChange={e => setData('description', e.target.value)}
-                                placeholder="Describe el producto: qué incluye, para qué sirve, medidas o presentación..." />
-                        </div>
-
-                        {/* ── VARIANTES ──────────────────────────────────────── */}
-                        <div className={`${TARJETA} ${esServicio ? 'hidden' : ''}`}>
-                            <div className="flex items-center justify-between mb-3">
-                                <div>
-                                    <InputLabel value="Variantes del Producto" className="!mb-0" />
-                                    <p className="text-xs text-stone-400 dark:text-stone-500 mt-0.5">Agrega colores, tallas, modelos o sabores, cada uno con su stock e imagen.</p>
-                                </div>
-                                <button type="button" onClick={addVariant}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 bg-marca-50 dark:bg-marca-950/40 border border-stone-200 dark:border-stone-800 text-marca-700 dark:text-marca-400 text-xs font-bold rounded-full hover:bg-marca-100 dark:hover:bg-marca-950/60 transition-colors">
-                                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4"/></svg>
-                                    Agregar variante
-                                </button>
-                            </div>
-
-                            {/* Variantes existentes (edición) */}
+                                        {/* Variantes existentes (edición) */}
                             {existingVariants.length > 0 && (
                                 <div className="mb-4 space-y-3">
                                     <p className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider">Variantes Guardadas</p>
@@ -918,7 +1117,7 @@ const VARIANT_TYPES = [
                                 </div>
                             )}
 
-                            {/* Variantes nuevas a agregar */}
+                                        {/* Variantes nuevas a agregar */}
                             {newVariants.length > 0 && (
                                 <div className="space-y-3">
                                     <p className="text-[10px] font-bold text-marca-600 dark:text-marca-400 uppercase tracking-wider">Nuevas Variantes</p>
@@ -975,47 +1174,52 @@ const VARIANT_TYPES = [
                                 </div>
                             )}
 
-                            {newVariants.length === 0 && existingVariants.length === 0 && (
-                                <p className="text-xs text-stone-400 dark:text-stone-500 italic">Aún no hay variantes para este producto.</p>
-                            )}
-                        </div>
-
-                        {/* Imágenes */}
-                        <div className={`grid grid-cols-1 gap-6 md:grid-cols-2 ${TARJETA}`}>
-                            <div>
-                                <InputLabel htmlFor="image" value="Foto Principal (Opcional)" />
-                                {previewImage && <div className="mt-2 mb-4"><img src={previewImage} alt="Preview" className="h-24 w-24 object-contain border border-stone-200 rounded bg-stone-50 dark:border-stone-800 dark:bg-stone-900 shadow-sm" /></div>}
-                                <input id="image" type="file" className="block w-full text-sm text-stone-500 dark:text-stone-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-marca-50 dark:file:bg-marca-950 file:text-marca-800 dark:file:text-marca-300 hover:file:bg-marca-200 dark:hover:file:bg-marca-900 mt-2"
-                                    onChange={handleImageChange} accept="image/*" />
-                                <InputError message={errors.image} className="mt-2" />
-                            </div>
-                            <div>
-                                <InputLabel htmlFor="photos" value="Fotos de Galería (Múltiples)" />
-                                <input id="photos" type="file" multiple className="mt-2 block w-full text-sm text-stone-500 dark:text-stone-400 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-marca-50 dark:file:bg-marca-950 file:text-marca-800 dark:file:text-marca-300 hover:file:bg-marca-200 dark:hover:file:bg-marca-900"
-                                    onChange={handlePhotosChange} accept="image/*" />
-                                {extraPhotos.length > 0 && (
-                                    <div className="mt-3 flex gap-2 flex-wrap">
-                                        {extraPhotos.map((src, idx) => <img key={idx} src={src} alt="" className="h-16 w-16 object-contain border border-stone-200 rounded bg-stone-50 dark:border-stone-800 dark:bg-stone-900 shadow-sm" />)}
+                                        {newVariants.length === 0 && existingVariants.length === 0 && (
+                                            <p className="text-xs italic text-stone-400 dark:text-stone-500">Aún no hay variantes para este producto.</p>
+                                        )}
                                     </div>
-                                )}
-                                {isEditing && existingPhotos.length > 0 && (
-                                    <div className="mt-4">
-                                        <h4 className="text-xs font-bold text-stone-500 dark:text-stone-400 uppercase mb-2">Galería Existente</h4>
-                                        <div className="flex gap-2 flex-wrap">
-                                            {existingPhotos.map(photo => (
-                                                <div key={photo.id} className="relative group">
-                                                    <img src={photo.image_url} className="h-16 w-16 object-contain border border-stone-200 rounded bg-stone-50 dark:border-stone-800 dark:bg-stone-900 shadow-sm" alt="" />
-                                                    <button type="button" onClick={() => deleteSecondaryImage(photo.id)}
-                                                        className="absolute inset-0 bg-red-500 bg-opacity-80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-bold rounded">X</button>
+                                </>
+                            )
+                        )}
+
+                        {/* ── Fotos ────────────────────────────────────────── */}
+                        {!simple && pestana === 'fotos' && (
+                            <>
+                                <SeccionModal titulo="Fotos del catálogo" ayuda="La principal es la que se ve en la rejilla; la galería se abre al tocar el producto." />
+
+                                <div className={`grid grid-cols-1 gap-6 md:grid-cols-2 ${TARJETA}`}>
+                                    <div>
+                                        <InputLabel htmlFor="image" value="Foto principal" />
+                                        {previewImage && <div className="mb-4 mt-2"><img src={previewImage} alt="Vista previa" className="h-24 w-24 rounded border border-stone-200 bg-stone-50 object-contain shadow-sm dark:border-stone-800 dark:bg-stone-900" /></div>}
+                                        <input id="image" type="file" accept="image/*" onChange={handleImageChange} className={`mt-2 ${ARCHIVO}`} />
+                                        <InputError message={errors.image} className="mt-2" />
+                                    </div>
+                                    <div>
+                                        <InputLabel htmlFor="photos" value="Galería (varias)" />
+                                        <input id="photos" type="file" multiple accept="image/*" onChange={handlePhotosChange} className={`mt-2 ${ARCHIVO}`} />
+                                        {extraPhotos.length > 0 && (
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                {extraPhotos.map((src, idx) => <img key={idx} src={src} alt="" className="h-16 w-16 rounded border border-stone-200 bg-stone-50 object-contain shadow-sm dark:border-stone-800 dark:bg-stone-900" />)}
+                                            </div>
+                                        )}
+                                        {isEditing && existingPhotos.length > 0 && (
+                                            <div className="mt-4">
+                                                <h4 className="mb-2 text-xs font-bold uppercase text-stone-500 dark:text-stone-400">Galería guardada</h4>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {existingPhotos.map(photo => (
+                                                        <div key={photo.id} className="group relative">
+                                                            <img src={photo.image_url} className="h-16 w-16 rounded border border-stone-200 bg-stone-50 object-contain shadow-sm dark:border-stone-800 dark:bg-stone-900" alt="" />
+                                                            <button type="button" onClick={() => deleteSecondaryImage(photo.id)}
+                                                                className="absolute inset-0 flex items-center justify-center rounded bg-red-500 bg-opacity-80 font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">X</button>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </div>
+                                </div>
 
-                        {/* Fichero de Fotos (privado) */}
+                                {/* Fichero de Fotos (privado) */}
                         <div className={TARJETA}>
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                                 <div>
@@ -1082,53 +1286,58 @@ const VARIANT_TYPES = [
                                 <p className="text-xs text-stone-400 dark:text-stone-500 italic">Este producto aún no tiene fotos en el fichero.</p>
                             )}
                         </div>
-                        {/* ── VISIBILIDAD ─────────────────────────────────── */}
-                        <div>
-                            <SeccionModal
-                                titulo="Visibilidad en el catálogo"
-                                ayuda="Cómo se comporta este producto para quien visita tu catálogo."
-                            />
+                            </>
+                        )}
 
-                            <div className={`mt-4 grid gap-4 sm:grid-cols-2 ${TARJETA}`}>
-                                {!esServicio && (
-                                    <Interruptor
-                                        etiqueta="Mostrar variantes"
-                                        ayuda="Al desactivarlo, las variantes no aparecen en el catálogo."
-                                        valor={data.show_variants_in_store}
-                                        onCambiar={(v) => setData('show_variants_in_store', v)}
-                                    />
-                                )}
-                                {!esServicio && (
-                                    <Interruptor
-                                        etiqueta="Por llegar"
-                                        ayuda="Se anuncia como próximo a llegar, aunque no tengas stock."
-                                        valor={data.por_llegar}
-                                        onCambiar={(v) => setData('por_llegar', v)}
-                                    />
-                                )}
-                                <Interruptor
-                                    etiqueta="Ocultar del catálogo"
-                                    ayuda={esServicio ? 'Sigue en tu lista, pero nadie lo ve.' : 'Sigue en tu inventario, pero nadie lo ve.'}
-                                    valor={data.is_hidden}
-                                    onCambiar={(v) => setData('is_hidden', v)}
+                        {/* ── Catálogo ─────────────────────────────────────── */}
+                        {!simple && pestana === 'catalogo' && (
+                            <>
+                                <SeccionModal
+                                    titulo="Visibilidad en el catálogo"
+                                    ayuda="Cómo se comporta para quien visita tu catálogo."
                                 />
-                                {!esServicio && (
+
+                                <div className={`grid gap-4 sm:grid-cols-2 ${TARJETA}`}>
                                     <Interruptor
-                                        etiqueta="Últimas unidades"
-                                        ayuda="Muestra un aviso para animar la compra."
-                                        valor={data.last_units}
-                                        onCambiar={(v) => setData('last_units', v)}
+                                        etiqueta="Ocultar del catálogo"
+                                        ayuda={esServicio ? 'Sigue en tu lista, pero nadie lo ve.' : 'Sigue en tu inventario, pero nadie lo ve.'}
+                                        valor={data.is_hidden}
+                                        onCambiar={(v) => setData('is_hidden', v)}
                                     />
-                                )}
-                            </div>
-                        </div>
+                                    {!esServicio && (
+                                        <Interruptor
+                                            etiqueta="Mostrar variantes"
+                                            ayuda="Al desactivarlo, las variantes no aparecen en el catálogo."
+                                            valor={data.show_variants_in_store}
+                                            onCambiar={(v) => setData('show_variants_in_store', v)}
+                                        />
+                                    )}
+                                    {!esServicio && (
+                                        <Interruptor
+                                            etiqueta="Por llegar"
+                                            ayuda="Se anuncia como próximo a llegar, aunque no tengas existencias."
+                                            valor={data.por_llegar}
+                                            onCambiar={(v) => setData('por_llegar', v)}
+                                        />
+                                    )}
+                                    {!esServicio && (
+                                        <Interruptor
+                                            etiqueta="Últimas unidades"
+                                            ayuda="Muestra un aviso para animar la compra."
+                                            valor={data.last_units}
+                                            onCambiar={(v) => setData('last_units', v)}
+                                        />
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Footer */}
                     <div className="flex shrink-0 justify-end gap-3 border-t border-stone-200 bg-stone-50 px-6 py-4 dark:border-stone-800 dark:bg-stone-950/70">
                         <SecondaryButton onClick={() => setShowModal(false)} type="button">Cancelar</SecondaryButton>
                         <PrimaryButton disabled={isSubmitting} type="submit">
-                            {isSubmitting ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Crear Producto')}
+                            {isSubmitting ? 'Guardando...' : (isEditing ? 'Guardar cambios' : (esServicio ? 'Crear servicio' : 'Crear producto'))}
                         </PrimaryButton>
                     </div>
                 </form>
@@ -1384,7 +1593,7 @@ function Resumen({ titulo, valor }) {
  * formas de pago: separarlos dejaba ocho campos sueltos donde nadie
  * recordaba cuál de divisas correspondía a cuál nivel.
  */
-function NivelDePrecio({ id, etiqueta, campo, campoDivisa, data, setData, costo, error, avisoSinPrecio = false }) {
+function NivelDePrecio({ id, etiqueta, campo, campoDivisa, data, setData, costo, error, avisoSinPrecio = false, sufijo = null }) {
     const costoNum = parseFloat(costo);
     const hayCosto = !isNaN(costoNum) && costoNum > 0;
 
@@ -1410,10 +1619,15 @@ function NivelDePrecio({ id, etiqueta, campo, campoDivisa, data, setData, costo,
                     id={id}
                     type="number"
                     step="0.01"
-                    className="mt-1 block w-full pl-7"
+                    className={`mt-1 block w-full pl-7 ${sufijo ? 'pr-12' : ''}`}
                     value={data[campo]}
                     onChange={(e) => setData(campo, e.target.value)}
                 />
+                {sufijo && (
+                    <span className="pointer-events-none absolute inset-y-0 right-0 mt-1 flex items-center pr-3 text-xs font-semibold text-stone-500 dark:text-stone-400">
+                        / {sufijo}
+                    </span>
+                )}
             </div>
 
             {avisoSinPrecio && !data[campo] && (
@@ -1435,10 +1649,15 @@ function NivelDePrecio({ id, etiqueta, campo, campoDivisa, data, setData, costo,
                         id={`${id}_divisa`}
                         type="number"
                         step="0.01"
-                        className="block w-full pl-7 text-sm"
+                        className={`block w-full pl-7 text-sm ${sufijo ? 'pr-12' : ''}`}
                         value={data[campoDivisa]}
                         onChange={(e) => setData(campoDivisa, e.target.value)}
                     />
+                    {sufijo && (
+                        <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-stone-500 dark:text-stone-400">
+                            / {sufijo}
+                        </span>
+                    )}
                 </div>
                 {divisa && <Ganancia {...divisa} />}
             </div>
@@ -1466,4 +1685,159 @@ function SeccionModal({ titulo, ayuda }) {
             </div>
         </div>
     );
+}
+
+
+/**
+ * Las pestañas del formulario, con un punto donde haya algo que corregir.
+ *
+ * Un servicio no tiene existencias ni variantes, así que esa pestaña no se
+ * le muestra: no es una opción escondida, es que no aplica.
+ */
+function PestanasDelProducto({ activa, onCambiar, esServicio, errores }) {
+    const conError = (id) => Object.keys(errores ?? {}).some(
+        (clave) => PESTANA_DEL_CAMPO[clave.split('.')[0]] === id,
+    );
+
+    return (
+        <nav aria-label="Secciones del producto" className="-mb-px mt-4 flex gap-1 overflow-x-auto scrollbar-slim">
+            {PESTANAS_DEL_PRODUCTO.filter(({ soloProducto }) => !soloProducto || !esServicio).map(({ id, texto }) => {
+                const esActiva = activa === id;
+
+                return (
+                    <button
+                        key={id}
+                        type="button"
+                        onClick={() => onCambiar(id)}
+                        aria-current={esActiva ? 'page' : undefined}
+                        className={`relative shrink-0 rounded-t-lg px-3.5 py-2 text-sm font-semibold transition-colors ${
+                            esActiva
+                                ? 'bg-white text-marca-700 shadow-[0_1px_0_0_#fff] dark:bg-stone-900 dark:text-marca-400'
+                                : 'text-stone-500 hover:bg-white/60 hover:text-stone-800 dark:text-stone-400 dark:hover:bg-stone-900/60 dark:hover:text-stone-100'
+                        }`}
+                    >
+                        {texto}
+                        {conError(id) && (
+                            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-red-500" aria-label="Hay algo que corregir" />
+                        )}
+                    </button>
+                );
+            })}
+        </nav>
+    );
+}
+
+/** Producto o servicio: decide qué campos tienen sentido en toda la ficha. */
+function TipoDeFicha({ valor, onCambiar }) {
+    return (
+        <div className="grid grid-cols-2 gap-3">
+            {[
+                { valor: 'producto', titulo: 'Producto', texto: 'Algo que entregas y tiene existencias.' },
+                { valor: 'servicio', titulo: 'Servicio', texto: 'Algo que haces: no se agota ni se descuenta.' },
+            ].map((opcion) => (
+                <button
+                    key={opcion.valor}
+                    type="button"
+                    onClick={() => onCambiar(opcion.valor)}
+                    aria-pressed={valor === opcion.valor}
+                    className={`rounded-xl border p-3 text-left transition-colors duration-150 ${
+                        valor === opcion.valor
+                            ? 'border-marca-600 bg-marca-50 dark:border-marca-500 dark:bg-marca-950/40'
+                            : 'border-stone-200 hover:bg-stone-50 dark:border-stone-700 dark:hover:bg-stone-800'
+                    }`}
+                >
+                    <span className="block text-sm font-bold">{opcion.titulo}</span>
+                    <span className="mt-0.5 block text-xs text-stone-500 dark:text-stone-400">{opcion.texto}</span>
+                </button>
+            ))}
+        </div>
+    );
+}
+
+/**
+ * Cuánto hay y en qué se mide.
+ *
+ * Van juntos porque son una sola decisión: «2,5» no quiere decir nada sin
+ * saber si son kilos o cajas. Al cambiar a una unidad que no admite partes
+ * la cantidad se redondea en el momento, para no guardar media caja.
+ */
+function CampoDeExistencias({ data, setData, unidades, isEditing, error }) {
+    const unidad = data.unidad || 'unidad';
+    const fraccion = admiteFraccion({ unidad });
+
+    const cambiarUnidad = (nueva) => {
+        const cantidad = parseFloat(data.stock) || 0;
+
+        setData((anterior) => ({
+            ...anterior,
+            unidad: nueva,
+            stock: admiteFraccion({ unidad: nueva }) ? cantidad : Math.round(cantidad),
+        }));
+    };
+
+    return (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+                <InputLabel htmlFor="unidad" value="Se vende por" />
+                <select
+                    id="unidad"
+                    value={unidad}
+                    onChange={(e) => cambiarUnidad(e.target.value)}
+                    className={`mt-1 text-sm ${CAMPO}`}
+                >
+                    {Object.entries(unidades ?? {}).map(([grupo, opciones]) => (
+                        <optgroup key={grupo} label={grupo}>
+                            {opciones.map((opcion) => (
+                                <option key={opcion.valor} value={opcion.valor}>
+                                    {opcion.nombre} ({opcion.corto})
+                                </option>
+                            ))}
+                        </optgroup>
+                    ))}
+                </select>
+                <p className="mt-1.5 text-xs text-stone-500 dark:text-stone-400">
+                    {fraccion
+                        ? 'Puedes vender partes: 0,5 o 2,75.'
+                        : 'Se vende de a piezas enteras.'}
+                </p>
+            </div>
+
+            <div>
+                <InputLabel htmlFor="stock" value={isEditing ? 'Cuánto tienes (corregir conteo)' : 'Cuánto tienes'} />
+                <div className="relative mt-1">
+                    <TextInput
+                        id="stock"
+                        type="number"
+                        min="0"
+                        step={pasoDeCantidad({ unidad })}
+                        className="mt-1 block w-full pr-14"
+                        value={data.stock}
+                        onChange={(e) => setData('stock', e.target.value)}
+                        required
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-0 mt-1 flex items-center pr-3 text-sm font-semibold text-stone-500 dark:text-stone-400">
+                        {unidadCorta({ unidad })}
+                    </span>
+                </div>
+                <InputError message={error} className="mt-2" />
+            </div>
+        </div>
+    );
+}
+
+/** Lee y guarda una preferencia sin reventar donde no haya almacenamiento. */
+function leerPreferencia(clave) {
+    try {
+        return localStorage.getItem(clave);
+    } catch (e) {
+        return null;
+    }
+}
+
+function guardarPreferencia(clave, valor) {
+    try {
+        localStorage.setItem(clave, valor);
+    } catch (e) {
+        // Sin almacenamiento el formulario simplemente abre completo
+    }
 }

@@ -45,7 +45,8 @@ class ProductPurchase extends Model
     protected function casts(): array
     {
         return [
-            'qty' => 'integer',
+            // Lo comprado se mide como se vende: 12,5 kg es una compra
+            'qty' => 'float',
             'unit_cost' => 'float',
             'total_cost' => 'float',
             'purchased_at' => 'datetime',

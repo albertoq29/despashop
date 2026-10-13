@@ -192,6 +192,11 @@ export function DetalleDeProducto({ articulo }) {
                             <>
                                 <p className="text-3xl font-bold tracking-tight" style={{ color: 'var(--cat-primario)' }}>
                                     ${Number(precio).toFixed(2)}
+                                    {articulo.unidadCorta && articulo.unidadCorta !== 'u' && (
+                                        <span className="ml-1.5 text-sm font-medium" style={{ color: 'var(--cat-tenue)' }}>
+                                            / {articulo.unidadCorta}
+                                        </span>
+                                    )}
                                 </p>
                                 {theme.show_bs_prices && bcvRate > 1 && (
                                     <p className="mt-0.5 text-sm" style={{ color: 'var(--cat-tenue)' }}>

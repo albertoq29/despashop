@@ -17,7 +17,8 @@ class FacturaItem extends Model
         'cost_price'     => 'float',
         'subtotal_usd'   => 'float',
         'profit_usd'     => 'float',
-        'qty'            => 'integer',
+        // Desde que se vende al peso, un renglón puede ser 2,5 kg
+        'qty'            => 'float',
         'renueva_el'     => 'date',
         'renovaciones'   => 'integer',
         'renovado_el'    => 'datetime',

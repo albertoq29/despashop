@@ -9,6 +9,7 @@ use App\Models\ProductPurchase;
 use App\Models\Setting;
 use App\Services\Ganancias\LibroDeCompras;
 use App\Services\Ganancias\ResumenDeGanancias;
+use App\Support\UnidadesDeMedida;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,7 +64,10 @@ class ProfitController extends Controller
                 'id' => $producto->id,
                 'name' => $producto->name,
                 'cost_price' => (float) ($producto->cost_price ?? 0),
-                'stock' => (int) $producto->stock,
+                'stock' => (float) $producto->stock,
+                'unidad' => $producto->unidad,
+                'unidadCorta' => $producto->unidad_corta,
+                'admiteFraccion' => $producto->admite_fraccion,
                 'inversion' => (float) $producto->inversion_historica,
             ],
             'compras' => ProductPurchase::where('product_id', $producto->id)
@@ -92,7 +96,7 @@ class ProfitController extends Controller
     {
         $validado = $request->validate([
             'product_id' => ['required', Rule::exists('products', 'id')->where('user_id', $this->tenantId())],
-            'qty' => ['required', 'integer', 'min:1', 'max:100000'],
+            'qty' => ['required', 'numeric', 'min:0.001', 'max:100000'],
             'unit_cost' => ['required', 'numeric', 'min:0.0001'],
             'purchased_at' => ['nullable', 'date', 'before_or_equal:today'],
             'note' => ['nullable', 'string', 'max:160'],
@@ -106,7 +110,7 @@ class ProfitController extends Controller
         DB::transaction(function () use ($producto, $validado, $request) {
             $this->libro->registrar(
                 $producto,
-                (int) $validado['qty'],
+                $this->cantidad($validado['qty'], $producto),
                 (float) $validado['unit_cost'],
                 ProductPurchase::MANUAL,
                 $validado['note'] ?? null,
@@ -115,11 +119,13 @@ class ProfitController extends Controller
 
             // Lo normal es que una compra entre al inventario
             if ($request->boolean('sumar_stock', true)) {
-                $producto->forceFill(['stock' => $producto->stock + (int) $validado['qty']])->save();
+                $entraron = $this->cantidad($validado['qty'], $producto);
+                $producto->forceFill(['stock' => round($producto->stock + $entraron, 3)])->save();
             }
         });
 
-        ActivityLog::record('compra.registrada', "Registró la compra de {$validado['qty']} unidades de {$producto->name}");
+        $cuanto = UnidadesDeMedida::formatear($this->cantidad($validado['qty'], $producto), $producto->unidad);
+        ActivityLog::record('compra.registrada', "Registró la compra de {$cuanto} de {$producto->name}");
 
         return back()->with('success', 'Compra registrada. La inversión del producto quedó al día.');
     }
@@ -145,7 +151,7 @@ class ProfitController extends Controller
             'product_id' => ['nullable', Rule::exists('products', 'id')->where('user_id', $this->tenantId())],
             'type' => ['required', 'in:loss,gain'],
             'concept' => ['nullable', 'string', 'max:100'],
-            'qty' => ['required', 'integer', 'min:1'],
+            'qty' => ['required', 'numeric', 'min:0.001'],
             'amount_usd' => ['required', 'numeric', 'min:0.01'],
             'reason' => ['required', 'string', 'max:500'],
             'adjust_stock' => ['nullable', 'boolean'],
@@ -173,7 +179,8 @@ class ProfitController extends Controller
                 $producto = Product::where('user_id', $this->tenantId())->find($validado['product_id']);
 
                 if ($producto) {
-                    $producto->forceFill(['stock' => max(0, $producto->stock - $validado['qty'])])->save();
+                    $salieron = $this->cantidad($validado['qty'], $producto);
+                    $producto->forceFill(['stock' => round(max(0, $producto->stock - $salieron), 3)])->save();
                 }
             }
         });
@@ -210,5 +217,18 @@ class ProfitController extends Controller
         Setting::put('ganancias_start_date', now()->toDateTimeString(), $this->tenantId());
 
         return back()->with('success', 'Control de ganancias configurado para contar desde hoy.');
+    }
+
+    /**
+     * La cantidad que de verdad se puede registrar de algo.
+     *
+     * Medio kilo entra al inventario; media caja no. Lo decide la unidad
+     * del producto, igual que al facturarlo.
+     */
+    private function cantidad(mixed $valor, Product $producto): float
+    {
+        $cantidad = max(0, (float) $valor);
+
+        return UnidadesDeMedida::admiteFraccion($producto->unidad) ? round($cantidad, 3) : round($cantidad);
     }
 }

@@ -4,6 +4,7 @@ namespace App\Services\Ganancias;
 
 use App\Models\Product;
 use App\Models\ProductPurchase;
+use App\Support\UnidadesDeMedida;
 use Illuminate\Support\Carbon;
 
 /**
@@ -26,13 +27,14 @@ class LibroDeCompras
      */
     public function registrar(
         Product $producto,
-        int $cantidad,
+        float $cantidad,
         ?float $costoUnitario = null,
         string $origen = ProductPurchase::MANUAL,
         ?string $nota = null,
         ?\DateTimeInterface $fecha = null,
     ): ?ProductPurchase {
-        if ($cantidad === 0) {
+        // Comparado contra 0.0: la cantidad puede venir en kilos o litros
+        if ($cantidad === 0.0) {
             return null;
         }
 
@@ -71,13 +73,16 @@ class LibroDeCompras
      * Bajar el stock a mano es una corrección y se anota en negativo, para
      * que el libro siga cuadrando con la realidad.
      */
-    public function ajustarPorStock(Product $producto, int $stockAnterior, int $stockNuevo, ?float $costoUnitario = null): ?ProductPurchase
+    public function ajustarPorStock(Product $producto, float $stockAnterior, float $stockNuevo, ?float $costoUnitario = null): ?ProductPurchase
     {
-        $diferencia = $stockNuevo - $stockAnterior;
+        $diferencia = round($stockNuevo - $stockAnterior, 3);
 
-        if ($diferencia === 0) {
+        if ($diferencia === 0.0) {
             return null;
         }
+
+        // La nota se lee, así que lleva la unidad: «2,5 kg» y no «2,5 unidades»
+        $cuanto = UnidadesDeMedida::formatear(abs($diferencia), $producto->unidad);
 
         return $this->registrar(
             $producto,
@@ -85,8 +90,8 @@ class LibroDeCompras
             $costoUnitario,
             $diferencia > 0 ? ProductPurchase::AJUSTE : ProductPurchase::CORRECCION,
             $diferencia > 0
-                ? "Se subió el inventario en {$diferencia} unidades, al costo del momento"
-                : 'Se bajó el inventario en ' . abs($diferencia) . ' unidades',
+                ? "Se subió el inventario en {$cuanto}, al costo del momento"
+                : "Se bajó el inventario en {$cuanto}",
         );
     }
 

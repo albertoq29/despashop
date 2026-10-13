@@ -101,7 +101,7 @@ class ReposicionDeStockTest extends TestCase
 
         $compra = ProductPurchase::where('origin', ProductPurchase::REPOSICION)->sole();
 
-        $this->assertSame(20, $compra->qty);
+        $this->assertSame(20.0, $compra->qty);
         $this->assertSame(11.0, $compra->unit_cost);
         $this->assertSame(220.0, $compra->total_cost);
         $this->assertSame('Proveedor Ramírez', $compra->note);
@@ -314,7 +314,7 @@ class ReposicionDeStockTest extends TestCase
 
         $ajuste = ProductPurchase::where('origin', ProductPurchase::AJUSTE)->sole();
 
-        $this->assertSame(3, $ajuste->qty);
+        $this->assertSame(3.0, $ajuste->qty);
         $this->assertSame(10.0, $ajuste->unit_cost);
         $this->assertSame(0, ProductPurchase::where('origin', ProductPurchase::REPOSICION)->count());
     }

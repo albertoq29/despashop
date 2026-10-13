@@ -119,7 +119,7 @@ class GananciasTest extends TestCase
         $producto = Product::sole();
         $compra = ProductPurchase::sole();
 
-        $this->assertSame(10, $compra->qty);
+        $this->assertSame(10.0, $compra->qty);
         $this->assertSame(12.0, $compra->unit_cost);
         $this->assertSame(120.0, $compra->total_cost);
         $this->assertSame(ProductPurchase::ALTA, $compra->origin);
@@ -178,7 +178,7 @@ class GananciasTest extends TestCase
 
         $correccion = ProductPurchase::where('origin', ProductPurchase::CORRECCION)->sole();
 
-        $this->assertSame(-3, $correccion->qty);
+        $this->assertSame(-3.0, $correccion->qty);
         $this->assertSame(70.0, (float) $producto->fresh()->inversion_historica);
     }
 
@@ -200,7 +200,8 @@ class GananciasTest extends TestCase
         $producto->refresh();
 
         $this->assertSame(142.5, (float) $producto->inversion_historica);
-        $this->assertSame(17, $producto->stock);
+        // Las existencias son decimales desde que se puede vender al peso
+        $this->assertSame(17.0, $producto->stock);
         $this->assertSame('2027-05-10', ProductPurchase::sole()->purchased_at->toDateString());
     }
 

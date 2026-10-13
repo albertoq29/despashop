@@ -5,6 +5,7 @@ import { Head, Link, useForm, router } from '@inertiajs/react';
 import TextInput from '@/Components/TextInput';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
+import { numero, pasoDeCantidad, unidadCorta, unidadDe } from '@/utils/unidades';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
@@ -225,8 +226,28 @@ export default function Index({
         });
     };
 
+/**
+     * La unidad del producto elegido en cada formulario.
+     *
+     * Sin esto los dos campos pedían «cantidad de unidades» y subían de uno
+     * en uno, aunque el producto se venda al peso: comprar 12,5 kg de queso
+     * era imposible.
+     */
+    const unidadDeFormulario = (productoId) => {
+        const producto = productos.find((p) => String(p.id) === String(productoId));
+
+        return {
+            corta: unidadCorta(producto ? { unidad: producto.unidad } : null),
+            uno: unidadDe(producto?.unidad).uno,
+            paso: pasoDeCantidad(producto ? { unidad: producto.unidad } : null),
+        };
+    };
+
+    const unidadDeLaCompra = unidadDeFormulario(compraForm.data.product_id);
+    const unidadDelAjuste = unidadDeFormulario(data.product_id);
+
     const handleQtyChange = (qtyVal) => {
-        const qty = parseInt(qtyVal) || 1;
+        const qty = parseFloat(qtyVal) || 1;
         setData(prev => {
             const updated = { ...prev, qty };
             if (prev.product_id && prev.type === 'loss') {
@@ -805,7 +826,7 @@ export default function Index({
                                                                             {sale.items.map((item, idx) => (
                                                                                 <tr key={idx} className="hover:bg-stone-50/50 dark:hover:bg-stone-900/50">
                                                                                     <td className="py-2.5 font-medium text-stone-800 dark:text-stone-200">{item.product_name}</td>
-                                                                                    <td className="py-2.5 text-center font-bold font-mono">{item.qty}</td>
+                                                                                    <td className="py-2.5 text-center font-bold font-mono">{numero(item.qty)}</td>
                                                                                     <td className="py-2.5 text-right font-mono">${item.unit_price_usd.toFixed(2)}</td>
                                                                                     <td className="py-2.5 text-right font-mono text-stone-400 dark:text-stone-500 font-mono">${item.cost_price.toFixed(2)}</td>
                                                                                     <td className="py-2.5 text-right font-mono">${(item.unit_price_usd * item.qty).toFixed(2)}</td>
@@ -903,7 +924,7 @@ export default function Index({
                                             </p>
                                             <p className="text-[11px] text-stone-600 dark:text-stone-400 italic leading-snug">"{adj.reason}"</p>
                                             <div className="flex justify-between items-center text-xs font-bold pt-1 border-t border-stone-100 dark:border-stone-800 mt-1">
-                                                <span className="text-stone-400 dark:text-stone-500">Cant: {adj.qty}</span>
+                                                <span className="text-stone-400 dark:text-stone-500">Cant: {numero(adj.qty)}</span>
                                                 <span className={adj.type === 'loss' ? 'text-red-600 dark:text-red-400 font-mono' : 'text-green-600 dark:text-green-400 font-mono'}>
                                                     {adj.type === 'loss' ? '-' : '+'}${adj.amount_usd.toFixed(2)}
                                                 </span>
@@ -1044,7 +1065,7 @@ export default function Index({
                                             onChange={e => setData('adjust_stock', e.target.checked)}
                                             className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25"
                                         />
-                                        <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">¿Descontar unidades del stock disponible del producto?</span>
+                                        <span className="text-xs font-semibold text-stone-700 dark:text-stone-300">¿Descontar esta cantidad de las existencias del producto?</span>
                                     </label>
                                 </div>
                             )}
@@ -1053,12 +1074,12 @@ export default function Index({
                             <div className={data.product_id ? "grid grid-cols-2 gap-4" : "block"}>
                                 {data.product_id && (
                                     <div>
-                                        <InputLabel htmlFor="adj_qty" value="Cantidad de Unidades" className="mb-1" />
+                                        <InputLabel htmlFor="adj_qty" value={`Cantidad (${unidadDelAjuste.corta})`} className="mb-1" />
                                         <TextInput
                                             id="adj_qty"
                                             type="number"
-                                            min="1"
-                                            step="1"
+                                            min={unidadDelAjuste.paso}
+                                            step={unidadDelAjuste.paso}
                                             value={data.qty}
                                             onChange={(e) => handleQtyChange(e.target.value)}
                                             className="w-full text-xs"
@@ -1193,12 +1214,12 @@ export default function Index({
 
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <InputLabel htmlFor="compra_qty" value="Cantidad" className="mb-1" />
+                                    <InputLabel htmlFor="compra_qty" value={`Cantidad (${unidadDeLaCompra.corta})`} className="mb-1" />
                                     <TextInput
                                         id="compra_qty"
                                         type="number"
-                                        min="1"
-                                        step="1"
+                                        min={unidadDeLaCompra.paso}
+                                        step={unidadDeLaCompra.paso}
                                         value={compraForm.data.qty}
                                         onChange={(e) => compraForm.setData('qty', e.target.value)}
                                         className="w-full font-mono"
@@ -1208,7 +1229,7 @@ export default function Index({
                                 </div>
 
                                 <div>
-                                    <InputLabel htmlFor="compra_costo" value="Costo por unidad (USD)" className="mb-1" />
+                                    <InputLabel htmlFor="compra_costo" value={`Costo por ${unidadDeLaCompra.uno} (USD)`} className="mb-1" />
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 dark:text-stone-500 text-xs font-mono font-bold">$</span>
                                         <TextInput

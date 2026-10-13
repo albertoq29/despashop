@@ -6,6 +6,7 @@ import Swal from 'sweetalert2';
 import { Check, Download, Eye, EyeOff, Pencil, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
+import { conUnidadSiHaceFalta } from '@/utils/unidades';
 
 /** Una fecha del servidor como se lee aquí: día primero. */
 function fechaCorta(iso) {
@@ -410,7 +411,7 @@ export default function Show({ auth, factura, plantilla }) {
                                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                                     {item.variants.map(v => (
                                                                         <span key={v.id} className="inline-block px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-marca-50 dark:bg-marca-950/40 text-marca-800 dark:text-marca-300 border border-marca-100/60 dark:border-marca-950/60">
-                                                                            {v.variant ? v.variant.label : 'Pendiente'} ({parseInt(v.qty)})
+                                                                            {v.variant ? v.variant.label : 'Pendiente'} ({conUnidadSiHaceFalta(v.qty, item.product)})
                                                                         </span>
                                                                     ))}
                                                                 </div>
@@ -419,6 +420,11 @@ export default function Show({ auth, factura, plantilla }) {
                                                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                             {!isGroup && !item.product_id && (
                                                                 <span className="text-[9px] sm:text-[10px] text-stone-400 dark:text-stone-500 italic">Item manual</span>
+                                                            )}
+                                                            {item.product?.item_type === 'servicio' && (
+                                                                <span className="inline-block rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-400 sm:text-[10px]">
+                                                                    Servicio
+                                                                </span>
                                                             )}
                                                             {!isComboItem && (
                                                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold border ${
@@ -443,7 +449,9 @@ export default function Show({ auth, factura, plantilla }) {
                                                             )}
                                                         </div>
                                                     </td>
-                                                    <td className="py-2.5 sm:py-3 px-1 text-right font-mono text-xs sm:text-sm">{qty}</td>
+                                                    <td className="py-2.5 sm:py-3 px-1 text-right font-mono text-xs sm:text-sm">
+                                                        {conUnidadSiHaceFalta(qty, item.product)}
+                                                    </td>
                                                     <td className="py-2.5 sm:py-3 px-1 text-right font-mono text-xs sm:text-sm">
                                                         {hidePriceDetails ? '—' : `$${parseFloat(unitPrice).toFixed(2)}`}
                                                     </td>

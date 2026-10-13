@@ -11,6 +11,7 @@ use App\Models\ProductPurchase;
 use App\Services\Ganancias\LibroDeCompras;
 use App\Services\Ganancias\Reposicion;
 use App\Support\Archivos;
+use App\Support\UnidadesDeMedida;
 use App\Models\PrivatePhoto;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -49,6 +50,8 @@ class ProductController extends Controller
         return Inertia::render('Productos/Index', [
             'productos'  => $productos,
             'categories' => $categories,
+            // Agrupadas para el selector: por pieza, por peso, por volumen
+            'unidades'   => UnidadesDeMedida::porGrupo(),
         ]);
     }
 
@@ -70,8 +73,10 @@ class ProductController extends Controller
                 'es_suscripcion'           => 'nullable|boolean',
                 'periodo_suscripcion'      => 'nullable|in:' . implode(',', array_keys(Product::PERIODOS)),
                 'cost_price'               => 'nullable|numeric|min:0',
-                // Un servicio no lleva existencias: solo se exigen a los productos
-                'stock'                    => 'required_unless:item_type,servicio|nullable|integer|min:0',
+                // Un servicio no lleva existencias: solo se exigen a los productos.
+                // Y no son enteras: quien vende al peso registra 2,5 kg.
+                'stock'                    => 'required_unless:item_type,servicio|nullable|numeric|min:0|max:99999999',
+                'unidad'                   => ['nullable', Rule::in(UnidadesDeMedida::claves())],
                 'categories'               => 'nullable|array',
                 'categories.*'             => 'exists:categories,id',
                 'conditional_price'        => 'nullable|numeric|min:0.01',
@@ -100,7 +105,8 @@ class ProductController extends Controller
                 : null;
 
             $tipo = $request->input('item_type') === Product::SERVICIO ? Product::SERVICIO : Product::PRODUCTO;
-            $existencias = $tipo === Product::SERVICIO ? 0 : (int) $request->stock;
+            $unidad = UnidadesDeMedida::normalizar($request->input('unidad'));
+            $existencias = $tipo === Product::SERVICIO ? 0 : $this->existencias($request->stock, $unidad);
             $costo = (float) ($request->cost_price ?? 0);
 
             $product = Product::create([
@@ -115,6 +121,7 @@ class ProductController extends Controller
                 ...$this->divisasYSuscripcion($request),
                 'cost_price'               => $request->cost_price,
                 'stock'                    => $existencias,
+                'unidad'                   => $unidad,
                 'conditional_price'        => $request->conditional_price,
                 'conditional_min_quantity' => $request->conditional_min_quantity,
                 'notes'                    => $request->notes,
@@ -189,7 +196,8 @@ class ProductController extends Controller
                 'es_suscripcion'           => 'nullable|boolean',
                 'periodo_suscripcion'      => 'nullable|in:' . implode(',', array_keys(Product::PERIODOS)),
                 'cost_price'               => 'nullable|numeric|min:0',
-                'stock'                    => 'required_unless:item_type,servicio|nullable|integer|min:0',
+                'stock'                    => 'required_unless:item_type,servicio|nullable|numeric|min:0|max:99999999',
+                'unidad'                   => ['nullable', Rule::in(UnidadesDeMedida::claves())],
                 'categories'               => 'nullable|array',
                 'categories.*'             => 'exists:categories,id',
                 'conditional_price'        => 'nullable|numeric|min:0.01',
@@ -223,7 +231,8 @@ class ProductController extends Controller
             $esServicio = $data['item_type'] === Product::SERVICIO;
             $data['service_duration'] = $esServicio ? $request->service_duration : null;
             $data['service_mode'] = $esServicio ? $request->service_mode : null;
-            $data['stock'] = $esServicio ? 0 : (int) $request->stock;
+            $data['unidad'] = UnidadesDeMedida::normalizar($request->input('unidad'));
+            $data['stock'] = $esServicio ? 0 : $this->existencias($request->stock, $data['unidad']);
             $data['price_usdt']             = $request->price_usdt ?: null;
             $data += $this->divisasYSuscripcion($request);
             $data['is_hidden']              = filter_var($request->input('is_hidden', false), FILTER_VALIDATE_BOOLEAN);
@@ -456,7 +465,8 @@ class ProductController extends Controller
         $tieneVariantes = $producto->variants()->exists();
 
         $validado = $request->validate([
-            'cantidad' => ['required', 'integer', 'min:1', 'max:100000'],
+            // Entra lo que se mide: 3,25 kg de queso es una reposición
+            'cantidad' => ['required', 'numeric', 'min:0.001', 'max:100000'],
             'costo_unitario' => ['required', 'numeric', 'min:0.01', 'max:1000000'],
             'variant_id' => [
                 $tieneVariantes ? 'required' : 'nullable',
@@ -466,14 +476,16 @@ class ProductController extends Controller
             'fecha' => ['nullable', 'date', 'before_or_equal:today'],
             'nota' => ['nullable', 'string', 'max:160'],
         ], [
-            'costo_unitario.min' => 'Indica cuánto te costó cada unidad.',
+            'costo_unitario.min' => 'Indica cuánto te costó cada ' . UnidadesDeMedida::de($producto->unidad)['uno'] . '.',
             'variant_id.required' => 'Di a cuál variante entraron las unidades.',
             'fecha.before_or_equal' => 'La compra no puede ser de una fecha futura.',
         ]);
 
+        $entraron = $this->existencias($validado['cantidad'], $producto->unidad);
+
         $resultado = $reposicion->registrar(
             $producto,
-            (int) $validado['cantidad'],
+            $entraron,
             (float) $validado['costo_unitario'],
             $validado['politica'],
             isset($validado['variant_id']) ? (int) $validado['variant_id'] : null,
@@ -481,12 +493,15 @@ class ProductController extends Controller
             isset($validado['fecha']) ? Carbon::parse($validado['fecha']) : null,
         );
 
+        $cuanto = UnidadesDeMedida::formatear($entraron, $producto->unidad);
+
         ActivityLog::record(
             'reposicion.registrada',
-            "Repuso {$validado['cantidad']} unidades de {$producto->name} a \${$validado['costo_unitario']} c/u",
+            "Repuso {$cuanto} de {$producto->name} a \${$validado['costo_unitario']} c/u",
         );
 
-        $aviso = "Reposición registrada: invertiste \${$resultado['invertido']} y el stock quedó en {$resultado['stock_despues']} uds.";
+        $quedan = UnidadesDeMedida::formatear($resultado['stock_despues'], $producto->unidad);
+        $aviso = "Reposición registrada: invertiste \${$resultado['invertido']} y quedan {$quedan}.";
 
         if ($resultado['costo_despues'] !== $resultado['costo_antes']) {
             $aviso .= " Tu costo unitario pasó de \${$resultado['costo_antes']} a \${$resultado['costo_despues']}.";
@@ -568,5 +583,19 @@ class ProductController extends Controller
         }
 
         return redirect()->back()->with('success', 'Orden de productos actualizado correctamente.');
+    }
+
+    /**
+     * Las existencias que de verdad se pueden guardar.
+     *
+     * Media caja no existe, medio kilo sí: si la unidad no admite partes se
+     * redondea, y si las admite se recorta a tres cifras, que es lo que
+     * cabe en la columna y alcanza para gramos dentro de un kilo.
+     */
+    private function existencias(mixed $valor, string $unidad): float
+    {
+        $cantidad = max(0, (float) ($valor ?? 0));
+
+        return UnidadesDeMedida::admiteFraccion($unidad) ? round($cantidad, 3) : round($cantidad);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Delivery;
 use App\Models\Factura;
 use App\Models\FacturaItem;
 use App\Models\Product;
+use App\Support\UnidadesDeMedida;
 use App\Models\ProductVariant;
 use App\Models\ExchangeRate;
 use Illuminate\Support\Facades\Auth;
@@ -70,8 +71,16 @@ class FacturaController extends Controller
                 'es_servicio'             => $p->esServicio(),
                 'es_suscripcion'          => $p->esSuscripcion(),
                 'periodo_suscripcion'     => $p->periodo_suscripcion,
+                // Un servicio se cobra por lo que dura y por donde se presta:
+                // la factura lo dice en vez de hablar de existencias
+                'service_duration'        => $p->service_duration,
+                'service_mode'            => $p->service_mode,
                 'cost_price'              => $p->cost_price,
                 'stock'                   => $p->stock,
+                // Lo que se vende al peso o por metro se factura con decimales
+                'unidad'                  => $p->unidad,
+                'unidad_corta'            => $p->unidad_corta,
+                'admite_fraccion'         => $p->admite_fraccion,
                 'image_path'              => $p->image_path,
                 'categories'              => $p->categories->map(fn($cat) => [
                     'id'   => $cat->id,
@@ -139,7 +148,9 @@ class FacturaController extends Controller
             'items.*.product_name'     => 'required|string|max:255',
             'items.*.price_type'       => 'required|in:detal,mayor,distribuidor,custom',
             'items.*.unit_price_usd'   => 'required|numeric|min:0',
-            'items.*.qty'              => 'required|integer|min:1',
+            // Medio kilo se factura; media caja no. El tope de decimales lo
+            // pone la unidad del producto, y se ajusta al guardar.
+            'items.*.qty'              => 'required|numeric|min:0.001|max:99999999',
             // Solo lo traen los renglones de un servicio por suscripción
             'items.*.renueva_el'       => 'nullable|date',
             // Pagar en efectivo en divisas tiene su propio precio por nivel
@@ -187,7 +198,7 @@ class FacturaController extends Controller
 
             $totalItemsQty = 0;
             foreach ($request->items as $item) {
-                $totalItemsQty += (int)$item['qty'];
+                $totalItemsQty += (float)$item['qty'];
             }
 
             $supplementCostPerUnit = 0;
@@ -241,6 +252,9 @@ class FacturaController extends Controller
             foreach ($request->items as $item) {
                 $imagePath = null;
                 $costPrice = 0;
+                // Se reinicia en cada vuelta: sin esto un renglon escrito a
+                // mano se quedaba con el producto del renglon anterior.
+                $product = null;
                 if (!empty($item['product_id'])) {
                     $product = Product::find($item['product_id']);
                     $imagePath = $product?->image_path;
@@ -265,7 +279,7 @@ class FacturaController extends Controller
                     'price_type'         => $item['price_type'],
                     'unit_price_usd'     => $item['unit_price_usd'],
                     'cost_price'         => $adjustedCostPrice,
-                    'qty'                => $item['qty'],
+                    'qty'                => $this->cantidad($item['qty'], $product),
                     'subtotal_usd'       => round($item['unit_price_usd'] * $item['qty'], 2),
                     'profit_usd'         => round(($item['unit_price_usd'] - $adjustedCostPrice) * $item['qty'], 2),
                     'renueva_el'         => $this->fechaDeRenovacion($item),
@@ -379,18 +393,20 @@ class FacturaController extends Controller
                     if (!$variant || $variant->stock < $item->qty) {
                         $vLabel = $variant ? $variant->label : 'Desconocida';
                         $available = $variant ? $variant->stock : 0;
-                        return redirect()->back()->with('error', 'Stock insuficiente para el producto "' . $item->product_name . '" (Variante: ' . $vLabel . '). Stock disponible: ' . $available . '. Cantidad solicitada: ' . $item->qty);
+                        return redirect()->back()->with('error', 'Stock insuficiente para el producto "' . $item->product_name . '" (Variante: ' . $vLabel . '). Stock disponible: ' . UnidadesDeMedida::numero($available) . '. Cantidad solicitada: ' . UnidadesDeMedida::numero($item->qty));
                     }
                 } else {
                     if ($item->product->stock < $item->qty) {
-                        return redirect()->back()->with('error', 'Stock insuficiente para el producto "' . $item->product_name . '". Stock disponible: ' . $item->product->stock . '. Cantidad solicitada: ' . $item->qty);
+                        $unidad = $item->product->unidad;
+
+                        return redirect()->back()->with('error', 'Stock insuficiente para el producto "' . $item->product_name . '". Stock disponible: ' . UnidadesDeMedida::formatear($item->product->stock, $unidad) . '. Cantidad solicitada: ' . UnidadesDeMedida::formatear($item->qty, $unidad));
                     }
                 }
             }
 
             if ($item->combo_id && $item->combo) {
                 if ($item->combo->stock < $item->qty) {
-                    return redirect()->back()->with('error', 'Stock insuficiente para el combo "' . $item->product_name . '". Stock disponible: ' . $item->combo->stock . '. Cantidad solicitada: ' . $item->qty);
+                    return redirect()->back()->with('error', 'Stock insuficiente para el combo "' . $item->product_name . '". Stock disponible: ' . UnidadesDeMedida::numero($item->combo->stock) . '. Cantidad solicitada: ' . UnidadesDeMedida::numero($item->qty));
                 }
             }
         }
@@ -502,8 +518,16 @@ class FacturaController extends Controller
                 'es_servicio'             => $p->esServicio(),
                 'es_suscripcion'          => $p->esSuscripcion(),
                 'periodo_suscripcion'     => $p->periodo_suscripcion,
+                // Un servicio se cobra por lo que dura y por donde se presta:
+                // la factura lo dice en vez de hablar de existencias
+                'service_duration'        => $p->service_duration,
+                'service_mode'            => $p->service_mode,
                 'cost_price'              => $p->cost_price,
                 'stock'                   => $p->stock,
+                // Lo que se vende al peso o por metro se factura con decimales
+                'unidad'                  => $p->unidad,
+                'unidad_corta'            => $p->unidad_corta,
+                'admite_fraccion'         => $p->admite_fraccion,
                 'image_path'              => $p->image_path,
                 'categories'              => $p->categories->map(fn($cat) => [
                     'id'   => $cat->id,
@@ -614,7 +638,9 @@ class FacturaController extends Controller
             'items.*.product_name'     => 'required|string|max:255',
             'items.*.price_type'       => 'required|in:detal,mayor,distribuidor,custom',
             'items.*.unit_price_usd'   => 'required|numeric|min:0',
-            'items.*.qty'              => 'required|integer|min:1',
+            // Medio kilo se factura; media caja no. El tope de decimales lo
+            // pone la unidad del producto, y se ajusta al guardar.
+            'items.*.qty'              => 'required|numeric|min:0.001|max:99999999',
             // Solo lo traen los renglones de un servicio por suscripción
             'items.*.renueva_el'       => 'nullable|date',
             // Pagar en efectivo en divisas tiene su propio precio por nivel
@@ -656,7 +682,7 @@ class FacturaController extends Controller
 
             $totalItemsQty = 0;
             foreach ($request->items as $item) {
-                $totalItemsQty += (int)$item['qty'];
+                $totalItemsQty += (float)$item['qty'];
             }
 
             $supplementCostPerUnit = 0;
@@ -720,6 +746,9 @@ class FacturaController extends Controller
             foreach ($request->items as $item) {
                 $imagePath = null;
                 $costPrice = 0;
+                // Se reinicia en cada vuelta: sin esto un renglon escrito a
+                // mano se quedaba con el producto del renglon anterior.
+                $product = null;
                 if (!empty($item['product_id'])) {
                     $product = Product::find($item['product_id']);
                     $imagePath = $product?->image_path;
@@ -744,7 +773,7 @@ class FacturaController extends Controller
                     'price_type'         => $item['price_type'],
                     'unit_price_usd'     => $item['unit_price_usd'],
                     'cost_price'         => $adjustedCostPrice,
-                    'qty'                => $item['qty'],
+                    'qty'                => $this->cantidad($item['qty'], $product),
                     'subtotal_usd'       => round($item['unit_price_usd'] * $item['qty'], 2),
                     'profit_usd'         => round(($item['unit_price_usd'] - $adjustedCostPrice) * $item['qty'], 2),
                     'renueva_el'         => $this->fechaDeRenovacion($item),
@@ -786,5 +815,23 @@ class FacturaController extends Controller
 
         return redirect()->route('facturas.index')
             ->with('success', 'Borrador eliminado correctamente.');
+    }
+
+    /**
+     * La cantidad que de verdad se puede facturar de algo.
+     *
+     * La unidad del producto decide: dos kilos y medio son 2,5, pero dos
+     * cajas y media no existen. Sin producto (un renglon escrito a mano)
+     * se respeta lo que se escribio.
+     */
+    private function cantidad(mixed $valor, ?Product $producto): float
+    {
+        $cantidad = max(0, (float) $valor);
+
+        if ($producto === null) {
+            return round($cantidad, 3);
+        }
+
+        return UnidadesDeMedida::admiteFraccion($producto->unidad) ? round($cantidad, 3) : round($cantidad);
     }
 }

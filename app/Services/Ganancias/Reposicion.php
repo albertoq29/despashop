@@ -46,11 +46,11 @@ class Reposicion
      * unidades: su stock es la suma de las variantes, y tocarlo por fuera
      * lo pisaría el siguiente guardado del producto.
      *
-     * @return array{compra: ?ProductPurchase, stock_antes: int, stock_despues: int, costo_antes: float, costo_despues: float, invertido: float}
+     * @return array{compra: ?ProductPurchase, stock_antes: float, stock_despues: float, costo_antes: float, costo_despues: float, invertido: float}
      */
     public function registrar(
         Product $producto,
-        int $cantidad,
+        float $cantidad,
         float $costoUnitario,
         string $politica = self::PROMEDIO,
         ?int $varianteId = null,
@@ -58,7 +58,7 @@ class Reposicion
         ?\DateTimeInterface $fecha = null,
     ): array {
         return DB::transaction(function () use ($producto, $cantidad, $costoUnitario, $politica, $varianteId, $nota, $fecha) {
-            $stockAntes = (int) $producto->stock;
+            $stockAntes = (float) $producto->stock;
             $costoAntes = (float) ($producto->cost_price ?? 0);
 
             $compra = $this->libro->registrar(
@@ -70,15 +70,15 @@ class Reposicion
                 $fecha,
             );
 
-            $cambios = ['stock' => $stockAntes + $cantidad];
+            $cambios = ['stock' => round($stockAntes + $cantidad, 3)];
 
             // Con variantes, el stock del producto es la suma de las suyas
             if ($varianteId !== null) {
                 $variante = $producto->variants()->find($varianteId);
 
                 if ($variante instanceof ProductVariant) {
-                    $variante->forceFill(['stock' => max(0, (int) $variante->stock + $cantidad)])->save();
-                    $cambios['stock'] = (int) $producto->variants()->sum('stock');
+                    $variante->forceFill(['stock' => max(0, (int) $variante->stock + (int) round($cantidad))])->save();
+                    $cambios['stock'] = (float) $producto->variants()->sum('stock');
                 }
             }
 
@@ -93,7 +93,7 @@ class Reposicion
             return [
                 'compra' => $compra,
                 'stock_antes' => $stockAntes,
-                'stock_despues' => (int) $producto->stock,
+                'stock_despues' => (float) $producto->stock,
                 'costo_antes' => round($costoAntes, 2),
                 'costo_despues' => round((float) ($producto->cost_price ?? 0), 2),
                 'invertido' => round($cantidad * $costoUnitario, 2),
@@ -109,7 +109,7 @@ class Reposicion
      * separado. Sin stock viejo (o sin costo viejo) no hay nada que
      * promediar y manda el costo nuevo.
      */
-    public function costoResultante(string $politica, int $stockAntes, float $costoAntes, int $cantidad, float $costoNuevo): ?float
+    public function costoResultante(string $politica, float $stockAntes, float $costoAntes, float $cantidad, float $costoNuevo): ?float
     {
         if ($politica === self::MANTENER) {
             return null;

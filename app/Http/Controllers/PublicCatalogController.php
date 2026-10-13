@@ -44,7 +44,7 @@ class PublicCatalogController extends Controller
     private const COLUMNAS = [
         'id', 'user_id', 'name', 'description', 'item_type', 'service_duration', 'service_mode',
         'price_usdt', 'price_divisa_usdt', 'conditional_price', 'conditional_min_quantity',
-        'stock', 'por_llegar', 'last_units', 'image_path', 'show_variants_in_store', 'display_order',
+        'stock', 'unidad', 'por_llegar', 'last_units', 'image_path', 'show_variants_in_store', 'display_order',
     ];
 
     public function __construct(
@@ -334,6 +334,10 @@ class PublicCatalogController extends Controller
             'conditional_min_quantity' => $producto->conditional_min_quantity,
             // Un servicio no se agota: no tiene existencias que mostrar
             'stock' => $esServicio ? null : $producto->stock,
+            // Lo que se vende al peso o por metro lo dice en su precio y en
+            // sus existencias: «$12,00 / kg», «quedan 2,5 kg»
+            'unidad' => $esServicio ? null : $producto->unidad,
+            'unidadCorta' => $esServicio ? null : $producto->unidad_corta,
             'por_llegar' => ! $esServicio && $producto->por_llegar,
             'last_units' => ! $esServicio && $producto->last_units,
             'image_url' => $producto->image_url,

@@ -7,6 +7,7 @@ import { buildHaystack, fuzzySearchList } from '@/utils/fuzzySearch';
 import AgregadoRapido from '@/Components/AgregadoRapido';
 import { Banknote, CalendarClock } from 'lucide-react';
 import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
+import { ajustarCantidad, conUnidad, pasoDeCantidad, unidadCorta } from '@/utils/unidades';
 
 const PRICE_COLORS = {
     detal:        'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-900',
@@ -87,9 +88,38 @@ function getSuggestedPrice(producto, priceType, enDivisas = false) {
  * y, con el stock en cero que le toca por definición, no se podía ni
  * agregar a una factura.
  */
+/** Dónde se presta un servicio. Mismas claves que App\Models\Product. */
+const MODALIDADES_DE_SERVICIO = {
+    local: 'En el local',
+    domicilio: 'A domicilio',
+    remoto: 'En línea',
+    acordar: 'A convenir',
+};
+
 const esServicio = (producto) => producto?.es_servicio === true;
 
-const stockDisponible = (producto) => (esServicio(producto) ? Infinity : parseInt(producto?.stock) || 0);
+/**
+ * Las existencias no son enteras desde que se puede vender al peso: un queso
+ * de 2,5 kg se factura por su peso, no por piezas.
+ */
+const stockDisponible = (producto) => (esServicio(producto) ? Infinity : parseFloat(producto?.stock) || 0);
+
+/**
+ * Si el precio no necesita decir su unidad.
+ *
+ * «$14,00 / u» en cada renglón es ruido: lo normal es vender piezas. La
+ * unidad aparece cuando no es la de siempre, que es cuando hace falta.
+ */
+const porUnidadSuelta = (producto) => esServicio(producto) || (producto?.unidad ?? 'unidad') === 'unidad';
+
+/** Lo que dura y dónde se presta: de un servicio es lo que importa saber. */
+const detalleDeServicio = (producto) => {
+    if (!esServicio(producto)) {
+        return null;
+    }
+
+    return [producto.service_duration, MODALIDADES_DE_SERVICIO[producto.service_mode]].filter(Boolean).join(' · ') || null;
+};
 
 let _uid = 0;
 const uid = () => ++_uid;
@@ -194,8 +224,18 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
     // Productos filtrados por categoría y por búsqueda tolerante a errores
     // (acentos, letras cambiadas, palabras en otro orden). Al buscar manda la
     // relevancia; sin búsqueda, el orden elegido por fecha de alta.
+    /**
+     * Lo que se puede agregar, según la pestaña.
+     *
+     * Los servicios iban mezclados con los productos y se leían mal: entre
+     * cosas con existencias aparecía una que no las tiene, con su «Stock: 0»
+     * al lado. Van aparte, y la pestaña solo se ofrece si el comercio tiene.
+     */
+    const hayServicios = useMemo(() => productos.some(p => esServicio(p)), [productos]);
+
     const filteredProducts = useMemo(() => {
-        let list = productos;
+        let list = productos.filter(p => (activeTab === 'servicios' ? esServicio(p) : !esServicio(p)));
+
         if (selectedCategoryId) {
             list = list.filter(p =>
                 p.categories && p.categories.some(cat => cat.id === parseInt(selectedCategoryId))
@@ -205,7 +245,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
             return fuzzySearchList(deferredSearch, list, p => productHaystacks.get(p.id));
         }
         return ordenarPorAlta(list);
-    }, [deferredSearch, productos, selectedCategoryId, productHaystacks, productosOrden]);
+    }, [activeTab, deferredSearch, productos, selectedCategoryId, productHaystacks, productosOrden]);
 
     // Combos con el mismo criterio
     const filteredCombos = useMemo(() => {
@@ -220,7 +260,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
         const byProduct = new Map();
         const byCombo = new Map();
         items.forEach(i => {
-            const qty = parseInt(i.qty) || 0;
+            const qty = parseFloat(i.qty) || 0;
             if (i.product_id) byProduct.set(i.product_id, (byProduct.get(i.product_id) || 0) + qty);
             if (i.combo_id) byCombo.set(i.combo_id, Math.max(byCombo.get(i.combo_id) || 0, qty));
         });
@@ -230,14 +270,14 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
     const getItemMaxStock = (item) => {
         if (item.type === 'manual') return Infinity;
         if (item.type === 'combo') {
-            return item._combo ? (parseInt(item._combo.stock) || 0) : Infinity;
+            return item._combo ? (parseFloat(item._combo.stock) || 0) : Infinity;
         }
         if (item.type === 'product' || item.type === 'combo_product') {
             const product = item._producto;
             if (!product) return Infinity;
             if (product.variants && product.variants.length > 0 && item.product_variant_id) {
                 const variant = product.variants.find(v => v.id === item.product_variant_id);
-                return variant ? (parseInt(variant.stock) || 0) : 0;
+                return variant ? (parseFloat(variant.stock) || 0) : 0;
             }
             return stockDisponible(product);
         }
@@ -264,7 +304,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                 Swal.fire({
                     icon: 'warning',
                     title: 'Stock insuficiente',
-                    text: `No puedes agregar más de ${availableStock} unidades de "${producto.name}".`,
+                    text: `No puedes agregar más de ${conUnidad(availableStock, producto)} de "${producto.name}".`,
                     toast: true,
                     position: 'top-end',
                     timer: 2000,
@@ -516,7 +556,9 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
 
                     if (field === 'unit_price' || field === 'qty' || field === 'price_type' || field === 'product_variant_id') {
                         const price = field === 'unit_price' ? parseFloat(value) || 0 : parseFloat(updated.unit_price) || 0;
-                        let qty   = field === 'qty' ? (isNaN(parseInt(value)) ? 1 : parseInt(value)) : updated.qty;
+                        // La unidad manda: 2,5 kg sí, 2,5 cajas no
+                        const cruda = field === 'qty' ? parseFloat(value) : updated.qty;
+                        let qty   = field === 'qty' ? (isNaN(cruda) ? 1 : ajustarCantidad(cruda, updated._producto)) : updated.qty;
 
                         // Check stock limits on quantity change
                         if (field === 'qty') {
@@ -525,7 +567,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                 Swal.fire({
                                     icon: 'warning',
                                     title: 'Stock insuficiente',
-                                    text: `Solo quedan ${maxStock} unidades disponibles en stock de este producto/variante.`,
+                                    text: `Solo quedan ${conUnidad(maxStock, updated._producto)} de este producto.`,
                                     toast: true,
                                     position: 'top-end',
                                     timer: 3000,
@@ -544,7 +586,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                     Swal.fire({
                                         icon: 'warning',
                                         title: 'Stock insuficiente',
-                                        text: `La variante seleccionada solo tiene ${varStock} unidades disponibles. Se ajustó la cantidad.`,
+                                        text: `La variante seleccionada solo tiene ${varStock}. Se ajustó la cantidad.`,
                                         toast: true,
                                         position: 'top-end',
                                         timer: 3000,
@@ -714,7 +756,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                 price_type:         i.price_type,
                 unit_price_usd:     parseFloat(i.unit_price) || 0,
                 renueva_el:         i.renueva_el || null,
-                qty:                parseInt(i.qty) || 1,
+                qty:                parseFloat(i.qty) || 1,
             })),
             supplements: appliedSupplements.map(s => ({
                 supplement_id: s.id,
@@ -757,7 +799,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                     <svg className="w-5 h-5 text-marca-600 dark:text-marca-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                                     </svg>
-                                    {activeTab === 'productos' ? 'Agregar Producto' : 'Agregar Combo'}
+                                    {activeTab === 'combos' ? 'Agregar combo' : activeTab === 'servicios' ? 'Agregar servicio' : 'Agregar producto'}
                                 </h3>
 
                                 {/* Tab Selector */}
@@ -776,6 +818,22 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                     >
                                         Productos
                                     </button>
+                                    {hayServicios && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setActiveTab('servicios');
+                                                setSelectedCategoryId('');
+                                            }}
+                                            className={`flex-1 text-center py-1.5 text-xs font-bold rounded-lg transition-all ${
+                                                activeTab === 'servicios'
+                                                    ? 'bg-white dark:bg-stone-900 text-marca-700 dark:text-marca-400 shadow-sm border border-stone-200 dark:border-stone-800'
+                                                    : 'text-stone-400 dark:text-stone-500 hover:text-stone-600 dark:hover:text-stone-300'
+                                            }`}
+                                        >
+                                            Servicios
+                                        </button>
+                                    )}
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -795,7 +853,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                 <div className="relative mb-3">
                                     <input
                                         type="text"
-                                        placeholder={activeTab === 'productos' ? "Buscar producto..." : "Buscar combo..."}
+                                        placeholder={activeTab === 'combos' ? 'Buscar combo...' : activeTab === 'servicios' ? 'Buscar servicio...' : 'Buscar producto...'}
                                         value={search}
                                         onChange={e => setSearch(e.target.value)}
                                         className="w-full pl-9 pr-3 py-2.5 border border-stone-200 dark:border-stone-800 rounded-xl text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
@@ -805,7 +863,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                     </svg>
                                 </div>
 
-                                {activeTab === 'productos' && categorias && categorias.length > 0 && (
+                                {activeTab !== 'combos' && categorias && categorias.length > 0 && (
                                     <div className="mb-3">
                                         <select
                                             value={selectedCategoryId}
@@ -823,9 +881,11 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                 {/* Cuántos hay y en qué orden se están mostrando */}
                                 <div className="flex items-center justify-between gap-2 mb-2">
                                     <span className="text-[10px] font-bold text-stone-400 dark:text-stone-500 uppercase tracking-wider">
-                                        {activeTab === 'productos'
-                                            ? `${filteredProducts.length} producto${filteredProducts.length === 1 ? '' : 's'}`
-                                            : `${filteredCombos.length} combo${filteredCombos.length === 1 ? '' : 's'}`}
+                                        {activeTab === 'combos'
+                                            ? `${filteredCombos.length} combo${filteredCombos.length === 1 ? '' : 's'}`
+                                            : activeTab === 'servicios'
+                                              ? `${filteredProducts.length} servicio${filteredProducts.length === 1 ? '' : 's'}`
+                                              : `${filteredProducts.length} producto${filteredProducts.length === 1 ? '' : 's'}`}
                                     </span>
 
                                     {search.trim() ? (
@@ -847,7 +907,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                 </div>
 
                                 <div className="space-y-2 max-h-[480px] overflow-y-auto overscroll-contain pr-1 scrollbar-slim">
-                                    {activeTab === 'productos' ? (
+                                    {activeTab !== 'combos' ? (
                                         <>
                                             {filteredProducts.map(p => {
                                                 const inCart = cartCounts.byProduct.get(p.id) || 0;
@@ -882,8 +942,12 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-sm font-semibold text-stone-800 dark:text-stone-200 truncate group-hover:text-marca-800 dark:group-hover:text-marca-300">{p.name}</p>
                                                         <p className="text-xs text-stone-500 dark:text-stone-400 mt-0.5">
-                                                            {p.price_usdt ? `$${parseFloat(p.price_usdt).toFixed(2)}` : 'A consultar'}
-                                                        {esServicio(p) ? ' · Servicio' : ` · Stock: ${p.stock}`}
+                                                            {p.price_usdt
+                                                                ? `$${parseFloat(p.price_usdt).toFixed(2)}${porUnidadSuelta(p) ? '' : ` / ${unidadCorta(p)}`}`
+                                                                : 'A consultar'}
+                                                            {esServicio(p)
+                                                                ? ` · ${detalleDeServicio(p) ?? 'Servicio'}`
+                                                                : ` · Quedan ${conUnidad(p.stock, p)}`}
                                                         </p>
                                                         {inCart > 0 && (
                                                             <p className="text-[10px] font-bold text-marca-700 dark:text-marca-400 mt-0.5">{inCart} en la factura</p>
@@ -896,7 +960,9 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                 );
                                             })}
                                             {filteredProducts.length === 0 && (
-                                                <p className="text-center text-sm text-stone-400 dark:text-stone-500 py-6">No se encontraron productos</p>
+                                                <p className="text-center text-sm text-stone-400 dark:text-stone-500 py-6">
+                                                    {activeTab === 'servicios' ? 'No se encontraron servicios' : 'No se encontraron productos'}
+                                                </p>
                                             )}
                                         </>
                                     ) : (
@@ -1265,7 +1331,21 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                             <img src={`/storage/${item.product_image_path}`} alt="" className="w-8 h-8 rounded-lg object-cover flex-shrink-0"/>
                                                                         )}
                                                                         <span className="text-sm font-semibold text-stone-800 dark:text-stone-200">{item.product_name}</span>
+                                                                        {esServicio(item._producto) && (
+                                                                            <span className="shrink-0 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-sky-800 dark:bg-sky-950 dark:text-sky-300">
+                                                                                Servicio
+                                                                            </span>
+                                                                        )}
                                                                     </div>
+
+                                                                    {/* De un servicio importa lo que dura y dónde se presta,
+                                                                        no cuántas quedan en el depósito */}
+                                                                    {detalleDeServicio(item._producto) && (
+                                                                        <p className="mt-1 flex items-center gap-1.5 text-[11px] text-stone-500 dark:text-stone-400">
+                                                                            <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                                                                            {detalleDeServicio(item._producto)}
+                                                                        </p>
+                                                                    )}
                                                                     
                                                                     {/* LISTA DE VARIANTES AGRUPADAS */}
                                                                     {isGroup && (
@@ -1301,7 +1381,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                             min={getItemMaxStock(v) === 0 ? "0" : "1"}
                                                                                             value={v.qty}
                                                                                             onChange={e => {
-                                                                                                const val = parseInt(e.target.value);
+                                                                                                const val = parseFloat(e.target.value);
                                                                                                 const minVal = getItemMaxStock(v) === 0 ? 0 : 1;
                                                                                                 updateItem(v._uid, 'qty', isNaN(val) ? minVal : val);
                                                                                             }}
@@ -1409,7 +1489,9 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                 }}
                                                                                 className="w-24 border border-stone-200 dark:border-stone-800 rounded-lg px-2.5 py-1.5 text-sm font-mono text-right focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
                                                                             />
-                                                                            <span className="text-xs text-stone-400 dark:text-stone-500">/u</span>
+                                                                            <span className="text-xs text-stone-400 dark:text-stone-500">
+                                                                {esServicio(item._producto) ? '' : `/${unidadCorta(item._producto)}`}
+                                                            </span>
                                                                         </div>
 
                                                                         {/* Cantidad (SÓLO SI NO ES GRUPO) */}
@@ -1419,7 +1501,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                 <div className="flex items-center border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden">
                                                                                     <button
                                                                                         onClick={() => {
-                                                                                            const minVal = getItemMaxStock(item) === 0 ? 0 : 1;
+                                                                                            const minVal = getItemMaxStock(item) === 0 ? 0 : pasoDeCantidad(item._producto);
                                                                                             updateItem(item._uid, 'qty', Math.max(minVal, item.qty - 1));
                                                                                         }}
                                                                                         className="px-2.5 py-1.5 text-sm font-bold text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
@@ -1427,14 +1509,15 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                     >−</button>
                                                                                     <input
                                                                                         type="number"
-                                                                                        min={getItemMaxStock(item) === 0 ? "0" : "1"}
+                                                                                        min={getItemMaxStock(item) === 0 ? 0 : pasoDeCantidad(item._producto)}
+                                                                                        step={pasoDeCantidad(item._producto)}
                                                                                         value={item.qty}
                                                                                         onChange={e => {
-                                                                                            const val = parseInt(e.target.value);
-                                                                                            const minVal = getItemMaxStock(item) === 0 ? 0 : 1;
+                                                                                            const val = parseFloat(e.target.value);
+                                                                                            const minVal = getItemMaxStock(item) === 0 ? 0 : pasoDeCantidad(item._producto);
                                                                                             updateItem(item._uid, 'qty', isNaN(val) ? minVal : val);
                                                                                         }}
-                                                                                        className="w-16 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none"
+                                                                                        className="w-20 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none"
                                                                                     />
                                                                                     <button
                                                                                         onClick={() => updateItem(item._uid, 'qty', item.qty + 1)}
@@ -1442,6 +1525,11 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                         type="button"
                                                                                     >+</button>
                                                                                 </div>
+                                                                                {!esServicio(item._producto) && !item.combo_id && (
+                                                                                    <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
+                                                                                        {unidadCorta(item._producto)}
+                                                                                    </span>
+                                                                                )}
                                                                             </div>
                                                                         )}
                                                                         <RenovacionDelRenglon item={item} onCambiar={updateItem} />

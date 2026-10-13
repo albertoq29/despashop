@@ -139,6 +139,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                             <>
                                 <p className={`mt-1 ${ESTILO_PRECIO[theme.price_style] ?? ESTILO_PRECIO.normal}`}>
                                     ${Number(precio).toFixed(2)}
+                                    <PorUnidad articulo={articulo} />
                                 </p>
                                 <PromoEnDivisas articulo={articulo} className="mt-1" />
                                 <PreciosPorVolumen articulo={articulo} />
@@ -210,6 +211,7 @@ export function Tarjeta({ articulo, indice = 0, enFila = false }) {
                                 <div className="flex flex-wrap items-baseline gap-x-2">
                                     <p className={ESTILO_PRECIO[theme.price_style] ?? ESTILO_PRECIO.normal} style={{ color: 'var(--cat-primario)' }}>
                                         ${Number(precio).toFixed(2)}
+                                        <PorUnidad articulo={articulo} />
                                     </p>
                                     {theme.show_bs_prices && bcvRate > 1 && (
                                         <p className="text-xs" style={{ color: 'var(--cat-tenue)' }}>
@@ -355,6 +357,25 @@ function FlechaFila({ direccion, onClick }) {
         >
             <Icono className="h-5 w-5" />
         </button>
+    );
+}
+
+/**
+ * «/ kg», «/ L»: la unidad al lado del precio.
+ *
+ * Solo cuando no es la de siempre. Poner «/ u» en cada precio de un
+ * catálogo que vende piezas es ruido; no ponerlo en uno que vende al peso
+ * deja al cliente sin saber qué está pagando.
+ */
+function PorUnidad({ articulo }) {
+    if (!articulo.unidadCorta || articulo.unidadCorta === 'u') {
+        return null;
+    }
+
+    return (
+        <span className="ml-1 text-xs font-medium" style={{ color: 'var(--cat-tenue)' }}>
+            / {articulo.unidadCorta}
+        </span>
     );
 }
 

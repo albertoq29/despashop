@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Concerns\GestionaArchivos;
+use App\Support\UnidadesDeMedida;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use App\Support\Archivos;
@@ -60,6 +61,7 @@ class Product extends Model
         'cost_price',
         'inversion_historica',
         'stock',
+        'unidad',
         'image_path',
         'category_id',
         'conditional_price',
@@ -80,6 +82,7 @@ class Product extends Model
         'last_units'             => 'boolean',
         'es_suscripcion'         => 'boolean',
         'inversion_historica'    => 'float',
+        'stock'                  => 'float',
     ];
 
     /**
@@ -104,7 +107,7 @@ class Product extends Model
         'anual' => 12,
     ];
 
-    protected $appends = ['image_url', 'thumb_url', 'price_bs', 'price_mayor_bs', 'price_distribuidor_bs', 'price_ref', 'conditional_price_bs'];
+    protected $appends = ['image_url', 'thumb_url', 'price_bs', 'price_mayor_bs', 'price_distribuidor_bs', 'price_ref', 'conditional_price_bs', 'unidad_corta', 'admite_fraccion'];
 
     public function getImageUrlAttribute()
     {
@@ -180,6 +183,32 @@ class Product extends Model
     }
 
     // ── Suscripciones ──────────────────────────────────────────────────────────
+
+    /* ── Unidad de medida ───────────────────────────────────────────────── */
+
+    /** La abreviatura que acompaña a los números: «kg», «L», «u». */
+    public function getUnidadCortaAttribute(): string
+    {
+        return UnidadesDeMedida::de($this->unidad)['corto'];
+    }
+
+    /** Si se puede vender una parte: medio kilo sí, media caja no. */
+    public function getAdmiteFraccionAttribute(): bool
+    {
+        return UnidadesDeMedida::admiteFraccion($this->unidad);
+    }
+
+    /** Se vende de a piezas enteras, que es el caso de siempre. */
+    public function sePorUnidad(): bool
+    {
+        return UnidadesDeMedida::normalizar($this->unidad) === UnidadesDeMedida::POR_DEFECTO;
+    }
+
+    /** Las existencias como se leen: «2,5 kg», «12 u». */
+    public function existenciaLegible(): string
+    {
+        return UnidadesDeMedida::formatear($this->stock, $this->unidad);
+    }
 
     /** Un servicio por suscripción tiene período; sin él no se puede renovar. */
     public function esSuscripcion(): bool
