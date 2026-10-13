@@ -799,8 +799,17 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                 Swal.fire({ icon: 'warning', title: 'Nombre vacío', text: 'Todos los items deben tener nombre.' });
                 return;
             }
-            if (item.qty < 1) {
-                Swal.fire({ icon: 'warning', title: 'Cantidad inválida', text: 'La cantidad debe ser al menos 1.' });
+            // El mínimo lo pone la unidad: 0,25 kg se factura, 0,25 cajas no
+            const minimo = pasoDeCantidad(item._producto);
+
+            if (!(item.qty >= minimo)) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Cantidad inválida',
+                    text: minimo < 1
+                        ? `La cantidad de "${item.product_name}" tiene que ser mayor que cero.`
+                        : `La cantidad de "${item.product_name}" debe ser al menos 1.`,
+                });
                 return;
             }
             if (item.unit_price < 0) {

@@ -208,6 +208,35 @@ class UnidadesDeMedidaTest extends TestCase
         $this->assertSame(2.0, $this->comoTenant(fn () => Factura::sole()->items->sole())->qty);
     }
 
+    /**
+     * Lo reporto el comercio: al facturar kilos salía «la cantidad debe ser
+     * al menos 1». Menos de un kilo es una venta normal.
+     */
+    public function test_menos_de_una_unidad_se_factura_si_la_unidad_se_parte(): void
+    {
+        $producto = $this->productoAlPeso();
+
+        $this->facturar($producto, '0.35')->assertSessionHasNoErrors();
+
+        $item = $this->comoTenant(fn () => Factura::sole()->items->sole());
+
+        $this->assertSame(0.35, $item->qty);
+        $this->assertSame(3.15, (float) $item->subtotal_usd);
+    }
+
+    /**
+     * Y al contrario: 0,4 cajas se redondeaba a 0 y el renglón quedaba en
+     * nada, cobrando cero por algo que sí se entregó.
+     */
+    public function test_una_cantidad_menor_que_una_pieza_no_queda_en_cero(): void
+    {
+        $producto = $this->productoAlPeso(['unidad' => 'caja', 'name' => 'Cerveza']);
+
+        $this->facturar($producto, '0.4')->assertSessionHasNoErrors();
+
+        $this->assertSame(1.0, $this->comoTenant(fn () => Factura::sole()->items->sole())->qty);
+    }
+
     public function test_confirmar_descuenta_las_existencias_con_decimales(): void
     {
         $producto = $this->productoAlPeso();

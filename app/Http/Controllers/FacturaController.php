@@ -828,10 +828,11 @@ class FacturaController extends Controller
     {
         $cantidad = max(0, (float) $valor);
 
-        if ($producto === null) {
-            return round($cantidad, 3);
+        if ($producto === null || UnidadesDeMedida::admiteFraccion($producto->unidad)) {
+            return max(0.001, round($cantidad, 3));
         }
 
-        return UnidadesDeMedida::admiteFraccion($producto->unidad) ? round($cantidad, 3) : round($cantidad);
+        // Al redondear, 0,4 cajas daban 0 y el renglón quedaba en nada
+        return max(1, round($cantidad));
     }
 }

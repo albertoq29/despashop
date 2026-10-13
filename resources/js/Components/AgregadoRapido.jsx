@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { ajustarCantidad, pasoDeCantidad } from '@/utils/unidades';
 import { fuzzyCandidates, matchConfidence } from '@/utils/fuzzySearch';
 
 /**
@@ -82,26 +83,39 @@ export function parsearLinea(raw) {
     texto = texto.replace(/\s*[-–—·|]*\s*(us\$|\$|bs\.?)\s*[\d.,]+$/i, '').trim();
     if (!texto) return { ignorada: true };
 
+    // La cantidad admite decimales porque hay cosas que se venden al peso:
+    // «Queso llanero - 2,5» es una linea normal en una charcuteria. Si el
+    // producto resulta medirse en piezas, se redondea al revisar la lista.
     let qty = 1;
     let m;
-    if ((m = texto.match(/^(\d{1,2})\s*[x*]?\s+(.{2,})$/i))) {
-        qty = parseInt(m[1], 10);
+    if ((m = texto.match(/^(\d{1,2}(?:[.,]\d{1,3})?)\s*[x*]?\s+(.{2,})$/i))) {
+        qty = aNumero(m[1]);
         texto = m[2];
-    } else if ((m = texto.match(/^(.{2,}?)\s*[x*]\s*(\d{1,3})$/i))) {
+    } else if ((m = texto.match(/^(.{2,}?)\s*[x*]\s*(\d{1,3}(?:[.,]\d{1,3})?)$/i))) {
         texto = m[1];
-        qty = parseInt(m[2], 10);
-    } else if ((m = texto.match(/^(.{2,}?)\s*[-–:]\s*(\d{1,3})$/))) {
+        qty = aNumero(m[2]);
+    } else if ((m = texto.match(/^(.{2,}?)\s*[-–:]\s*(\d{1,3}(?:[.,]\d{1,3})?)$/))) {
         texto = m[1];
-        qty = parseInt(m[2], 10);
-    } else if ((m = texto.match(/^(.{2,}?)\s*\((\d{1,3})\)$/))) {
+        qty = aNumero(m[2]);
+    } else if ((m = texto.match(/^(.{2,}?)\s*\((\d{1,3}(?:[.,]\d{1,3})?)\)$/))) {
         texto = m[1];
-        qty = parseInt(m[2], 10);
+        qty = aNumero(m[2]);
     }
 
     texto = texto.trim().replace(/[,;.]+$/, '').trim();
     if (texto.length < 2) return { ignorada: true };
 
-    return { texto, qty: Math.min(999, Math.max(1, qty || 1)) };
+    return { texto, qty: Math.min(999, Math.max(0.001, qty || 1)) };
+}
+
+/** Una cantidad escrita a la venezolana: «2,5» es dos y medio. */
+function aNumero(texto) {
+    return parseFloat(String(texto).replace(',', '.'));
+}
+
+/** Lo que admite la unidad del producto; sin producto, lo que se escribio. */
+function redondear(cantidad, producto) {
+    return producto ? ajustarCantidad(cantidad, producto) : Math.round(cantidad * 1000) / 1000;
 }
 
 export default function AgregadoRapido({ productos = [], haystacks, onAgregar }) {
@@ -339,7 +353,8 @@ export default function AgregadoRapido({ productos = [], haystacks, onAgregar })
 
                                     {filas.map(fila => {
                                         const producto = fila.productoId !== '' ? productosPorId.get(fila.productoId) : null;
-                                        const stock = producto ? (parseInt(producto.stock) || 0) : 0;
+                                        const stock = producto ? (parseFloat(producto.stock) || 0) : 0;
+                                        const paso = pasoDeCantidad(producto);
                                         const elegido = fila.candidatos.find(c => c.item.id === fila.productoId);
                                         const nivel = producto
                                             ? (elegido ? matchConfidence(elegido.score) : 'exacta')
@@ -440,22 +455,23 @@ export default function AgregadoRapido({ productos = [], haystacks, onAgregar })
                                                     <div className="flex items-center border border-stone-200 dark:border-stone-800 rounded-lg overflow-hidden flex-shrink-0">
                                                         <button
                                                             type="button"
-                                                            onClick={() => actualizarFila(fila.id, { qty: Math.max(1, fila.qty - 1) })}
+                                                            onClick={() => actualizarFila(fila.id, { qty: Math.max(paso, redondear(fila.qty - 1, producto)) })}
                                                             className="px-2.5 py-1.5 text-sm font-bold text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                                                         >−</button>
                                                         <input
                                                             type="number"
-                                                            min="1"
+                                                            min={paso}
+                                                            step={paso}
                                                             value={fila.qty}
                                                             onChange={e => {
-                                                                const v = parseInt(e.target.value, 10);
-                                                                actualizarFila(fila.id, { qty: isNaN(v) ? 1 : Math.max(1, v) });
+                                                                const v = parseFloat(e.target.value);
+                                                                actualizarFila(fila.id, { qty: isNaN(v) ? paso : Math.max(paso, redondear(v, producto)) });
                                                             }}
-                                                            className="w-14 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none"
+                                                            className="w-16 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none"
                                                         />
                                                         <button
                                                             type="button"
-                                                            onClick={() => actualizarFila(fila.id, { qty: fila.qty + 1 })}
+                                                            onClick={() => actualizarFila(fila.id, { qty: redondear(fila.qty + 1, producto) })}
                                                             className="px-2.5 py-1.5 text-sm font-bold text-stone-600 dark:text-stone-400 hover:bg-stone-100 dark:hover:bg-stone-800 transition-colors"
                                                         >+</button>
                                                     </div>
