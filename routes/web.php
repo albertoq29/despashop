@@ -20,6 +20,7 @@ use App\Http\Controllers\ExchangeRateController;
 use App\Http\Controllers\ExportacionController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\InvoiceTemplateController;
+use App\Http\Controllers\ImportacionController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\SeoController;
 use App\Http\Controllers\LegalController;
@@ -142,6 +143,12 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
 
     Route::post('productos/reorder', [ProductController::class, 'reorder'])->name('productos.reorder');
     Route::get('productos/reordenar', [ProductController::class, 'reorderPage'])->name('productos.reorder-page');
+
+    // Traer el inventario desde una hoja de cálculo. El archivo lo lee el
+    // navegador; aquí llegan las filas y la correspondencia de columnas.
+    Route::get('productos/importar', [ImportacionController::class, 'create'])->name('productos.importar');
+    Route::post('productos/importar/analizar', [ImportacionController::class, 'analizar'])->name('productos.importar.analizar');
+    Route::post('productos/importar', [ImportacionController::class, 'store'])->name('productos.importar.store');
 
     Route::patch('fichero-fotos/{foto}', [PrivatePhotoController::class, 'update'])->name('fichero-fotos.update');
     Route::delete('fichero-fotos/{foto}', [PrivatePhotoController::class, 'destroy'])->name('fichero-fotos.destroy');

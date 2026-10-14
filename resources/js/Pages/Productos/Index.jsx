@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import Modal from '@/Components/Modal';
 import { Interruptor } from '@/Components/UI';
 import InputLabel from '@/Components/InputLabel';
@@ -9,7 +9,7 @@ import InputError from '@/Components/InputError';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import Swal from 'sweetalert2';
-import { Banknote } from 'lucide-react';
+import { Banknote, FileSpreadsheet } from 'lucide-react';
 import { hoyLocal } from '@/utils/fechas';
 import NombreDelPrecio from '@/Components/NombreDelPrecio';
 import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
@@ -501,6 +501,13 @@ export default function Index({ auth, productos, categories, unidades }) {
                                 <SecondaryButton onClick={() => router.visit(route('productos.reorder-page'))} className="w-full sm:w-auto justify-center flex items-center gap-1.5">
                                     <span>↕️ Ordenar Catálogo</span>
                                 </SecondaryButton>
+                                <Link
+                                    href={route('productos.importar')}
+                                    className="pulsable inline-flex w-full items-center justify-center gap-1.5 rounded-md border border-stone-300 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-stone-700 hover:bg-stone-50 dark:border-stone-700 dark:text-stone-200 dark:hover:bg-stone-800 sm:w-auto"
+                                >
+                                    <FileSpreadsheet className="h-4 w-4" />
+                                    Importar Excel
+                                </Link>
                                 <PrimaryButton onClick={openCreate} className="w-full sm:w-auto justify-center">+ Nuevo</PrimaryButton>
                             </div>
                         </div>
