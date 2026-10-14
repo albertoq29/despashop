@@ -55,8 +55,8 @@ class ColumnasDeImportacion
             'nombre' => 'Costo',
             'ayuda' => 'Lo que te cuesta a ti. No se publica.',
             'sinonimos' => [
-                'costo', 'costo unitario', 'costo compra', 'precio de compra', 'precio compra',
-                'compra', 'cost', 'cost price', 'unit cost', 'inversion',
+                'costo', 'costo unitario', 'costo compra', 'costo promedio', 'precio de compra',
+                'precio compra', 'cost', 'cost price', 'unit cost', 'inversion',
             ],
         ],
         'precio' => [
@@ -65,7 +65,7 @@ class ColumnasDeImportacion
             'sinonimos' => [
                 'precio', 'precio detal', 'precio al detal', 'precio de venta', 'precio venta',
                 'precio unitario', 'precio publico', 'pvp', 'p v p', 'venta', 'valor',
-                'price', 'retail', 'retail price', 'sale price', 'precio 1',
+                'price', 'retail', 'retail price', 'sale price', 'precio 1', 'p vta', 'pv',
             ],
         ],
         'existencias' => [
@@ -74,6 +74,7 @@ class ColumnasDeImportacion
             'sinonimos' => [
                 'existencias', 'existencia', 'stock', 'cantidad', 'cantidad disponible', 'disponible',
                 'inventario', 'unidades', 'saldo', 'qty', 'quantity', 'on hand', 'stock actual',
+                'ctd', 'cdad', 'cant', 'exist',
             ],
         ],
         'unidad' => [
@@ -81,7 +82,7 @@ class ColumnasDeImportacion
             'ayuda' => 'Kg, litros, cajas… Si no viene, se cuenta por unidades.',
             'sinonimos' => [
                 'unidad', 'unidad de medida', 'medida', 'um', 'u m', 'uom', 'unit', 'unit of measure',
-                'presentacion',
+                'presentacion', 'ud', 'unid',
             ],
         ],
         'categorias' => [
@@ -90,6 +91,9 @@ class ColumnasDeImportacion
             'sinonimos' => [
                 'categoria', 'categorias', 'rubro', 'rubros', 'linea', 'familia', 'grupo',
                 'departamento', 'seccion', 'category', 'categories', 'department', 'tipo de producto',
+                // Contracciones: no se deducen solas porque no empiezan
+                // igual que la palabra entera
+                'depto', 'dpto', 'dep', 'categ', 'cat',
             ],
         ],
         'descripcion' => [
@@ -97,7 +101,7 @@ class ColumnasDeImportacion
             'ayuda' => 'La que se ve en tu catálogo.',
             'sinonimos' => [
                 'descripcion', 'descripcion larga', 'detalle', 'detalles', 'description',
-                'caracteristicas', 'especificaciones', 'contenido',
+                'caracteristicas', 'especificaciones', 'contenido', 'descrip', 'desc',
             ],
         ],
         'tipo' => [
@@ -110,7 +114,7 @@ class ColumnasDeImportacion
             'ayuda' => 'Solo las ves tú.',
             'sinonimos' => [
                 'notas', 'nota', 'notas internas', 'observaciones', 'observacion', 'comentarios',
-                'notes', 'internal notes', 'remarks',
+                'notes', 'internal notes', 'remarks', 'obs',
             ],
         ],
         'oculto' => [
@@ -157,6 +161,24 @@ class ColumnasDeImportacion
         }
 
         // Segunda pasada, más laxa: «precio (usd)» o «nombre del producto*»
+        $sugerencia = self::buscar($sugerencia, $tomadas, $normalizados, 'contiene');
+
+        // Tercera: abreviaturas. Nadie escribe «existencias» completo en una
+        // hoja de cálculo; escribe «EXIST.», «DEPTO.» u «OBSERVAC.», y ahí
+        // el encabezado es más corto que la palabra, no más largo.
+        return self::buscar($sugerencia, $tomadas, $normalizados, 'abrevia');
+    }
+
+    /**
+     * Una pasada de búsqueda sobre los campos que todavía no tienen columna.
+     *
+     * @param  array<string, int>  $sugerencia
+     * @param  list<int>  $tomadas
+     * @param  list<string>  $normalizados
+     * @return array<string, int>
+     */
+    private static function buscar(array $sugerencia, array &$tomadas, array $normalizados, string $modo): array
+    {
         foreach (self::CAMPOS as $campo => $definicion) {
             if (isset($sugerencia[$campo])) {
                 continue;
@@ -168,7 +190,13 @@ class ColumnasDeImportacion
                         continue;
                     }
 
-                    if (str_contains($encabezado, $sinonimo)) {
+                    // Cuatro letras como mínimo para abreviar: con menos, una
+                    // columna llamada «U» o «P» se llevaría cualquier cosa.
+                    $coincide = $modo === 'contiene'
+                        ? str_contains($encabezado, $sinonimo)
+                        : mb_strlen($encabezado) >= 4 && str_starts_with($sinonimo, $encabezado);
+
+                    if ($coincide) {
                         $sugerencia[$campo] = $indice;
                         $tomadas[] = $indice;
 

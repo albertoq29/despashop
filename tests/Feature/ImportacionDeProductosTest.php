@@ -108,6 +108,55 @@ class ImportacionDeProductosTest extends TestCase
         $this->assertSame(1, $sugerencia['precio_mayor']);
     }
 
+    /**
+     * Nadie escribe «existencias» completo en una hoja de cálculo. Escribe
+     * «EXIST.», y perder esa columna deja todo el inventario en cero.
+     */
+    public function test_reconoce_las_abreviaturas_de_una_hoja_de_contador(): void
+    {
+        $sugerencia = ColumnasDeImportacion::sugerir([
+            'COD.', 'DENOMINACION DEL RENGLON', 'DEPTO.', 'EXIST.', 'MEDIDA',
+            'COSTO PROM. (US$)', 'P.V.P.', 'P. MAYOREO', 'OBSERVAC.', 'PROVEEDOR',
+        ]);
+
+        $this->assertSame(1, $sugerencia['nombre']);
+        $this->assertSame(2, $sugerencia['categorias']);
+        $this->assertSame(3, $sugerencia['existencias']);
+        $this->assertSame(4, $sugerencia['unidad']);
+        $this->assertSame(5, $sugerencia['costo']);
+        $this->assertSame(6, $sugerencia['precio']);
+        $this->assertSame(7, $sugerencia['precio_mayor']);
+        $this->assertSame(8, $sugerencia['notas']);
+
+        // Lo que no tiene dónde ir se queda fuera, no se inventa un destino
+        $this->assertNotContains(0, $sugerencia);
+        $this->assertNotContains(9, $sugerencia);
+    }
+
+    /**
+     * «Precio de compra» es el costo, pero «última compra» es una fecha.
+     * Leerla como dinero convierte un 12/09/2026 en doce millones.
+     */
+    public function test_una_fecha_de_compra_no_se_confunde_con_el_costo(): void
+    {
+        $sugerencia = ColumnasDeImportacion::sugerir(['Producto', 'ULT. COMPRA', 'Precio']);
+
+        $this->assertArrayNotHasKey('costo', $sugerencia);
+    }
+
+    /**
+     * Con menos de cuatro letras, una columna llamada «U» o «P» se llevaría
+     * cualquier cosa por parecerse al principio de una palabra.
+     */
+    public function test_una_abreviatura_de_dos_letras_no_se_lleva_nada(): void
+    {
+        $sugerencia = ColumnasDeImportacion::sugerir(['Nombre', 'N', 'P', 'XX']);
+
+        $this->assertSame(0, $sugerencia['nombre']);
+        $this->assertArrayNotHasKey('precio', $sugerencia);
+        $this->assertArrayNotHasKey('notas', $sugerencia);
+    }
+
     public function test_una_columna_no_se_asigna_a_dos_campos(): void
     {
         $sugerencia = ColumnasDeImportacion::sugerir(['Producto', 'Articulo', 'Precio']);

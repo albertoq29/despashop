@@ -37,3 +37,8 @@ yarn-error.log
 
 # Volcados que deja grep al caerse en Windows
 *.stackdump
+
+# El historial de la consola: no es del proyecto y a veces arrastra
+# comandos de otros, con sus rutas y sus variables.
+.bash_history
+.zsh_history
