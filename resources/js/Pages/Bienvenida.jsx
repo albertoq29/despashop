@@ -221,17 +221,13 @@ function Portada({ ajustes, registroAbierto, auth }) {
                     )}
                 </div>
 
-                {/* El visual va desplazado y recortado: rompe la simetría del bloque */}
+                {/* Lo que se vende es el catálogo, así que lo que se enseña es
+                    el catálogo. Antes había una foto de archivo que no era de
+                    esto: además de no decir nada, era una llamada a otro
+                    servidor justo en lo primero que pinta la página. */}
                 <figure className="relative animate-aparecer [animation-delay:120ms]">
-                    <div className="overflow-hidden rounded-2xl border border-stone-200 bg-stone-100 dark:border-stone-800 dark:bg-stone-900">
-                        <img
-                            src="https://picsum.photos/seed/catalogizador-mostrador-tienda/1200/1000"
-                            alt="Comerciante atendiendo en el mostrador de su tienda"
-                            width={1200}
-                            height={1000}
-                            className="aspect-[6/5] w-full object-cover"
-                            loading="eager"
-                        />
+                    <div className="rounded-2xl border border-stone-200 bg-stone-100 p-4 dark:border-stone-800 dark:bg-stone-900 sm:p-5">
+                        <VistaDelCatalogo />
                     </div>
 
                     <figcaption className="absolute -bottom-5 left-5 right-12 rounded-xl border border-stone-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-stone-800 dark:bg-stone-900/95 sm:right-16">
@@ -410,16 +406,10 @@ function Capacidades() {
                 </h2>
 
                 <div className="mt-12 grid gap-4 md:grid-cols-6">
-                    {/* Celda ancha con imagen real */}
+                    {/* La celda ancha enseña de lo que habla: un logo y los
+                        colores que saca de él */}
                     <article className="revelar group relative col-span-full overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800 md:col-span-4 md:row-span-2">
-                        <img
-                            src="https://picsum.photos/seed/catalogizador-productos-estante/1000/620"
-                            alt="Productos ordenados en los estantes de una tienda"
-                            width={1000}
-                            height={620}
-                            loading="lazy"
-                            className="h-56 w-full object-cover transition-transform duration-500 ease-salida group-hover:scale-[1.03] md:h-72"
-                        />
+                        <DelLogoAlColor />
 
                         <div className="bg-white p-7 dark:bg-stone-900">
                             <Etiqueta Icono={Palette} />
@@ -553,15 +543,8 @@ function Facturacion() {
                 ref={contenedor}
                 className="mx-auto grid max-w-6xl items-center gap-12 px-5 py-20 lg:grid-cols-2 lg:gap-16 lg:py-28"
             >
-                <figure className="revelar order-last overflow-hidden rounded-2xl border border-stone-200 dark:border-stone-800 lg:order-first">
-                    <img
-                        src="https://picsum.photos/seed/catalogizador-factura-escritorio/1000/750"
-                        alt="Facturas y papeles sobre el escritorio de un negocio"
-                        width={1000}
-                        height={750}
-                        loading="lazy"
-                        className="aspect-[4/3] w-full object-cover"
-                    />
+                <figure className="revelar order-last overflow-hidden rounded-2xl border border-stone-200 bg-stone-100 p-5 dark:border-stone-800 dark:bg-stone-900 lg:order-first sm:p-8">
+                    <VistaDeLaFactura />
                 </figure>
 
                 <div className="revelar">
@@ -852,3 +835,156 @@ function periodo(facturacion) {
         }[facturacion] ?? ''
     );
 }
+
+/* ── Lo que se enseña en la portada y en las secciones ────────────── */
+
+/**
+ * Un catálogo de mentira, dibujado con marcado.
+ *
+ * Aquí había una foto de archivo de un servicio externo. No enseñaba el
+ * producto, se la pedía a otro servidor en lo primero que pinta la página y
+ * su texto alternativo describía algo que no estaba en la imagen. Esto pesa
+ * nada, carga con la página y sí enseña lo que el comercio va a tener.
+ */
+function VistaDelCatalogo() {
+    return (
+        <div className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-950">
+            {/* Cabecera del catálogo */}
+            <div className="flex items-center gap-2.5 border-b border-stone-200 bg-marca-700 px-4 py-3 dark:border-stone-800 dark:bg-marca-800">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/15 text-xs font-bold text-white">
+                    T
+                </span>
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-white">Tu negocio</span>
+                    <span className="block truncate text-[11px] text-white/70">Abierto hoy</span>
+                </span>
+                <span className="shrink-0 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold text-white">
+                    WhatsApp
+                </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 p-3 sm:gap-4 sm:p-4">
+                {ARTICULOS_DE_MUESTRA.map((articulo) => (
+                    <div
+                        key={articulo.nombre}
+                        className="overflow-hidden rounded-xl border border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900"
+                    >
+                        <div
+                            aria-hidden="true"
+                            className="h-16 w-full sm:h-20"
+                            style={{ background: articulo.fondo }}
+                        />
+                        <div className="p-2.5">
+                            <p className="truncate text-xs font-semibold text-stone-800 dark:text-stone-100">
+                                {articulo.nombre}
+                            </p>
+                            <p className="mt-1 flex items-baseline gap-1.5">
+                                <span className="text-sm font-bold text-marca-700 dark:text-marca-400">
+                                    {articulo.dolares}
+                                </span>
+                                <span className="text-[10px] text-stone-500 dark:text-stone-400">
+                                    {articulo.bolivares}
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+/** Dos artículos cualquiera: lo que importa es la forma, no el rubro. */
+const ARTICULOS_DE_MUESTRA = [
+    {
+        nombre: 'Torta tres leches',
+        dolares: '$12,00',
+        bolivares: 'Bs. 438,00',
+        fondo: 'linear-gradient(135deg, #f5efe3 0%, #e9ddc7 100%)',
+    },
+    {
+        nombre: 'Café molido 500 g',
+        dolares: '$9,00',
+        bolivares: 'Bs. 328,50',
+        fondo: 'linear-gradient(135deg, #e6e9e3 0%, #cdd5c9 100%)',
+    },
+];
+
+/** El logo y los colores que salen de él: justo lo que dice el bloque. */
+function DelLogoAlColor() {
+    return (
+        <div className="flex h-56 items-center justify-center gap-6 bg-stone-100 px-6 dark:bg-stone-950 md:h-72 md:gap-10">
+            <span
+                aria-hidden="true"
+                className="grid h-20 w-20 shrink-0 place-items-center rounded-2xl font-display text-3xl font-semibold text-white shadow-sm md:h-24 md:w-24 md:text-4xl"
+                style={{ background: 'linear-gradient(140deg, #0f766e 0%, #065f46 100%)' }}
+            >
+                T
+            </span>
+
+            <ArrowRight aria-hidden="true" className="h-5 w-5 shrink-0 text-stone-400 dark:text-stone-600" />
+
+            <span className="flex shrink-0 flex-col gap-2">
+                {['#0f766e', '#065f46', '#f59e0b', '#f5f5f4'].map((color) => (
+                    <span key={color} className="flex items-center gap-2.5">
+                        <span
+                            aria-hidden="true"
+                            className="h-7 w-7 rounded-lg ring-1 ring-inset ring-black/10 md:h-9 md:w-9"
+                            style={{ background: color }}
+                        />
+                        <span className="font-mono text-[10px] uppercase text-stone-500 dark:text-stone-400 md:text-xs">
+                            {color}
+                        </span>
+                    </span>
+                ))}
+            </span>
+        </div>
+    );
+}
+
+/** Una factura con la marca del comercio, que es de lo que habla el bloque. */
+function VistaDeLaFactura() {
+    return (
+        <div className="mx-auto max-w-sm rounded-xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-800 dark:bg-stone-950">
+            <div className="flex items-start justify-between gap-3 border-b border-stone-200 pb-4 dark:border-stone-800">
+                <span className="flex items-center gap-2.5">
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-marca-700 text-sm font-bold text-white dark:bg-marca-600">
+                        T
+                    </span>
+                    <span>
+                        <span className="block text-sm font-semibold text-stone-900 dark:text-stone-100">Tu negocio</span>
+                        <span className="block text-[11px] text-stone-500 dark:text-stone-400">J-00000000-0</span>
+                    </span>
+                </span>
+                <span className="text-right">
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-stone-400">Factura</span>
+                    <span className="block text-sm font-bold text-stone-900 dark:text-stone-100">#0042</span>
+                </span>
+            </div>
+
+            <div className="space-y-2.5 py-4">
+                {RENGLONES_DE_MUESTRA.map(([concepto, cantidad, monto]) => (
+                    <div key={concepto} className="flex items-baseline gap-3 text-xs">
+                        <span className="min-w-0 flex-1 truncate text-stone-700 dark:text-stone-300">{concepto}</span>
+                        <span className="shrink-0 text-stone-400">{cantidad}</span>
+                        <span className="w-16 shrink-0 text-right font-mono text-stone-900 dark:text-stone-100">{monto}</span>
+                    </div>
+                ))}
+            </div>
+
+            <div className="flex items-baseline justify-between border-t border-stone-200 pt-4 dark:border-stone-800">
+                <span className="text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">Total</span>
+                <span className="text-right">
+                    <span className="block font-display text-lg font-bold text-stone-900 dark:text-stone-100">$34,50</span>
+                    <span className="block text-[11px] text-stone-500 dark:text-stone-400">Bs. 1.259,25</span>
+                </span>
+            </div>
+        </div>
+    );
+}
+
+const RENGLONES_DE_MUESTRA = [
+    ['Torta tres leches', '1', '$12,00'],
+    ['Café molido 500 g', '2', '$18,00'],
+    ['Queso llanero', '0,5 kg', '$4,50'],
+];

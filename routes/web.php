@@ -21,6 +21,7 @@ use App\Http\Controllers\ExportacionController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\InvoiceTemplateController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\SeoController;
 use App\Http\Controllers\LegalController;
 use App\Http\Controllers\PlanChangeRequestController;
 use App\Http\Controllers\PrivatePhotoController;
@@ -37,6 +38,11 @@ use Illuminate\Support\Facades\Route;
 // ── Público ────────────────────────────────────────────────────────────────────
 
 Route::get('/', [LandingController::class, 'index'])->name('home');
+
+// Lo que leen los buscadores. Se arman en el momento porque dependen del
+// dominio y de qué catálogos estén publicados hoy.
+Route::get('/robots.txt', [SeoController::class, 'robots'])->name('robots');
+Route::get('/sitemap.xml', [SeoController::class, 'sitemap'])->name('sitemap');
 Route::get('/terminos', [LegalController::class, 'terminos'])->name('terminos');
 
 // ── Cuenta pendiente de revisión ───────────────────────────────────────────────

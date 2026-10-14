@@ -16,8 +16,10 @@ use App\Support\Archivos;
 use App\Support\NivelesDePrecio;
 use App\Support\SeccionesDelCatalogo;
 use App\Support\Tenancy;
+use App\Support\Whatsapp;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -65,7 +67,10 @@ class PublicCatalogController extends Controller
             'isPreview' => $viewerIsOwner && (! $theme->is_published || $owner->planExpired()),
             'modoEditor' => false,
             'rutaBase' => '/' . $owner->username,
-        ])->withViewData(['og' => $this->vistaPreviaDelEnlace($owner, $theme)]);
+        ])->withViewData([
+            'og' => $this->vistaPreviaDelEnlace($owner, $theme),
+            'jsonld' => $this->datosEstructurados($owner, $theme),
+        ]);
     }
 
     /**
@@ -498,5 +503,72 @@ class PublicCatalogController extends Controller
         $clean = trim(preg_replace('/[^a-z0-9\s]/', '', $clean));
 
         return array_values(array_unique(array_filter(explode(' ', $clean))));
+    }
+
+    /**
+     * El catalogo, descrito para un buscador.
+     *
+     * Es lo que convierte el resultado en una ficha de negocio —nombre, foto,
+     * telefono, que vende— en vez de un enlace suelto. Solo entra lo que ya
+     * esta a la vista en la pagina: nombre, precio al detal y foto. El costo,
+     * los precios por volumen y las notas internas no salen de aqui, igual
+     * que no salen en la respuesta de la pagina.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosEstructurados(User $owner, CatalogTheme $theme): array
+    {
+        $nombre = $owner->business_name ?: $owner->name;
+        $vista = $this->vistaPreviaDelEnlace($owner, $theme);
+        $url = $owner->catalogUrl();
+
+        $tienda = [
+            '@context' => 'https://schema.org',
+            '@type' => 'Store',
+            'name' => $nombre,
+            'url' => $url,
+            'description' => $vista['descripcion'],
+            'image' => $vista['imagen'],
+            'inLanguage' => 'es-VE',
+        ];
+
+        $whatsapp = Whatsapp::numero($theme->whatsapp_number ?: $owner->whatsapp);
+
+        if ($whatsapp !== '') {
+            $tienda['telephone'] = '+' . $whatsapp;
+        }
+
+        if ($theme->logo_path) {
+            $tienda['logo'] = Archivos::url($theme->logo_path);
+        }
+
+        $articulos = $this->tenancy->forTenant($owner->id, fn () => $this->consultaBase()
+            ->whereNotNull('price_usdt')
+            ->orderBy('display_order')
+            ->orderByDesc('id')
+            ->limit(24)
+            ->get(['id', 'name', 'description', 'price_usdt', 'image_path']));
+
+        if ($articulos->isNotEmpty()) {
+            $tienda['hasOfferCatalog'] = [
+                '@type' => 'OfferCatalog',
+                'name' => 'Catálogo de ' . $nombre,
+                'itemListElement' => $articulos->values()->map(fn ($producto, $i) => array_filter([
+                    '@type' => 'Offer',
+                    'position' => $i + 1,
+                    'price' => number_format((float) $producto->price_usdt, 2, '.', ''),
+                    'priceCurrency' => 'USD',
+                    'availability' => 'https://schema.org/InStock',
+                    'itemOffered' => array_filter([
+                        '@type' => 'Product',
+                        'name' => $producto->name,
+                        'description' => $producto->description ? Str::limit($producto->description, 180) : null,
+                        'image' => Archivos::url($producto->image_path),
+                    ]),
+                ]))->all(),
+            ];
+        }
+
+        return $tienda;
     }
 }

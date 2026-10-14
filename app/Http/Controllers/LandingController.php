@@ -16,6 +16,9 @@ use Inertia\Response;
  */
 class LandingController extends Controller
 {
+    /** Lo que se lee en la pestaña y en el resultado de Google. */
+    private const TITULO = 'Catálogo, inventario y facturas para tu negocio';
+
     public function index(Request $request): Response
     {
         $ajustes = array_merge([
@@ -46,9 +49,12 @@ class LandingController extends Controller
         // Sale de los ajustes ya cargados, sin otra consulta.
         $diasDePrueba = (int) $ajustes['trial_days'] ?: (int) config('planes.dias_de_prueba');
 
+        // Se consultan una vez: los usan la página y los datos estructurados
+        $planes = Plan::public()->get();
+
         return Inertia::render('Bienvenida', [
             'ajustes' => $ajustes,
-            'planes' => Plan::public()->get(),
+            'planes' => $planes,
             'diasDePrueba' => $diasDePrueba,
             // Solo el primero vigente: varias ventanas al entrar no se leen,
             // se cierran
@@ -60,6 +66,9 @@ class LandingController extends Controller
             'auth' => [
                 'user' => $request->user()?->only(['id', 'name', 'username', 'role', 'status']),
             ],
+        ])->withViewData([
+            'og' => $this->vistaPreviaDelEnlace($ajustes),
+            'jsonld' => $this->datosEstructurados($ajustes, $planes),
         ]);
     }
 
@@ -117,5 +126,107 @@ class LandingController extends Controller
                 ],
                 'titulo' => $user->catalogTheme?->hero_title,
             ]);
+    }
+
+    /**
+     * Lo que lee un buscador antes de que corra una sola línea de JavaScript.
+     *
+     * Googlebot pinta la pagina, pero el primer rastreo se queda con esta
+     * respuesta: con el nombre de la plataforma a secas no hay de qué
+     * agarrarse. El título lleva la misma plantilla que app.jsx para que no
+     * cambie al navegar.
+     *
+     * @return array{titulo: string, descripcion: string, imagen: string, canonica: string}
+     */
+    private function vistaPreviaDelEnlace(array $ajustes): array
+    {
+        $marca = $ajustes['brand_name'] ?: config('app.name');
+
+        return [
+            'titulo' => self::TITULO . ' - ' . $marca,
+            'descripcion' => $ajustes['landing_meta_description']
+                ?: 'Publica tu catálogo en línea con tu propia dirección, lleva tu inventario '
+                    . 'y emite facturas con tu marca. Los pedidos te llegan por WhatsApp.',
+            'imagen' => url('/marca/enlace.png'),
+            'canonica' => url('/'),
+        ];
+    }
+
+    /**
+     * Datos estructurados de la plataforma.
+     *
+     * Es lo que convierte un resultado en una ficha con nombre, descripción y
+     * precio, en vez de un enlace azul. Los precios salen de los planes
+     * publicados: si mañana cambian, el buscador los lee cambiados.
+     *
+     * @return array<string, mixed>
+     */
+    private function datosEstructurados(array $ajustes, $planes): array
+    {
+        $marca = $ajustes['brand_name'] ?: config('app.name');
+        $vista = $this->vistaPreviaDelEnlace($ajustes);
+
+        // El precio que se anuncia es el que se paga: `precio_final` ya trae
+        // el descuento vigente, que es lo que el visitante va a ver en pantalla
+        $ofertas = $planes
+            ->filter(fn ($plan) => $plan->precio_final !== null)
+            ->map(fn ($plan) => [
+                '@type' => 'Offer',
+                'name' => $plan->name,
+                'price' => number_format((float) $plan->precio_final, 2, '.', ''),
+                'priceCurrency' => 'USD',
+                'url' => url('/') . '#planes',
+                'availability' => 'https://schema.org/InStock',
+            ])
+            ->values()
+            ->all();
+
+        $aplicacion = [
+            '@type' => 'SoftwareApplication',
+            'name' => $marca,
+            'applicationCategory' => 'BusinessApplication',
+            'operatingSystem' => 'Web',
+            'description' => $vista['descripcion'],
+            'url' => url('/'),
+            'inLanguage' => 'es-VE',
+            'featureList' => [
+                'Catálogo en línea con dirección propia',
+                'Pedidos por WhatsApp',
+                'Inventario con precios al detal, al mayor y de distribuidor',
+                'Facturación con la marca del comercio',
+                'Precios en dólares y en bolívares',
+            ],
+        ];
+
+        if ($ofertas !== []) {
+            $aplicacion['offers'] = $ofertas;
+        }
+
+        return [
+            '@context' => 'https://schema.org',
+            '@graph' => [
+                [
+                    '@type' => 'Organization',
+                    '@id' => url('/') . '#organizacion',
+                    'name' => $marca,
+                    'url' => url('/'),
+                    'logo' => url('/marca/icono-512.png'),
+                    'sameAs' => array_values(array_filter([
+                        $ajustes['social_instagram'] ?: null,
+                        $ajustes['social_facebook'] ?: null,
+                        $ajustes['social_tiktok'] ?: null,
+                    ])),
+                ],
+                [
+                    '@type' => 'WebSite',
+                    '@id' => url('/') . '#sitio',
+                    'name' => $marca,
+                    'url' => url('/'),
+                    'inLanguage' => 'es-VE',
+                    'publisher' => ['@id' => url('/') . '#organizacion'],
+                ],
+                $aplicacion,
+            ],
+        ];
     }
 }
