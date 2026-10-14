@@ -1,12 +1,23 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, ArrowLeft, Check, FileSpreadsheet, Loader2, Upload } from 'lucide-react';
+import {
+    AlertTriangle,
+    ArrowLeft,
+    Check,
+    FileSpreadsheet,
+    List,
+    Loader2,
+    MousePointerClick,
+    Upload,
+    X,
+} from 'lucide-react';
 import axios from 'axios';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import InputLabel from '@/Components/InputLabel';
 import PrimaryButton from '@/Components/PrimaryButton';
 import SecondaryButton from '@/Components/SecondaryButton';
 import { Interruptor } from '@/Components/UI';
+import { useEsEscritorio } from '@/hooks/usePantalla';
 
 /** Lo que el navegador sabe abrir. */
 const FORMATOS = '.xlsx,.xls,.csv,.ods';
@@ -39,6 +50,13 @@ export default function Importar({ campos, maximoFilas, limite }) {
     const [leyendo, setLeyendo] = useState(false);
     const [enviando, setEnviando] = useState(false);
     const entrada = useRef(null);
+
+    // Sobre la tabla se decide mejor —se ve el dato mientras se elige—, pero
+    // una hoja de doce columnas no cabe en un teléfono por mucho que se
+    // achique. Allá queda la lista, que hace exactamente lo mismo.
+    const esEscritorio = useEsEscritorio();
+    const [modo, setModo] = useState('tabla');
+    const sobreLaTabla = esEscritorio && modo === 'tabla';
 
     const leer = async (file) => {
         if (!file) {
@@ -216,14 +234,53 @@ export default function Importar({ campos, maximoFilas, limite }) {
                         )}
 
                         <div>
-                            <h2 className="font-display text-lg font-semibold text-stone-900 dark:text-stone-100">
-                                ¿Qué trae cada columna?
-                            </h2>
-                            <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                                Esto es lo que entendimos. Corrige lo que haga falta; lo que dejes en «No importar»
-                                se queda vacío.
-                            </p>
+                            <div className="flex flex-wrap items-end justify-between gap-3">
+                                <div className="min-w-0">
+                                    <h2 className="font-display text-lg font-semibold text-stone-900 dark:text-stone-100">
+                                        ¿Qué trae cada columna?
+                                    </h2>
+                                    <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
+                                        {sobreLaTabla
+                                            ? 'Esto es lo que entendimos. Toca el encabezado de una columna para decir qué es.'
+                                            : 'Esto es lo que entendimos. Corrige lo que haga falta; lo que dejes en «No importar» se queda vacío.'}
+                                    </p>
+                                </div>
 
+                                {esEscritorio && (
+                                    <div role="radiogroup" aria-label="Cómo asignar las columnas" className="flex shrink-0 gap-1 rounded-lg bg-stone-100 p-1 dark:bg-stone-800">
+                                        {[
+                                            { id: 'tabla', texto: 'Sobre la tabla', Icono: MousePointerClick },
+                                            { id: 'lista', texto: 'En lista', Icono: List },
+                                        ].map(({ id, texto, Icono }) => (
+                                            <button
+                                                key={id}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={modo === id}
+                                                onClick={() => setModo(id)}
+                                                className={`pulsable inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                    modo === id
+                                                        ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-950 dark:text-stone-100'
+                                                        : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100'
+                                                }`}
+                                            >
+                                                <Icono className="h-3.5 w-3.5" />
+                                                {texto}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {sobreLaTabla ? (
+                                <TablaAsignable
+                                    campos={campos}
+                                    columnas={columnas}
+                                    onColumnas={setColumnas}
+                                    encabezados={encabezados}
+                                    filas={filas}
+                                />
+                            ) : (
                             <div className="mt-4 space-y-2">
                                 {campos.map((campo) => {
                                     const elegida = columnas[campo.clave];
@@ -278,9 +335,10 @@ export default function Importar({ campos, maximoFilas, limite }) {
                                     );
                                 })}
                             </div>
+                            )}
                         </div>
 
-                        <Vistazo campos={campos} columnas={columnas} filas={filas} />
+                        {! sobreLaTabla && <Vistazo campos={campos} columnas={columnas} filas={filas} />}
 
                         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3.5 dark:border-stone-800 dark:bg-stone-900">
                             <Interruptor
@@ -384,4 +442,296 @@ function muestraDe(filas, indice) {
     }
 
     return '';
+}
+
+
+/* ── Asignar sobre la tabla ───────────────────────────────── */
+
+/** Cuántas filas del archivo se enseñan debajo de cada columna. */
+const FILAS_EN_LA_TABLA = 6;
+
+/**
+ * La hoja tal como viene, con cada columna asignable de un clic.
+ *
+ * Elegir en una lista de trece desplegables obliga a recordar qué había en
+ * «PVP» mientras se busca el campo. Aquí se ve el dato y se decide encima:
+ * se toca el encabezado y se dice qué es. Las que no se asignen se quedan
+ * en gris y no se importan.
+ *
+ * Solo en computadora: una hoja de doce columnas no cabe en un teléfono.
+ */
+function TablaAsignable({ campos, columnas, onColumnas, encabezados, filas }) {
+    const [abierta, setAbierta] = useState(null);
+
+    // Qué campos cuelgan de cada columna; normalmente uno, a veces ninguno
+    const porColumna = new Map();
+
+    campos.forEach((campo) => {
+        const indice = columnas[campo.clave];
+
+        if (indice !== undefined && indice !== null && indice !== '') {
+            porColumna.set(indice, [...(porColumna.get(indice) ?? []), campo]);
+        }
+    });
+
+    const asignar = (indice, clave) => {
+        onColumnas((anterior) => ({ ...anterior, [clave]: indice }));
+        setAbierta(null);
+    };
+
+    const quitar = (clave) => onColumnas((anterior) => ({ ...anterior, [clave]: null }));
+
+    const limpiarColumna = (indice) => {
+        onColumnas((anterior) => {
+            const siguiente = { ...anterior };
+
+            (porColumna.get(indice) ?? []).forEach((campo) => {
+                siguiente[campo.clave] = null;
+            });
+
+            return siguiente;
+        });
+        setAbierta(null);
+    };
+
+    return (
+        <div className="mt-4">
+            <div className="overflow-x-auto rounded-xl border border-stone-200 dark:border-stone-800">
+                <table className="w-full min-w-max border-collapse text-left text-sm">
+                    <thead>
+                        <tr>
+                            {encabezados.map((encabezado, indice) => {
+                                const asignados = porColumna.get(indice) ?? [];
+                                const activa = asignados.length > 0;
+
+                                return (
+                                    <th
+                                        key={indice}
+                                        className={`relative border-b border-r border-stone-200 p-0 align-top last:border-r-0 dark:border-stone-800 ${
+                                            activa ? 'bg-marca-50/70 dark:bg-marca-950/40' : 'bg-stone-50 dark:bg-stone-900'
+                                        }`}
+                                    >
+                                        <button
+                                            type="button"
+                                            onClick={() => setAbierta(abierta === indice ? null : indice)}
+                                            aria-expanded={abierta === indice}
+                                            className="pulsable w-full min-w-[9rem] max-w-[16rem] px-3 py-2.5 text-left hover:bg-white/70 dark:hover:bg-stone-800/70"
+                                        >
+                                            <span className="block truncate text-[11px] font-normal uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                                                {encabezado || `Columna ${indice + 1}`}
+                                            </span>
+
+                                            <span className="mt-1 flex flex-wrap items-center gap-1">
+                                                {activa ? (
+                                                    asignados.map((campo) => (
+                                                        <span
+                                                            key={campo.clave}
+                                                            className="inline-flex items-center gap-1 rounded-md bg-marca-700 px-2 py-0.5 text-[11px] font-semibold text-white dark:bg-marca-600"
+                                                        >
+                                                            <Check className="h-3 w-3" strokeWidth={3} />
+                                                            {campo.nombre}
+                                                        </span>
+                                                    ))
+                                                ) : (
+                                                    <span className="text-[11px] font-medium text-stone-400 dark:text-stone-500">
+                                                        No se importa
+                                                    </span>
+                                                )}
+                                            </span>
+                                        </button>
+
+                                        {abierta === indice && (
+                                            <MenuDeCampos
+                                                campos={campos}
+                                                columnas={columnas}
+                                                encabezados={encabezados}
+                                                indice={indice}
+                                                asignados={asignados}
+                                                onElegir={(clave) => asignar(indice, clave)}
+                                                onLimpiar={() => limpiarColumna(indice)}
+                                                onCerrar={() => setAbierta(null)}
+                                            />
+                                        )}
+                                    </th>
+                                );
+                            })}
+                        </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-stone-100 dark:divide-stone-800">
+                        {filas.slice(0, FILAS_EN_LA_TABLA).map((fila, nf) => (
+                            <tr key={nf}>
+                                {encabezados.map((_, indice) => {
+                                    const activa = porColumna.has(indice);
+
+                                    return (
+                                        <td
+                                            key={indice}
+                                            className={`max-w-[16rem] truncate border-r border-stone-100 px-3 py-2 last:border-r-0 dark:border-stone-800/70 ${
+                                                activa
+                                                    ? 'bg-white text-stone-700 dark:bg-stone-950 dark:text-stone-300'
+                                                    : 'bg-stone-50/60 text-stone-400 dark:bg-stone-900/40 dark:text-stone-600'
+                                            }`}
+                                        >
+                                            {String(fila?.[indice] ?? '').trim() || '—'}
+                                        </td>
+                                    );
+                                })}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <ResumenDeCampos campos={campos} columnas={columnas} onQuitar={quitar} />
+        </div>
+    );
+}
+
+/**
+ * Qué puede ser esta columna.
+ *
+ * Si el campo ya está puesto en otra, se dice en cuál: elegirlo aquí lo
+ * mueve, y conviene saberlo antes de tocar.
+ */
+function MenuDeCampos({ campos, columnas, encabezados, indice, asignados, onElegir, onLimpiar, onCerrar }) {
+    useEffect(() => {
+        const alPulsar = (evento) => evento.key === 'Escape' && onCerrar();
+
+        document.addEventListener('keydown', alPulsar);
+
+        return () => document.removeEventListener('keydown', alPulsar);
+    }, [onCerrar]);
+
+    const yaPuestos = asignados.map((campo) => campo.clave);
+
+    return (
+        <>
+            {/* Cerrar al tocar fuera, sin tapar la tabla con un velo oscuro */}
+            <button
+                type="button"
+                aria-label="Cerrar"
+                onClick={onCerrar}
+                className="fixed inset-0 z-20 cursor-default"
+            />
+
+            <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl dark:border-stone-700 dark:bg-stone-900">
+                <p className="border-b border-stone-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:border-stone-800 dark:text-stone-400">
+                    ¿Qué es «{encabezados[indice] || `Columna ${indice + 1}`}»?
+                </p>
+
+                <div className="max-h-72 overflow-y-auto py-1">
+                    {campos.map((campo) => {
+                        const donde = columnas[campo.clave];
+                        const enOtra = donde !== undefined && donde !== null && donde !== '' && donde !== indice;
+                        const aqui = yaPuestos.includes(campo.clave);
+
+                        return (
+                            <button
+                                key={campo.clave}
+                                type="button"
+                                onClick={() => onElegir(campo.clave)}
+                                className={`flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                                    aqui ? 'bg-marca-50 dark:bg-marca-950/50' : ''
+                                }`}
+                            >
+                                <span className="mt-0.5 w-4 shrink-0">
+                                    {aqui && <Check className="h-4 w-4 text-marca-700 dark:text-marca-400" strokeWidth={3} />}
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block font-medium text-stone-800 dark:text-stone-100">
+                                        {campo.nombre}
+                                        {campo.obligatorio && (
+                                            <span className="ml-1 text-[10px] font-bold uppercase text-marca-700 dark:text-marca-400">
+                                                obligatorio
+                                            </span>
+                                        )}
+                                    </span>
+                                    {enOtra && (
+                                        <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-500">
+                                            Ahora está en «{encabezados[donde] || `Columna ${donde + 1}`}»
+                                        </span>
+                                    )}
+                                </span>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {asignados.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={onLimpiar}
+                        className="flex w-full items-center gap-2 border-t border-stone-200 px-3 py-2 text-left text-sm font-medium text-stone-600 hover:bg-stone-100 dark:border-stone-800 dark:text-stone-300 dark:hover:bg-stone-800"
+                    >
+                        <X className="h-4 w-4" />
+                        No importar esta columna
+                    </button>
+                )}
+            </div>
+        </>
+    );
+}
+
+/** Lo que falta por asignar, para no tener que repasar la tabla entera. */
+function ResumenDeCampos({ campos, columnas, onQuitar }) {
+    const puesto = (campo) => {
+        const indice = columnas[campo.clave];
+
+        return indice !== undefined && indice !== null && indice !== '';
+    };
+
+    const faltan = campos.filter((campo) => ! puesto(campo));
+    const puestos = campos.filter(puesto);
+
+    return (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-stone-200 bg-white px-4 py-3 dark:border-stone-800 dark:bg-stone-900">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                    Se va a importar ({puestos.length})
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                    {puestos.length === 0 && (
+                        <span className="text-sm text-stone-400 dark:text-stone-500">Nada todavía.</span>
+                    )}
+                    {puestos.map((campo) => (
+                        <button
+                            key={campo.clave}
+                            type="button"
+                            onClick={() => onQuitar(campo.clave)}
+                            title="Quitar"
+                            className="pulsable inline-flex items-center gap-1 rounded-full bg-marca-100 px-2.5 py-1 text-xs font-semibold text-marca-800 hover:bg-marca-200 dark:bg-marca-950 dark:text-marca-300 dark:hover:bg-marca-900"
+                        >
+                            {campo.nombre}
+                            <X className="h-3 w-3" />
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 dark:border-stone-800 dark:bg-stone-900/50">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                    Se queda vacío ({faltan.length})
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                    {faltan.length === 0 && (
+                        <span className="text-sm text-stone-400 dark:text-stone-500">Nada: lo trajiste todo.</span>
+                    )}
+                    {faltan.map((campo) => (
+                        <span
+                            key={campo.clave}
+                            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${
+                                campo.obligatorio
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
+                                    : 'bg-stone-200 text-stone-600 dark:bg-stone-800 dark:text-stone-400'
+                            }`}
+                        >
+                            {campo.nombre}
+                            {campo.obligatorio && ' · hace falta'}
+                        </span>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
 }
