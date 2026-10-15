@@ -959,7 +959,9 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                 : 'A consultar'}
                                                             {esServicio(p)
                                                                 ? ` · ${detalleDeServicio(p) ?? 'Servicio'}`
-                                                                : ` · Quedan ${conUnidad(p.stock, p)}`}
+                                                                : seCuenta(p)
+                                                                  ? ` · Quedan ${conUnidad(p.stock, p)}`
+                                                                  : ' · No aplica stock'}
                                                         </p>
                                                         {inCart > 0 && (
                                                             <p className="text-[10px] font-bold text-marca-700 dark:text-marca-400 mt-0.5">{inCart} en la factura</p>
@@ -1537,7 +1539,7 @@ export default function Create({ auth, productos, combos = [], bcvRate, suppleme
                                                                                         type="button"
                                                                                     >+</button>
                                                                                 </div>
-                                                                                {!esServicio(item._producto) && !item.combo_id && (
+                                                                                {seCuenta(item._producto) && !item.combo_id && (
                                                                                     <span className="text-xs font-semibold text-stone-500 dark:text-stone-400">
                                                                                         {unidadCorta(item._producto)}
                                                                                     </span>
