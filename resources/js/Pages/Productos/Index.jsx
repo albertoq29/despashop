@@ -1791,10 +1791,10 @@ function CampoDeExistencias({ data, setData, unidades, isEditing, error }) {
                 lo que se arma por encargo. Contarlas solo logra que el
                 catálogo las muestre agotadas y la factura se niegue. */}
             <Interruptor
-                etiqueta="Llevar la cuenta de cuánto tengo"
+                etiqueta="¿Este producto requiere un registro de existencia?"
                 ayuda={cuenta
-                    ? 'Al facturar se descuenta, y en tu catálogo sale «Agotado» cuando llegue a cero.'
-                    : 'Este producto nunca se agota ni se descuenta al facturar. Útil para lo que haces al momento o siempre tienes.'}
+                    ? 'Sí: al facturar se descuenta, y en tu catálogo sale «Agotado» cuando llegue a cero.'
+                    : 'No: nunca se agota ni se descuenta al facturar. Útil para lo que haces al momento o siempre tienes.'}
                 valor={cuenta}
                 onCambiar={(v) => setData('controla_stock', v)}
             />
