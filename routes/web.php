@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountStatusController;
+use App\Http\Controllers\Admin\CorreosController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\LandingNoticeController;
 use App\Http\Controllers\Admin\PlanChangeRequestController as AdminPlanChangeRequestController;
@@ -236,6 +237,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/seguridad/revisar-todo', [SecurityEventController::class, 'reviewAll'])->name('seguridad.revisar-todo');
 
     // Avisos flotantes de la portada
+    // Escribirle a los comercios que cumplen ciertas condiciones
+    Route::get('/correos', [CorreosController::class, 'index'])->name('correos.index');
+    Route::post('/correos', [CorreosController::class, 'store'])->name('correos.store');
+
     Route::get('/avisos', [LandingNoticeController::class, 'index'])->name('avisos.index');
     Route::post('/avisos', [LandingNoticeController::class, 'store'])->name('avisos.store');
     Route::post('/avisos/reordenar', [LandingNoticeController::class, 'reorder'])->name('avisos.reorder');

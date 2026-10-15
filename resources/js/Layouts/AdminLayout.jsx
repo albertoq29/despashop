@@ -6,6 +6,7 @@ import {
     Megaphone,
     LayoutDashboard,
     LogOut,
+    Mail,
     Menu,
     MessageSquarePlus,
     Settings,
@@ -108,6 +109,7 @@ function BarraLateral({ abierta, onCerrar, marca, seguridad, sugerencias, cambio
             patron: 'admin.cambios-plan.*',
             insignia: cambiosDePlan?.pendientes || 0,
         },
+        { href: route('admin.correos.index'), etiqueta: 'Correos a comercios', Icono: Mail, patron: 'admin.correos.*' },
         { href: route('admin.avisos.index'), etiqueta: 'Avisos de la portada', Icono: Megaphone, patron: 'admin.avisos.*' },
         { href: route('admin.ajustes'), etiqueta: 'Ajustes', Icono: Settings, patron: 'admin.ajustes*' },
     ];
