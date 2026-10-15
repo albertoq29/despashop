@@ -270,7 +270,7 @@ class RegistroDeSeguridadTest extends TestCase
             ->postJson(route('catalogo.ia.generar'), [
                 'descripcion' => 'Vendemos documentos falsos y cedulas falsas para quien lo necesite rápido.',
                 'tono' => 'cercano',
-                'incluir' => ['diseno' => true, 'textos' => true, 'inventario' => false],
+                'incluir' => ['diseno' => true, 'textos' => true],
             ])
             ->assertStatus(422);
 

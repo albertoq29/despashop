@@ -72,7 +72,7 @@ class AsistenteIaTest extends TestCase
         return array_replace_recursive([
             'descripcion' => 'Cafetería artesanal en Mérida. Vendemos café de altura en grano y molido, postres caseros y tazas.',
             'tono' => 'cercano',
-            'incluir' => ['diseno' => true, 'textos' => true, 'inventario' => true],
+            'incluir' => ['diseno' => true, 'textos' => true],
         ], $cambios);
     }
 
@@ -193,9 +193,10 @@ class AsistenteIaTest extends TestCase
         $this->assertSame('Atención directa', $beneficios['items'][1]['title']);
         $this->assertStringNotContainsStringIgnoringCase('env', json_encode($beneficios['items']));
 
-        // Inventario sin duplicados y con categorías de la propia propuesta
-        $this->assertSame(['Café en grano', 'Café molido', 'Postres'], $propuesta['inventario']['categorias']);
-        $this->assertNull($propuesta['inventario']['productos'][2]['categoria']);
+        // La respuesta falsa trae categorías y productos: la propuesta no los
+        // lleva. El asistente propone el catálogo, no inventa mercancía.
+        $this->assertArrayNotHasKey('inventario', $propuesta);
+        $this->assertArrayNotHasKey('productos', $propuesta);
 
         // Nunca se envían precios ni costos a la IA
         Http::assertSent(fn (PeticionHttp $p) => $p['model'] !== self::MODERACION
@@ -397,60 +398,6 @@ class AsistenteIaTest extends TestCase
             ->assertStatus(503);
 
         Http::assertNothingSent();
-    }
-
-    public function test_crea_el_inventario_elegido_oculto_y_una_sola_vez(): void
-    {
-        $usuario = $this->comercio();
-        $this->comoTenant($usuario, fn () => Category::create(['name' => 'Postres']));
-        $this->fingirGroq();
-
-        $id = $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->json('generacion_id');
-
-        $this->actingAs($usuario)
-            ->postJson(route('catalogo.ia.inventario', $id), ['categorias' => [0, 2], 'productos' => [0, 1]])
-            ->assertOk()
-            ->assertJsonPath('creado.categorias', 1)
-            ->assertJsonPath('creado.productos', 2);
-
-        $this->comoTenant($usuario, function () {
-            $this->assertSame(2, Category::count(), 'Postres ya existía');
-            $this->assertSame(2, Product::where('is_hidden', true)->whereNull('price_usdt')->count());
-            $this->assertSame('Postres', Product::where('name', 'Torta de zanahoria')->first()->categories->first()->name);
-        });
-
-        $this->actingAs($usuario)
-            ->postJson(route('catalogo.ia.inventario', $id), ['categorias' => [], 'productos' => [2]])
-            ->assertStatus(422);
-    }
-
-    public function test_el_inventario_respeta_el_limite_de_productos_del_plan(): void
-    {
-        $plan = Plan::create(['name' => 'Inicial', 'price_usd' => 0, 'max_products' => 2, 'ai_daily_limit' => 3]);
-        $usuario = $this->comercio(['plan_id' => $plan->id]);
-        $this->comoTenant($usuario, fn () => Product::create(['name' => 'Existente']));
-        $this->fingirGroq();
-
-        $id = $this->actingAs($usuario)->postJson(route('catalogo.ia.generar'), $this->pedido())->json('generacion_id');
-
-        $this->actingAs($usuario)
-            ->postJson(route('catalogo.ia.inventario', $id), ['categorias' => [], 'productos' => [0, 1, 2]])
-            ->assertOk()
-            ->assertJsonPath('creado.productos', 1)
-            ->assertJsonPath('creado.omitidos', 2);
-    }
-
-    public function test_un_comercio_no_puede_usar_la_propuesta_de_otro(): void
-    {
-        $uno = $this->comercio();
-        $dos = $this->comercio();
-        $this->fingirGroq();
-
-        $id = $this->actingAs($uno)->postJson(route('catalogo.ia.generar'), $this->pedido())->json('generacion_id');
-
-        $this->actingAs($dos)
-            ->postJson(route('catalogo.ia.inventario', $id), ['categorias' => [0], 'productos' => [0]])
-            ->assertNotFound();
     }
 
     public function test_aplicar_la_propuesta_y_guardar_pasa_la_validacion_del_editor(): void
@@ -774,7 +721,7 @@ class AsistenteIaTest extends TestCase
 
         $this->actingAs($usuario)
             ->postJson(route('catalogo.ia.generar'), $this->pedido([
-                'incluir' => ['diseno' => false, 'textos' => true, 'inventario' => false],
+                'incluir' => ['diseno' => false, 'textos' => true],
                 'preferencias' => ['estilo' => 'minimalista'],
             ]))
             ->assertOk();

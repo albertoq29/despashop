@@ -121,7 +121,7 @@ class GeneradorDeCatalogo
 
     /**
      * @param  array{nombre: string, categorias: list<string>, productos: list<string>, banners: int, combos: int}  $contexto
-     * @param  array{diseno: bool, textos: bool, inventario: bool, extras: list<string>, preferencias: array<string, string>}  $incluir
+     * @param  array{diseno: bool, textos: bool, extras: list<string>, preferencias: array<string, string>}  $incluir
      * @return list<array{role: string, content: string}>
      */
     public function mensajes(string $descripcion, string $tono, array $incluir, array $contexto, string $indicaciones = ''): array
@@ -133,9 +133,6 @@ class GeneradorDeCatalogo
         }
         if ($incluir['textos']) {
             $partes[] = 'los textos y el orden de los bloques de la página';
-        }
-        if ($incluir['inventario']) {
-            $partes[] = 'categorías y productos de ejemplo';
         }
 
         $sistema = implode("\n", [
@@ -157,7 +154,6 @@ class GeneradorDeCatalogo
             $incluir['textos'] ? '- Largos máximos: portada_titulo 50, portada_subtitulo 140, portada_boton 24, aviso y cinta 90 (pueden ir vacíos), seo_titulo 60, seo_descripcion 155, mensaje_whatsapp 140, sobre_nosotros_texto 400, contacto_texto 140. Exactamente 3 beneficios, título de 40 y texto de 110.' : null,
             $incluir['textos'] ? '- bloques: ordena los bloques de la página. Siempre incluye header y products. Disponibles: ' . implode(', ', $this->bloquesDisponibles($incluir, $contexto)) . '.' : null,
             $incluir['textos'] ? $this->instruccionDeExtras($incluir, $contexto) : null,
-            $incluir['inventario'] ? '- Hasta ' . config('ia.maximo_categorias') . ' categorías (máximo 30 caracteres) y hasta ' . config('ia.maximo_productos') . ' productos genéricos del rubro, cada uno con una categoría de la lista y una descripción de hasta 120 caracteres. No repitas productos que el comercio ya tiene.' : null,
             '',
             $this->instruccionDeServicios($contexto),
             $this->instruccionDePreferencias($incluir),
@@ -381,14 +377,6 @@ class GeneradorDeCatalogo
             }
         }
 
-        if ($incluir['inventario']) {
-            $propiedades['categorias'] = ['type' => 'array', 'items' => $texto];
-            $propiedades['productos'] = [
-                'type' => 'array',
-                'items' => $this->objeto(['nombre' => $texto, 'descripcion' => $texto, 'categoria' => $texto]),
-            ];
-        }
-
         return [
             'temperature' => 0.8,
             'reasoning_effort' => 'low',
@@ -433,10 +421,6 @@ class GeneradorDeCatalogo
             ];
 
             $propuesta['sections'] = $this->secciones($crudo, $propuesta['textos'], $seccionesActuales, $contexto, $incluir);
-        }
-
-        if ($incluir['inventario']) {
-            $propuesta['inventario'] = $this->inventario($crudo);
         }
 
         return $propuesta;
@@ -848,37 +832,6 @@ class GeneradorDeCatalogo
         }
 
         return false;
-    }
-
-    /* ── Inventario de ejemplo ──────────────────────────────────────────── */
-
-    private function inventario(array $crudo): array
-    {
-        $categorias = collect(is_array($crudo['categorias'] ?? null) ? $crudo['categorias'] : [])
-            ->map(fn ($nombre) => $this->texto($nombre, 30))
-            ->filter()
-            ->unique(fn ($nombre) => mb_strtolower($nombre))
-            ->take((int) config('ia.maximo_categorias'))
-            ->values();
-
-        $productos = collect(is_array($crudo['productos'] ?? null) ? $crudo['productos'] : [])
-            ->filter(fn ($item) => is_array($item))
-            ->map(function ($item) use ($categorias) {
-                $categoria = $this->texto($item['categoria'] ?? '', 30);
-
-                return [
-                    'nombre' => $this->texto($item['nombre'] ?? '', 80),
-                    'descripcion' => $this->texto($item['descripcion'] ?? '', 160),
-                    // Solo se acepta una categoría que esté en la propia propuesta
-                    'categoria' => $categorias->first(fn ($c) => mb_strtolower($c) === mb_strtolower($categoria)),
-                ];
-            })
-            ->filter(fn ($item) => $item['nombre'] !== '')
-            ->unique(fn ($item) => mb_strtolower($item['nombre']))
-            ->take((int) config('ia.maximo_productos'))
-            ->values();
-
-        return ['categorias' => $categorias->all(), 'productos' => $productos->all()];
     }
 
     /* ── Utilidades ─────────────────────────────────────────────────────── */

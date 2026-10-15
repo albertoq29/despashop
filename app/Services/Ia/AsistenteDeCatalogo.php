@@ -2,7 +2,6 @@
 
 namespace App\Services\Ia;
 
-use App\Models\ActivityLog;
 use App\Models\AiGeneration;
 use App\Models\CatalogBanner;
 use App\Models\CatalogTheme;
@@ -14,7 +13,6 @@ use App\Services\Seguridad\RegistroDeSeguridad;
 use App\Support\Contraste;
 use App\Support\SeccionesDelCatalogo;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -36,7 +34,7 @@ class AsistenteDeCatalogo
     }
 
     /**
-     * @param  array{diseno: bool, textos: bool, inventario: bool, extras: list<string>, preferencias: array<string, string>}  $incluir
+     * @param  array{diseno: bool, textos: bool, extras: list<string>, preferencias: array<string, string>}  $incluir
      */
     public function crear(User $comercio, ?User $solicitante, string $descripcion, string $tono, array $incluir, string $indicaciones = ''): AiGeneration
     {
@@ -58,75 +56,6 @@ class AsistenteDeCatalogo
         } finally {
             $candado->release();
         }
-    }
-
-    /**
-     * Crea las categorías y los productos de ejemplo que eligió el comercio.
-     *
-     * Se usa la propuesta guardada en el servidor, nunca lo que mande el
-     * navegador, y los productos nacen ocultos y sin precio: son un borrador
-     * para completar, no algo que deba verse en el catálogo sin revisar.
-     *
-     * @param  list<int>  $categoriasElegidas  Índices dentro de la propuesta
-     * @param  list<int>  $productosElegidos
-     * @return array{categorias: int, productos: int, omitidos: int}
-     */
-    public function crearInventario(User $comercio, AiGeneration $generacion, array $categoriasElegidas, array $productosElegidos): array
-    {
-        if ($generacion->status !== AiGeneration::COMPLETADA || empty($generacion->result['inventario'])) {
-            throw new ErrorDeIa('Esta propuesta no incluye inventario.', 422);
-        }
-
-        if ($generacion->inventory_applied_at) {
-            throw new ErrorDeIa('El inventario de esta propuesta ya se creó.', 422);
-        }
-
-        $inventario = $generacion->result['inventario'];
-        $categorias = collect($categoriasElegidas)->map(fn ($i) => $inventario['categorias'][$i] ?? null)->filter()->unique()->values();
-        $productos = collect($productosElegidos)->map(fn ($i) => $inventario['productos'][$i] ?? null)->filter()->values();
-
-        // Respeta el límite de productos del plan
-        $maximo = $comercio->plan?->max_products;
-        $disponibles = $maximo === null ? $productos->count() : max(0, $maximo - Product::count());
-        $omitidos = max(0, $productos->count() - $disponibles);
-        $productos = $productos->take($disponibles);
-
-        $creadas = 0;
-
-        DB::transaction(function () use ($categorias, $productos, $generacion, &$creadas) {
-            $existentes = Category::pluck('id', 'name')->mapWithKeys(fn ($id, $nombre) => [mb_strtolower($nombre) => $id]);
-
-            foreach ($categorias as $nombre) {
-                if (! $existentes->has(mb_strtolower($nombre))) {
-                    $existentes[mb_strtolower($nombre)] = Category::create(['name' => $nombre])->id;
-                    $creadas++;
-                }
-            }
-
-            foreach ($productos as $item) {
-                $producto = Product::create([
-                    'name' => $item['nombre'],
-                    'description' => $item['descripcion'] ?: null,
-                    'stock' => 0,
-                    'is_hidden' => true,
-                ]);
-
-                $categoriaId = $item['categoria'] ? $existentes->get(mb_strtolower($item['categoria'])) : null;
-
-                if ($categoriaId) {
-                    $producto->categories()->sync([$categoriaId]);
-                }
-            }
-
-            $generacion->update(['inventory_applied_at' => now()]);
-        });
-
-        ActivityLog::record('ia.inventario', "Creó {$productos->count()} productos de ejemplo con IA", [
-            'categorias' => $creadas,
-            'productos' => $productos->count(),
-        ]);
-
-        return ['categorias' => $creadas, 'productos' => $productos->count(), 'omitidos' => $omitidos];
     }
 
     private function procesar(User $comercio, ?User $solicitante, string $descripcion, string $tono, array $incluir, string $indicaciones): AiGeneration

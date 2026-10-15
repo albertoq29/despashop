@@ -35,7 +35,6 @@ class AiGeneration extends Model
         return [
             'options' => 'array',
             'result' => 'array',
-            'inventory_applied_at' => 'datetime',
         ];
     }
 

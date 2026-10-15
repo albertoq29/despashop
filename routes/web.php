@@ -73,9 +73,6 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         Route::post('/ia/generar', [CatalogoIaController::class, 'generar'])
             ->middleware('throttle:6,1')
             ->name('ia.generar');
-        Route::post('/ia/{generacion}/inventario', [CatalogoIaController::class, 'inventario'])
-            ->middleware('throttle:10,1')
-            ->name('ia.inventario');
         Route::post('/logo', [CatalogDesignController::class, 'uploadLogo'])->name('logo');
         Route::post('/logo/paleta', [CatalogDesignController::class, 'applyLogoPalette'])->name('logo.paleta');
         Route::post('/imagen/{tipo}', [CatalogDesignController::class, 'uploadImage'])->name('imagen');

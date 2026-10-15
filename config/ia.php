@@ -28,8 +28,4 @@ return [
     // opcionales: colores que quiere, qué destacar, qué evitar.
     'maximo_indicaciones' => 400,
 
-    // Cuánto inventario de ejemplo puede proponer en una sola creación
-    'maximo_categorias' => 8,
-    'maximo_productos' => 12,
-
 ];

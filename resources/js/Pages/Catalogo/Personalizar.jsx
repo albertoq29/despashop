@@ -396,29 +396,6 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
         avisar('Propuesta aplicada. Revísala en la vista previa y guarda para publicarla.', { accion: conDeshacer });
     };
 
-    const inventarioCreado = (creado) => {
-        const partes = [];
-
-        if (creado.productos > 0) {
-            partes.push(`${creado.productos} ${creado.productos === 1 ? 'producto oculto' : 'productos ocultos'}`);
-        }
-        if (creado.categorias > 0) {
-            partes.push(`${creado.categorias} ${creado.categorias === 1 ? 'categoría' : 'categorías'}`);
-        }
-
-        const omitidos = creado.omitidos > 0 ? ` ${creado.omitidos} no se crearon por el límite de tu plan.` : '';
-
-        avisar(
-            partes.length
-                ? `Se crearon ${partes.join(' y ')}. Complétalos en Inventario.${omitidos}`
-                : `No se creó ningún producto.${omitidos}`,
-            { tono: 'exito' },
-        );
-
-        // Las categorías nuevas quedan disponibles para los bloques de categoría destacada
-        router.reload({ only: ['categorias'], preserveState: true, preserveScroll: true });
-    };
-
     const guardarActual = useRef(guardar);
     guardarActual.current = guardar;
 
@@ -663,7 +640,6 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                     onUso={setUsoIa}
                     limites={{ minimo: ia.minimo, maximo: ia.maximo, maximoIndicaciones: ia.maximo_indicaciones }}
                     onAplicar={aplicarPropuesta}
-                    onInventarioCreado={inventarioCreado}
                 />
             )}
         </AuthenticatedLayout>

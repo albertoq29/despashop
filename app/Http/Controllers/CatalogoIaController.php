@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\AiGeneration;
 use App\Models\User;
 use App\Services\Ia\AsistenteDeCatalogo;
 use App\Services\Ia\ErrorDeIa;
@@ -39,7 +38,6 @@ class CatalogoIaController extends Controller
             'incluir' => ['required', 'array'],
             'incluir.diseno' => ['boolean'],
             'incluir.textos' => ['boolean'],
-            'incluir.inventario' => ['boolean'],
             'extras' => ['nullable', 'array'],
             'extras.*' => [Rule::in(GeneradorDeCatalogo::EXTRAS)],
             'preferencias' => ['nullable', 'array'],
@@ -56,7 +54,6 @@ class CatalogoIaController extends Controller
         $incluir = [
             'diseno' => (bool) ($datos['incluir']['diseno'] ?? false),
             'textos' => (bool) ($datos['incluir']['textos'] ?? false),
-            'inventario' => (bool) ($datos['incluir']['inventario'] ?? false),
         ];
 
         $comercio = $this->comercio();
@@ -90,26 +87,6 @@ class CatalogoIaController extends Controller
             'propuesta' => $generacion->result,
             'uso' => $this->limites->estado($comercio),
         ]);
-    }
-
-    public function inventario(Request $request, AiGeneration $generacion): JsonResponse
-    {
-        $datos = $request->validate([
-            'categorias' => ['present', 'array', 'max:20'],
-            'categorias.*' => ['integer', 'min:0'],
-            'productos' => ['present', 'array', 'max:20'],
-            'productos.*' => ['integer', 'min:0'],
-        ]);
-
-        $comercio = $this->comercio();
-
-        try {
-            $creado = $this->asistente->crearInventario($comercio, $generacion, $datos['categorias'], $datos['productos']);
-        } catch (ErrorDeIa $e) {
-            return $this->error($comercio, $e->getMessage(), $e->estadoHttp);
-        }
-
-        return response()->json(['creado' => $creado]);
     }
 
     /** Comercio dueño del catálogo: el autenticado o el que inspecciona el admin. */

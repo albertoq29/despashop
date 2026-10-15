@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import axios from 'axios';
 import { AnimatePresence, motion } from 'motion/react';
-import { AlertCircle, ArrowLeft, Check, Info, Loader2, Package, Palette, PenLine, RotateCcw, Sparkles, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Check, Info, Loader2, Palette, PenLine, RotateCcw, Sparkles, X } from 'lucide-react';
 import { contrasteSobre } from '../colores';
 import { TIPOS_DE_SECCION } from '../secciones';
 import { Segmentado } from './Controles';
@@ -11,7 +11,6 @@ const SALIDA = [0.23, 1, 0.32, 1];
 const QUE_PROPONER = [
     { clave: 'diseno', titulo: 'Diseño', texto: 'Colores, letras y estilo', Icono: Palette },
     { clave: 'textos', titulo: 'Textos y secciones', texto: 'Portada, beneficios, orden', Icono: PenLine },
-    { clave: 'inventario', titulo: 'Productos de ejemplo', texto: 'Categorías y borradores', Icono: Package },
 ];
 
 /**
@@ -76,21 +75,18 @@ const PASOS_DE_ESPERA = [
  * Asistente para crear el catálogo a partir de una descripción.
  *
  * Nada de lo que propone se guarda solo: el diseño y los textos pasan al
- * borrador del editor (se ven en la vista previa y se pueden deshacer) y el
- * inventario de ejemplo se crea únicamente si el comercio lo elige.
+ * borrador del editor, se ven en la vista previa y se pueden deshacer.
  */
-export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, onAplicar, onInventarioCreado }) {
+export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, onAplicar }) {
     const [paso, setPaso] = useState('escribir');
     const [descripcion, setDescripcion] = useState('');
     const [indicaciones, setIndicaciones] = useState('');
     const [tono, setTono] = useState('cercano');
-    const [incluir, setIncluir] = useState({ diseno: true, textos: true, inventario: false });
+    const [incluir, setIncluir] = useState({ diseno: true, textos: true });
     const [preferencias, setPreferencias] = useState({ estilo: '', fondo: '', letras: '' });
     const [extras, setExtras] = useState([]);
     const [error, setError] = useState(null);
     const [resultado, setResultado] = useState(null);
-    const [elegidos, setElegidos] = useState({ categorias: [], productos: [] });
-    const [aplicando, setAplicando] = useState(false);
     const peticion = useRef(0);
     const titulo = useId();
 
@@ -100,7 +96,7 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
             return undefined;
         }
 
-        const alPulsar = (evento) => evento.key === 'Escape' && !aplicando && onCerrar();
+        const alPulsar = (evento) => evento.key === 'Escape' && onCerrar();
         const anterior = document.body.style.overflow;
 
         document.addEventListener('keydown', alPulsar);
@@ -110,7 +106,7 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
             document.removeEventListener('keydown', alPulsar);
             document.body.style.overflow = anterior;
         };
-    }, [abierto, aplicando, onCerrar]);
+    }, [abierto, onCerrar]);
 
     const espera = useCuentaRegresiva(uso);
 
@@ -136,10 +132,6 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
 
             onUso(data.uso);
             setResultado(data);
-            setElegidos({
-                categorias: (data.propuesta.inventario?.categorias ?? []).map((_, i) => i),
-                productos: (data.propuesta.inventario?.productos ?? []).map((_, i) => i),
-            });
             setPaso('propuesta');
         } catch (e) {
             if (id !== peticion.current) {
@@ -161,28 +153,10 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
         }
     };
 
-    const aplicar = async () => {
-        const { propuesta, generacion_id: generacionId } = resultado;
-        setAplicando(true);
-        setError(null);
-
-        onAplicar(propuesta);
-
-        const conInventario = elegidos.categorias.length > 0 || elegidos.productos.length > 0;
-
-        if (propuesta.inventario && conInventario) {
-            try {
-                const { data } = await axios.post(route('catalogo.ia.inventario', generacionId), elegidos);
-                onInventarioCreado(data.creado);
-            } catch (e) {
-                setError(e.response?.data?.message ?? 'Se aplicó el diseño, pero no pudimos crear los productos de ejemplo.');
-                setAplicando(false);
-
-                return;
-            }
-        }
-
-        setAplicando(false);
+    // Nada de esto habla con el servidor: el diseño y los textos van al
+    // borrador del editor, que es donde el comercio los revisa y guarda.
+    const aplicar = () => {
+        onAplicar(resultado.propuesta);
         reiniciar();
         onCerrar();
     };
@@ -194,10 +168,6 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
     };
 
     const cerrar = () => {
-        if (aplicando) {
-            return;
-        }
-
         // Una petición en curso se ignora al volver; la descripción se conserva
         peticion.current++;
 
@@ -245,14 +215,13 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
                                     Crea tu catálogo con IA
                                 </h2>
                                 <p className="mt-0.5 text-xs text-stone-500 dark:text-stone-400">
-                                    Describe tu negocio y te proponemos diseño, textos y productos de ejemplo.
+                                    Describe tu negocio y te proponemos el diseño y los textos.
                                 </p>
                             </div>
                             <Cupo uso={uso} />
                             <button
                                 type="button"
                                 onClick={cerrar}
-                                disabled={aplicando}
                                 aria-label="Cerrar"
                                 className="pulsable -mr-1 grid h-9 w-9 shrink-0 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 disabled:opacity-40 dark:text-stone-400 dark:hover:bg-stone-800"
                             >
@@ -291,12 +260,7 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
                                     )}
                                     {paso === 'generando' && <Generando />}
                                     {paso === 'propuesta' && resultado && (
-                                        <Propuesta
-                                            propuesta={resultado.propuesta}
-                                            elegidos={elegidos}
-                                            onElegidos={setElegidos}
-                                            error={error}
-                                        />
+                                        <Propuesta propuesta={resultado.propuesta} error={error} />
                                     )}
                                 </motion.div>
                             </AnimatePresence>
@@ -309,7 +273,6 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
                                     <button
                                         type="button"
                                         onClick={reiniciar}
-                                        disabled={aplicando}
                                         className="pulsable inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-stone-600 hover:bg-stone-200/70 disabled:opacity-50 dark:text-stone-300 dark:hover:bg-stone-800"
                                     >
                                         <ArrowLeft className="h-4 w-4" />
@@ -319,7 +282,7 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
                                     <button
                                         type="button"
                                         onClick={generar}
-                                        disabled={aplicando || sinCupo || espera > 0}
+                                        disabled={sinCupo || espera > 0}
                                         title={sinCupo ? 'Ya usaste tus creaciones de hoy' : undefined}
                                         className="pulsable inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 disabled:opacity-50 dark:border-stone-700 dark:bg-stone-900 dark:text-stone-200 dark:hover:bg-stone-800"
                                     >
@@ -329,10 +292,9 @@ export default function AsistenteIa({ abierto, onCerrar, uso, onUso, limites, on
                                     <button
                                         type="button"
                                         onClick={aplicar}
-                                        disabled={aplicando}
-                                        className="pulsable boton-elevado inline-flex items-center gap-1.5 rounded-lg bg-marca-700 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-600 disabled:opacity-60 dark:bg-marca-500 dark:text-stone-950 dark:hover:bg-marca-400"
+                                        className="pulsable boton-elevado inline-flex items-center gap-1.5 rounded-lg bg-marca-700 px-4 py-2 text-sm font-semibold text-white hover:bg-marca-600 dark:bg-marca-500 dark:text-stone-950 dark:hover:bg-marca-400"
                                     >
-                                        {aplicando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                                        <Check className="h-4 w-4" />
                                         Aplicar al catálogo
                                     </button>
                                 </>
@@ -432,7 +394,7 @@ function Escribir({
 
             <div>
                 <p className="mb-2 text-sm font-medium text-stone-800 dark:text-stone-200">Qué quieres que proponga</p>
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-2">
                     {QUE_PROPONER.map(({ clave, titulo, texto, Icono }) => {
                         const activo = incluir[clave];
 
@@ -626,16 +588,8 @@ function Generando() {
 
 /* ── Paso 3: la propuesta ───────────────────────────────────────────────── */
 
-function Propuesta({ propuesta, elegidos, onElegidos, error }) {
-    const { tema, textos, sections: secciones, inventario, concepto } = propuesta;
-
-    const alternar = (lista, indice) =>
-        onElegidos((anterior) => ({
-            ...anterior,
-            [lista]: anterior[lista].includes(indice)
-                ? anterior[lista].filter((i) => i !== indice)
-                : [...anterior[lista], indice],
-        }));
+function Propuesta({ propuesta, error }) {
+    const { tema, textos, sections: secciones, concepto } = propuesta;
 
     return (
         <div className="space-y-6">
@@ -688,45 +642,6 @@ function Propuesta({ propuesta, elegidos, onElegidos, error }) {
                                 );
                             })}
                     </ol>
-                </Apartado>
-            )}
-
-            {inventario && (inventario.categorias.length > 0 || inventario.productos.length > 0) && (
-                <Apartado
-                    titulo="Productos de ejemplo"
-                    descripcion="Se crean ocultos, sin precio ni fotos, para que los completes en Inventario. Desmarca los que no quieras."
-                >
-                    {inventario.categorias.length > 0 && (
-                        <div className="mb-3 flex flex-wrap gap-1.5">
-                            {inventario.categorias.map((nombre, indice) => (
-                                <Casilla
-                                    key={nombre}
-                                    activa={elegidos.categorias.includes(indice)}
-                                    onClick={() => alternar('categorias', indice)}
-                                    compacta
-                                >
-                                    {nombre}
-                                </Casilla>
-                            ))}
-                        </div>
-                    )}
-
-                    <div className="grid gap-1.5 sm:grid-cols-2">
-                        {inventario.productos.map((producto, indice) => (
-                            <Casilla
-                                key={producto.nombre}
-                                activa={elegidos.productos.includes(indice)}
-                                onClick={() => alternar('productos', indice)}
-                            >
-                                <span className="block text-[13px] font-medium text-stone-800 dark:text-stone-100">{producto.nombre}</span>
-                                {producto.descripcion && (
-                                    <span className="mt-0.5 block text-[11px] leading-snug text-stone-500 dark:text-stone-400">
-                                        {producto.descripcion}
-                                    </span>
-                                )}
-                            </Casilla>
-                        ))}
-                    </div>
                 </Apartado>
             )}
         </div>
@@ -796,38 +711,12 @@ function Pildora({ activa, papel, titulo, onClick, children }) {
     );
 }
 
-function Apartado({ titulo, descripcion, children }) {
+function Apartado({ titulo, children }) {
     return (
         <section>
             <h3 className="text-sm font-semibold text-stone-800 dark:text-stone-100">{titulo}</h3>
-            {descripcion && <p className="mt-0.5 text-[11px] text-stone-500 dark:text-stone-400">{descripcion}</p>}
             <div className="mt-2.5">{children}</div>
         </section>
-    );
-}
-
-function Casilla({ activa, onClick, children, compacta = false }) {
-    return (
-        <button
-            type="button"
-            role="checkbox"
-            aria-checked={activa}
-            onClick={onClick}
-            className={`pulsable flex items-start gap-2 rounded-lg border text-left ${compacta ? 'px-2.5 py-1.5 text-xs' : 'p-2.5'} ${
-                activa
-                    ? 'border-marca-600/60 bg-marca-50/60 dark:border-marca-500/60 dark:bg-marca-950/30'
-                    : 'border-stone-200 opacity-60 hover:opacity-100 dark:border-stone-800'
-            }`}
-        >
-            <span
-                className={`mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded transition-colors ${
-                    activa ? 'bg-marca-600 text-white dark:bg-marca-500 dark:text-stone-950' : 'border border-stone-300 dark:border-stone-600'
-                }`}
-            >
-                {activa && <Check className="h-3 w-3" strokeWidth={3} />}
-            </span>
-            <span className="min-w-0">{children}</span>
-        </button>
     );
 }
 
