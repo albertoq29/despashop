@@ -204,7 +204,9 @@ class ImportacionDeProductos
      */
     private function dinero(mixed $valor): ?float
     {
-        if (is_numeric($valor)) {
+        // Solo si el Excel lo entregó como número. Una cadena como «1.450»
+        // también pasa por `is_numeric` y vale 1,45: hay que leerla abajo.
+        if (is_int($valor) || is_float($valor)) {
             return round(max(0, (float) $valor), 2) ?: null;
         }
 
@@ -220,11 +222,28 @@ class ImportacionDeProductos
         if ($ultimaComa !== false && ($ultimoPunto === false || $ultimaComa > $ultimoPunto)) {
             $texto = str_replace('.', '', $texto);
             $texto = str_replace(',', '.', $texto);
+        } elseif ($this->esSeparadorDeMiles($texto)) {
+            $texto = str_replace('.', '', $texto);
         } else {
             $texto = str_replace(',', '', $texto);
         }
 
         return is_numeric($texto) ? (round(max(0, (float) $texto), 2) ?: null) : null;
+    }
+
+    /**
+     * Si ese punto separa los miles y no los decimales.
+     *
+     * «1.450» son mil cuatrocientos cincuenta tornillos, no uno con
+     * cuarenta y cinco; leerlo al revés deja el inventario en la milésima
+     * parte. La señal es la de siempre, la que usa cualquier hoja de
+     * cálculo: un solo separador con exactamente tres cifras detrás.
+     *
+     * Con un cero delante no vale: «0.500» es medio kilo, no quinientos.
+     */
+    private function esSeparadorDeMiles(string $texto): bool
+    {
+        return (bool) preg_match('/^[1-9]\d{0,2}\.\d{3}$/', $texto);
     }
 
     private function existencias(mixed $valor, string $unidad): float
@@ -251,7 +270,9 @@ class ImportacionDeProductos
             'ml' => ['ml', 'mililitro', 'mililitros', 'cc'],
             'm' => ['m', 'mt', 'mts', 'metro', 'metros'],
             'cm' => ['cm', 'centimetro', 'centimetros'],
-            'm2' => ['m2', 'metro cuadrado', 'metros cuadrados'],
+            'm2' => ['m2', 'mt2', 'metro cuadrado', 'metros cuadrados'],
+            'm3' => ['m3', 'mt3', 'metro cubico', 'metros cubicos'],
+            'gal' => ['gal', 'gln', 'galon', 'galones'],
             'caja' => ['caja', 'cajas', 'cj', 'box'],
             'paquete' => ['paquete', 'paquetes', 'paq', 'pack'],
             'bulto' => ['bulto', 'bultos', 'saco', 'sacos'],

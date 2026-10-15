@@ -21,6 +21,8 @@ const UNIDADES = {
     m: { corto: 'm', uno: 'metro', fraccion: true },
     cm: { corto: 'cm', uno: 'centímetro', fraccion: false },
     m2: { corto: 'm²', uno: 'metro cuadrado', fraccion: true },
+    m3: { corto: 'm³', uno: 'metro cúbico', fraccion: true },
+    gal: { corto: 'gal', uno: 'galón', fraccion: true },
 };
 
 const POR_DEFECTO = UNIDADES.unidad;

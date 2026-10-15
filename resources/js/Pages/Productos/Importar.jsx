@@ -4,6 +4,7 @@ import {
     AlertTriangle,
     ArrowLeft,
     Check,
+    ChevronRight,
     FileSpreadsheet,
     List,
     Loader2,
@@ -51,12 +52,13 @@ export default function Importar({ campos, maximoFilas, limite }) {
     const [enviando, setEnviando] = useState(false);
     const entrada = useRef(null);
 
-    // Sobre la tabla se decide mejor —se ve el dato mientras se elige—, pero
-    // una hoja de doce columnas no cabe en un teléfono por mucho que se
-    // achique. Allá queda la lista, que hace exactamente lo mismo.
+    // Decidir viendo el dato es mejor en cualquier pantalla; lo que cambia es
+    // la forma. En computadora cabe la hoja entera y se asigna sobre ella; en
+    // un teléfono no cabe, así que se le da la vuelta y va una columna a la
+    // vez, a lo ancho. La lista de siempre sigue estando en las dos.
     const esEscritorio = useEsEscritorio();
-    const [modo, setModo] = useState('tabla');
-    const sobreLaTabla = esEscritorio && modo === 'tabla';
+    const [modo, setModo] = useState('visual');
+    const esVisual = modo === 'visual';
 
     const leer = async (file) => {
         if (!file) {
@@ -240,45 +242,46 @@ export default function Importar({ campos, maximoFilas, limite }) {
                                         ¿Qué trae cada columna?
                                     </h2>
                                     <p className="mt-1 text-sm text-stone-500 dark:text-stone-400">
-                                        {sobreLaTabla
-                                            ? 'Esto es lo que entendimos. Toca el encabezado de una columna para decir qué es.'
+                                        {esVisual
+                                            ? (esEscritorio
+                                                ? 'Esto es lo que entendimos. Toca el encabezado de una columna para decir qué es.'
+                                                : 'Esto es lo que entendimos. Toca una columna para decir qué es.')
                                             : 'Esto es lo que entendimos. Corrige lo que haga falta; lo que dejes en «No importar» se queda vacío.'}
                                     </p>
                                 </div>
 
-                                {esEscritorio && (
-                                    <div role="radiogroup" aria-label="Cómo asignar las columnas" className="flex shrink-0 gap-1 rounded-lg bg-stone-100 p-1 dark:bg-stone-800">
-                                        {[
-                                            { id: 'tabla', texto: 'Sobre la tabla', Icono: MousePointerClick },
-                                            { id: 'lista', texto: 'En lista', Icono: List },
-                                        ].map(({ id, texto, Icono }) => (
-                                            <button
-                                                key={id}
-                                                type="button"
-                                                role="radio"
-                                                aria-checked={modo === id}
-                                                onClick={() => setModo(id)}
-                                                className={`pulsable inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
-                                                    modo === id
-                                                        ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-950 dark:text-stone-100'
-                                                        : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100'
-                                                }`}
-                                            >
-                                                <Icono className="h-3.5 w-3.5" />
-                                                {texto}
-                                            </button>
-                                        ))}
-                                    </div>
-                                )}
+                                <div role="radiogroup" aria-label="Cómo asignar las columnas" className="flex shrink-0 gap-1 rounded-lg bg-stone-100 p-1 dark:bg-stone-800">
+                                    {[
+                                        { id: 'visual', texto: esEscritorio ? 'Sobre la tabla' : 'Por columna', Icono: MousePointerClick },
+                                        { id: 'lista', texto: 'En lista', Icono: List },
+                                    ].map(({ id, texto, Icono }) => (
+                                        <button
+                                            key={id}
+                                            type="button"
+                                            role="radio"
+                                            aria-checked={modo === id}
+                                            onClick={() => setModo(id)}
+                                            className={`pulsable inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                                                modo === id
+                                                    ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-950 dark:text-stone-100'
+                                                    : 'text-stone-500 hover:text-stone-800 dark:text-stone-400 dark:hover:text-stone-100'
+                                            }`}
+                                        >
+                                            <Icono className="h-3.5 w-3.5" />
+                                            {texto}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
 
-                            {sobreLaTabla ? (
-                                <TablaAsignable
+                            {esVisual ? (
+                                <Asignador
                                     campos={campos}
                                     columnas={columnas}
                                     onColumnas={setColumnas}
                                     encabezados={encabezados}
                                     filas={filas}
+                                    esEscritorio={esEscritorio}
                                 />
                             ) : (
                             <div className="mt-4 space-y-2">
@@ -338,7 +341,7 @@ export default function Importar({ campos, maximoFilas, limite }) {
                             )}
                         </div>
 
-                        {! sobreLaTabla && <Vistazo campos={campos} columnas={columnas} filas={filas} />}
+                        {! esVisual && <Vistazo campos={campos} columnas={columnas} filas={filas} />}
 
                         <div className="rounded-xl border border-stone-200 bg-white px-4 py-3.5 dark:border-stone-800 dark:bg-stone-900">
                             <Interruptor
@@ -460,7 +463,7 @@ const FILAS_EN_LA_TABLA = 6;
  *
  * Solo en computadora: una hoja de doce columnas no cabe en un teléfono.
  */
-function TablaAsignable({ campos, columnas, onColumnas, encabezados, filas }) {
+function Asignador({ campos, columnas, onColumnas, encabezados, filas, esEscritorio }) {
     const [abierta, setAbierta] = useState(null);
 
     // Qué campos cuelgan de cada columna; normalmente uno, a veces ninguno
@@ -493,6 +496,34 @@ function TablaAsignable({ campos, columnas, onColumnas, encabezados, filas }) {
         });
         setAbierta(null);
     };
+
+    if (! esEscritorio) {
+        return (
+            <div className="mt-4">
+                <TarjetasDeColumna
+                    encabezados={encabezados}
+                    filas={filas}
+                    porColumna={porColumna}
+                    onAbrir={setAbierta}
+                />
+
+                {abierta !== null && (
+                    <HojaDeCampos
+                        campos={campos}
+                        columnas={columnas}
+                        encabezados={encabezados}
+                        indice={abierta}
+                        asignados={porColumna.get(abierta) ?? []}
+                        onElegir={(clave) => asignar(abierta, clave)}
+                        onLimpiar={() => limpiarColumna(abierta)}
+                        onCerrar={() => setAbierta(null)}
+                    />
+                )}
+
+                <ResumenDeCampos campos={campos} columnas={columnas} onQuitar={quitar} />
+            </div>
+        );
+    }
 
     return (
         <div className="mt-4">
@@ -603,8 +634,6 @@ function MenuDeCampos({ campos, columnas, encabezados, indice, asignados, onEleg
         return () => document.removeEventListener('keydown', alPulsar);
     }, [onCerrar]);
 
-    const yaPuestos = asignados.map((campo) => campo.clave);
-
     return (
         <>
             {/* Cerrar al tocar fuera, sin tapar la tabla con un velo oscuro */}
@@ -620,43 +649,14 @@ function MenuDeCampos({ campos, columnas, encabezados, indice, asignados, onEleg
                     ¿Qué es «{encabezados[indice] || `Columna ${indice + 1}`}»?
                 </p>
 
-                <div className="max-h-72 overflow-y-auto py-1">
-                    {campos.map((campo) => {
-                        const donde = columnas[campo.clave];
-                        const enOtra = donde !== undefined && donde !== null && donde !== '' && donde !== indice;
-                        const aqui = yaPuestos.includes(campo.clave);
-
-                        return (
-                            <button
-                                key={campo.clave}
-                                type="button"
-                                onClick={() => onElegir(campo.clave)}
-                                className={`flex w-full items-start gap-2 px-3 py-2 text-left text-sm hover:bg-stone-100 dark:hover:bg-stone-800 ${
-                                    aqui ? 'bg-marca-50 dark:bg-marca-950/50' : ''
-                                }`}
-                            >
-                                <span className="mt-0.5 w-4 shrink-0">
-                                    {aqui && <Check className="h-4 w-4 text-marca-700 dark:text-marca-400" strokeWidth={3} />}
-                                </span>
-                                <span className="min-w-0 flex-1">
-                                    <span className="block font-medium text-stone-800 dark:text-stone-100">
-                                        {campo.nombre}
-                                        {campo.obligatorio && (
-                                            <span className="ml-1 text-[10px] font-bold uppercase text-marca-700 dark:text-marca-400">
-                                                obligatorio
-                                            </span>
-                                        )}
-                                    </span>
-                                    {enOtra && (
-                                        <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-500">
-                                            Ahora está en «{encabezados[donde] || `Columna ${donde + 1}`}»
-                                        </span>
-                                    )}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+                <ListaDeCampos
+                    campos={campos}
+                    columnas={columnas}
+                    encabezados={encabezados}
+                    indice={indice}
+                    asignados={asignados}
+                    onElegir={onElegir}
+                />
 
                 {asignados.length > 0 && (
                     <button
@@ -732,6 +732,211 @@ function ResumenDeCampos({ campos, columnas, onQuitar }) {
                     ))}
                 </div>
             </div>
+        </div>
+    );
+}
+
+
+/**
+ * Una columna por tarjeta, a lo ancho.
+ *
+ * La tabla de la computadora en un teléfono es un desastre: once columnas
+ * son mil seiscientos píxeles de desplazamiento lateral, y al llegar a la
+ * sexta ya no se ve de cuál era el encabezado. Dada vuelta funciona: cada
+ * columna ocupa el ancho entero, con sus primeros valores a la vista, que es
+ * lo único que hace falta para decidir qué es.
+ */
+function TarjetasDeColumna({ encabezados, filas, porColumna, onAbrir }) {
+    return (
+        <div className="space-y-2.5">
+            {encabezados.map((encabezado, indice) => {
+                const asignados = porColumna.get(indice) ?? [];
+                const activa = asignados.length > 0;
+                const valores = filas
+                    .slice(0, 12)
+                    .map((fila) => String(fila?.[indice] ?? '').trim())
+                    .filter(Boolean)
+                    .slice(0, 3);
+
+                return (
+                    <button
+                        key={indice}
+                        type="button"
+                        onClick={() => onAbrir(indice)}
+                        className={`pulsable flex w-full items-center gap-3 rounded-xl border p-3.5 text-left ${
+                            activa
+                                ? 'border-marca-300 bg-marca-50/60 dark:border-marca-800 dark:bg-marca-950/40'
+                                : 'border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
+                        }`}
+                    >
+                        <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                                <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                                    {encabezado || `Columna ${indice + 1}`}
+                                </span>
+                                <span className="shrink-0 text-[10px] text-stone-300 dark:text-stone-600">
+                                    {indice + 1}/{encabezados.length}
+                                </span>
+                            </span>
+
+                            {/* Los datos de verdad: es lo que permite decidir */}
+                            <span className="mt-1 block truncate text-sm text-stone-600 dark:text-stone-400">
+                                {valores.length > 0 ? valores.join(' · ') : 'Columna vacía'}
+                            </span>
+
+                            <span className="mt-2 flex flex-wrap items-center gap-1">
+                                {activa ? (
+                                    asignados.map((campo) => (
+                                        <span
+                                            key={campo.clave}
+                                            className="inline-flex items-center gap-1 rounded-md bg-marca-700 px-2 py-0.5 text-[11px] font-semibold text-white dark:bg-marca-600"
+                                        >
+                                            <Check className="h-3 w-3" strokeWidth={3} />
+                                            {campo.nombre}
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-[11px] font-medium text-stone-400 dark:text-stone-500">
+                                        Toca para decir qué es
+                                    </span>
+                                )}
+                            </span>
+                        </span>
+
+                        <ChevronRight className="h-5 w-5 shrink-0 text-stone-300 dark:text-stone-600" />
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+/**
+ * La lista de campos, subiendo desde abajo.
+ *
+ * En un teléfono un menú colgado de una tarjeta se sale de la pantalla o
+ * queda debajo del teclado. Desde abajo cabe entero, se alcanza con el
+ * pulgar y se cierra deslizando o tocando fuera.
+ */
+function HojaDeCampos({ campos, columnas, encabezados, indice, asignados, onElegir, onLimpiar, onCerrar }) {
+    useEffect(() => {
+        const alPulsar = (evento) => evento.key === 'Escape' && onCerrar();
+        const anterior = document.body.style.overflow;
+
+        document.addEventListener('keydown', alPulsar);
+        document.body.style.overflow = 'hidden';
+
+        return () => {
+            document.removeEventListener('keydown', alPulsar);
+            document.body.style.overflow = anterior;
+        };
+    }, [onCerrar]);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end" role="dialog" aria-modal="true">
+            <button
+                type="button"
+                aria-label="Cerrar"
+                onClick={onCerrar}
+                className="absolute inset-0 bg-stone-950/50"
+            />
+
+            <div className="relative flex max-h-[80dvh] w-full flex-col rounded-t-2xl bg-white shadow-2xl dark:bg-stone-900">
+                <div className="shrink-0 border-b border-stone-200 px-5 pb-3 pt-4 dark:border-stone-800">
+                    <span aria-hidden="true" className="mx-auto mb-3 block h-1 w-10 rounded-full bg-stone-300 dark:bg-stone-700" />
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
+                        Columna {indice + 1} de {encabezados.length}
+                    </p>
+                    <h3 className="mt-0.5 truncate font-display text-lg font-semibold text-stone-900 dark:text-stone-100">
+                        ¿Qué es «{encabezados[indice] || `Columna ${indice + 1}`}»?
+                    </h3>
+                </div>
+
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                    <ListaDeCampos
+                        campos={campos}
+                        columnas={columnas}
+                        encabezados={encabezados}
+                        indice={indice}
+                        asignados={asignados}
+                        onElegir={onElegir}
+                        holgada
+                    />
+                </div>
+
+                <div className="flex shrink-0 gap-2 border-t border-stone-200 px-4 py-3 dark:border-stone-800">
+                    {asignados.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={onLimpiar}
+                            className="pulsable inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-stone-300 px-4 py-3 text-sm font-semibold text-stone-700 dark:border-stone-700 dark:text-stone-200"
+                        >
+                            <X className="h-4 w-4" />
+                            No importar
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={onCerrar}
+                        className="pulsable flex-1 rounded-xl bg-stone-900 px-4 py-3 text-sm font-semibold text-white dark:bg-stone-100 dark:text-stone-900"
+                    >
+                        Listo
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Los campos entre los que se elige, con dónde está puesto cada uno.
+ *
+ * La usan el menú de la computadora y la hoja del teléfono: es la misma
+ * decisión, y si se escribiera dos veces se contradirían a la primera.
+ */
+function ListaDeCampos({ campos, columnas, encabezados, indice, asignados, onElegir, holgada = false }) {
+    const yaPuestos = asignados.map((campo) => campo.clave);
+
+    return (
+        <div className={holgada ? 'py-1' : 'max-h-72 overflow-y-auto py-1'}>
+            {campos.map((campo) => {
+                const donde = columnas[campo.clave];
+                const enOtra = donde !== undefined && donde !== null && donde !== '' && donde !== indice;
+                const aqui = yaPuestos.includes(campo.clave);
+
+                return (
+                    <button
+                        key={campo.clave}
+                        type="button"
+                        onClick={() => onElegir(campo.clave)}
+                        className={`flex w-full items-start gap-2 text-left hover:bg-stone-100 dark:hover:bg-stone-800 ${
+                            holgada ? 'px-5 py-3' : 'px-3 py-2 text-sm'
+                        } ${aqui ? 'bg-marca-50 dark:bg-marca-950/50' : ''}`}
+                    >
+                        <span className="mt-0.5 w-4 shrink-0">
+                            {aqui && <Check className="h-4 w-4 text-marca-700 dark:text-marca-400" strokeWidth={3} />}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className={`block font-medium text-stone-800 dark:text-stone-100 ${holgada ? 'text-base' : ''}`}>
+                                {campo.nombre}
+                                {campo.obligatorio && (
+                                    <span className="ml-1 text-[10px] font-bold uppercase text-marca-700 dark:text-marca-400">
+                                        obligatorio
+                                    </span>
+                                )}
+                            </span>
+                            {holgada && (
+                                <span className="mt-0.5 block text-xs text-stone-500 dark:text-stone-400">{campo.ayuda}</span>
+                            )}
+                            {enOtra && (
+                                <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-500">
+                                    Ahora está en «{encabezados[donde] || `Columna ${donde + 1}`}»
+                                </span>
+                            )}
+                        </span>
+                    </button>
+                );
+            })}
         </div>
     );
 }

@@ -36,6 +36,8 @@ class UnidadesDeMedida
         'm' => ['nombre' => 'Metros', 'corto' => 'm', 'uno' => 'metro', 'fraccion' => true, 'grupo' => 'Por medida'],
         'cm' => ['nombre' => 'Centímetros', 'corto' => 'cm', 'uno' => 'centímetro', 'fraccion' => false, 'grupo' => 'Por medida'],
         'm2' => ['nombre' => 'Metros cuadrados', 'corto' => 'm²', 'uno' => 'metro cuadrado', 'fraccion' => true, 'grupo' => 'Por medida'],
+        'm3' => ['nombre' => 'Metros cúbicos', 'corto' => 'm³', 'uno' => 'metro cúbico', 'fraccion' => true, 'grupo' => 'Por medida'],
+        'gal' => ['nombre' => 'Galones', 'corto' => 'gal', 'uno' => 'galón', 'fraccion' => true, 'grupo' => 'Por volumen'],
     ];
 
     /** @return list<string> */

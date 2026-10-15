@@ -249,6 +249,61 @@ class ImportacionDeProductosTest extends TestCase
         $this->assertNull($precios['Vacio']);
     }
 
+    /**
+     * Pasó con un inventario de ferretería de verdad: la columna decía
+     * «1.450» tornillos y entraron como 1. Un punto con tres cifras detrás
+     * separa los miles, que es como lo lee cualquier hoja de cálculo.
+     */
+    public function test_un_punto_de_miles_no_se_come_el_inventario(): void
+    {
+        $this->importar(
+            [
+                ['Tornillos', '1.450'],
+                ['Clavos', '12.500'],
+                // Dos cifras detrás son decimales de verdad
+                ['Cemento', '8.75'],
+                // Con un cero delante también: medio kilo, no quinientos
+                ['Queso', '0.500'],
+            ],
+            ['nombre' => 0, 'existencias' => 1],
+        )->assertSessionHasNoErrors();
+
+        $existencias = $this->comoTenant(fn () => Product::pluck('stock', 'name'));
+
+        $this->assertSame(1450.0, $existencias['Tornillos']);
+        $this->assertSame(12500.0, $existencias['Clavos']);
+        $this->assertSame(9.0, $existencias['Cemento']);
+        $this->assertSame(1.0, $existencias['Queso']);
+    }
+
+    public function test_reconoce_las_unidades_de_una_ferreteria(): void
+    {
+        $this->importar(
+            [
+                ['Arena lavada', '12,75', 'M3'],
+                ['Pintura', '48', 'GLN'],
+                ['Cemento', '85', 'SACO'],
+                ['Cable', '320,5', 'MTS'],
+                ['Tornillo', '1.450', 'PZA'],
+            ],
+            ['nombre' => 0, 'existencias' => 1, 'unidad' => 2],
+        )->assertSessionHasNoErrors();
+
+        $this->comoTenant(function () {
+            $unidades = Product::pluck('unidad', 'name');
+
+            $this->assertSame('m3', $unidades['Arena lavada']);
+            $this->assertSame('gal', $unidades['Pintura']);
+            $this->assertSame('bulto', $unidades['Cemento']);
+            $this->assertSame('m', $unidades['Cable']);
+            $this->assertSame('unidad', $unidades['Tornillo']);
+
+            // Y los metros cúbicos admiten partes: 12,75 no es 13
+            $this->assertSame(12.75, Product::where('name', 'Arena lavada')->value('stock'));
+            $this->assertSame(1450.0, Product::where('name', 'Tornillo')->value('stock'));
+        });
+    }
+
     public function test_entiende_las_unidades_como_las_escribe_cada_quien(): void
     {
         $this->importar(
