@@ -465,6 +465,7 @@ const FILAS_EN_LA_TABLA = 6;
  */
 function Asignador({ campos, columnas, onColumnas, encabezados, filas, esEscritorio }) {
     const [abierta, setAbierta] = useState(null);
+    const anclas = useRef([]);
 
     // Qué campos cuelgan de cada columna; normalmente uno, a veces ninguno
     const porColumna = new Map();
@@ -538,12 +539,13 @@ function Asignador({ campos, columnas, onColumnas, encabezados, filas, esEscrito
                                 return (
                                     <th
                                         key={indice}
-                                        className={`relative border-b border-r border-stone-200 p-0 align-top last:border-r-0 dark:border-stone-800 ${
+                                        className={`border-b border-r border-stone-200 p-0 align-top last:border-r-0 dark:border-stone-800 ${
                                             activa ? 'bg-marca-50/70 dark:bg-marca-950/40' : 'bg-stone-50 dark:bg-stone-900'
                                         }`}
                                     >
                                         <button
                                             type="button"
+                                            ref={(nodo) => { anclas.current[indice] = nodo; }}
                                             onClick={() => setAbierta(abierta === indice ? null : indice)}
                                             aria-expanded={abierta === indice}
                                             className="pulsable w-full min-w-[9rem] max-w-[16rem] px-3 py-2.5 text-left hover:bg-white/70 dark:hover:bg-stone-800/70"
@@ -578,6 +580,7 @@ function Asignador({ campos, columnas, onColumnas, encabezados, filas, esEscrito
                                                 encabezados={encabezados}
                                                 indice={indice}
                                                 asignados={asignados}
+                                                anclaRef={{ current: anclas.current[indice] }}
                                                 onElegir={(clave) => asignar(indice, clave)}
                                                 onLimpiar={() => limpiarColumna(indice)}
                                                 onCerrar={() => setAbierta(null)}
@@ -625,14 +628,46 @@ function Asignador({ campos, columnas, onColumnas, encabezados, filas, esEscrito
  * Si el campo ya está puesto en otra, se dice en cuál: elegirlo aquí lo
  * mueve, y conviene saberlo antes de tocar.
  */
-function MenuDeCampos({ campos, columnas, encabezados, indice, asignados, onElegir, onLimpiar, onCerrar }) {
+function MenuDeCampos({ campos, columnas, encabezados, indice, asignados, onElegir, onLimpiar, onCerrar, anclaRef }) {
+    // Posición fija calculada desde el botón, y no colgada de él: la tabla
+    // se desplaza de lado, y un menú dentro de ese desplazamiento se recorta.
+    // A la última columna la dejaba inservible.
+    const [sitio, setSitio] = useState({ top: -9999, left: -9999 });
+
     useEffect(() => {
         const alPulsar = (evento) => evento.key === 'Escape' && onCerrar();
 
-        document.addEventListener('keydown', alPulsar);
+        const colocar = () => {
+            const ancla = anclaRef?.current;
 
-        return () => document.removeEventListener('keydown', alPulsar);
-    }, [onCerrar]);
+            if (! ancla) {
+                return;
+            }
+
+            const caja = ancla.getBoundingClientRect();
+            const ANCHO = 256;
+            const margen = 8;
+
+            // Si no cabe a la derecha, se alinea por el borde derecho del
+            // encabezado; y si tampoco, se pega al borde de la pantalla.
+            const izquierda = caja.left + ANCHO + margen <= window.innerWidth
+                ? caja.left
+                : Math.max(margen, Math.min(caja.right - ANCHO, window.innerWidth - ANCHO - margen));
+
+            setSitio({ top: caja.bottom + 4, left: izquierda });
+        };
+
+        colocar();
+        document.addEventListener('keydown', alPulsar);
+        window.addEventListener('resize', colocar);
+        window.addEventListener('scroll', colocar, true);
+
+        return () => {
+            document.removeEventListener('keydown', alPulsar);
+            window.removeEventListener('resize', colocar);
+            window.removeEventListener('scroll', colocar, true);
+        };
+    }, [onCerrar, anclaRef]);
 
     return (
         <>
@@ -644,7 +679,10 @@ function MenuDeCampos({ campos, columnas, encabezados, indice, asignados, onEleg
                 className="fixed inset-0 z-20 cursor-default"
             />
 
-            <div className="absolute left-0 top-full z-30 mt-1 w-64 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl dark:border-stone-700 dark:bg-stone-900">
+            <div
+                style={{ top: sitio.top, left: sitio.left }}
+                className="fixed z-30 w-64 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl dark:border-stone-700 dark:bg-stone-900"
+            >
                 <p className="border-b border-stone-200 px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-stone-500 dark:border-stone-800 dark:text-stone-400">
                     ¿Qué es «{encabezados[indice] || `Columna ${indice + 1}`}»?
                 </p>
@@ -748,67 +786,101 @@ function ResumenDeCampos({ campos, columnas, onQuitar }) {
  */
 function TarjetasDeColumna({ encabezados, filas, porColumna, onAbrir }) {
     return (
-        <div className="space-y-2.5">
+        <div className="space-y-3">
             {encabezados.map((encabezado, indice) => {
                 const asignados = porColumna.get(indice) ?? [];
                 const activa = asignados.length > 0;
-                const valores = filas
-                    .slice(0, 12)
-                    .map((fila) => String(fila?.[indice] ?? '').trim())
-                    .filter(Boolean)
-                    .slice(0, 3);
+                const valores = filas.slice(0, 4).map((fila) => String(fila?.[indice] ?? '').trim());
 
                 return (
                     <button
                         key={indice}
                         type="button"
                         onClick={() => onAbrir(indice)}
-                        className={`pulsable flex w-full items-center gap-3 rounded-xl border p-3.5 text-left ${
+                        className={`pulsable block w-full overflow-hidden rounded-xl border-2 text-left transition-colors ${
                             activa
-                                ? 'border-marca-300 bg-marca-50/60 dark:border-marca-800 dark:bg-marca-950/40'
-                                : 'border-stone-200 bg-white dark:border-stone-800 dark:bg-stone-900'
+                                ? 'border-marca-500 dark:border-marca-600'
+                                : 'border-dashed border-stone-300 dark:border-stone-700'
                         }`}
                     >
-                        <span className="min-w-0 flex-1">
-                            <span className="flex items-center gap-2">
-                                <span className="truncate text-[11px] font-semibold uppercase tracking-wide text-stone-400 dark:text-stone-500">
-                                    {encabezado || `Columna ${indice + 1}`}
-                                </span>
-                                <span className="shrink-0 text-[10px] text-stone-300 dark:text-stone-600">
-                                    {indice + 1}/{encabezados.length}
-                                </span>
+                        {/* La cabecera de una columna de hoja de cálculo: la letra
+                            y el nombre. Es lo que el comercio acaba de ver en Excel. */}
+                        <span
+                            className={`flex items-center gap-2.5 px-3 py-2 ${
+                                activa ? 'bg-marca-600 dark:bg-marca-700' : 'bg-stone-200 dark:bg-stone-800'
+                            }`}
+                        >
+                            <span
+                                className={`grid h-7 w-7 shrink-0 place-items-center rounded font-mono text-sm font-bold ${
+                                    activa ? 'bg-white/20 text-white' : 'bg-white text-stone-600 dark:bg-stone-900 dark:text-stone-300'
+                                }`}
+                            >
+                                {letraDeColumna(indice)}
                             </span>
-
-                            {/* Los datos de verdad: es lo que permite decidir */}
-                            <span className="mt-1 block truncate text-sm text-stone-600 dark:text-stone-400">
-                                {valores.length > 0 ? valores.join(' · ') : 'Columna vacía'}
-                            </span>
-
-                            <span className="mt-2 flex flex-wrap items-center gap-1">
-                                {activa ? (
-                                    asignados.map((campo) => (
-                                        <span
-                                            key={campo.clave}
-                                            className="inline-flex items-center gap-1 rounded-md bg-marca-700 px-2 py-0.5 text-[11px] font-semibold text-white dark:bg-marca-600"
-                                        >
-                                            <Check className="h-3 w-3" strokeWidth={3} />
-                                            {campo.nombre}
-                                        </span>
-                                    ))
-                                ) : (
-                                    <span className="text-[11px] font-medium text-stone-400 dark:text-stone-500">
-                                        Toca para decir qué es
-                                    </span>
-                                )}
+                            <span
+                                className={`min-w-0 flex-1 truncate text-sm font-semibold ${
+                                    activa ? 'text-white' : 'text-stone-700 dark:text-stone-200'
+                                }`}
+                            >
+                                {encabezado || `Columna ${indice + 1}`}
                             </span>
                         </span>
 
-                        <ChevronRight className="h-5 w-5 shrink-0 text-stone-300 dark:text-stone-600" />
+                        {/* Las celdas, apiladas como en la hoja */}
+                        <span className="block bg-white dark:bg-stone-950">
+                            {valores.map((valor, nf) => (
+                                <span
+                                    key={nf}
+                                    className="block truncate border-b border-stone-100 px-3 py-2 text-sm text-stone-700 dark:border-stone-800/70 dark:text-stone-300"
+                                >
+                                    {valor || <span className="text-stone-300 dark:text-stone-700">—</span>}
+                                </span>
+                            ))}
+                        </span>
+
+                        {/* Qué es, en grande */}
+                        <span
+                            className={`flex items-center gap-2 px-3 py-3 ${
+                                activa
+                                    ? 'bg-marca-50 dark:bg-marca-950/60'
+                                    : 'bg-stone-50 dark:bg-stone-900'
+                            }`}
+                        >
+                            {activa ? (
+                                <>
+                                    <Check className="h-5 w-5 shrink-0 text-marca-700 dark:text-marca-400" strokeWidth={3} />
+                                    <span className="min-w-0 flex-1 truncate text-base font-bold text-marca-800 dark:text-marca-300">
+                                        {asignados.map((campo) => campo.nombre).join(' + ')}
+                                    </span>
+                                </>
+                            ) : (
+                                <>
+                                    <MousePointerClick className="h-5 w-5 shrink-0 text-stone-400 dark:text-stone-500" />
+                                    <span className="min-w-0 flex-1 text-base font-semibold text-stone-500 dark:text-stone-400">
+                                        Toca para decir qué es
+                                    </span>
+                                </>
+                            )}
+                            <ChevronRight className="h-5 w-5 shrink-0 text-stone-400 dark:text-stone-500" />
+                        </span>
                     </button>
                 );
             })}
         </div>
     );
+}
+
+/** A, B, C… como las columnas de una hoja de cálculo. */
+function letraDeColumna(indice) {
+    let letra = '';
+    let n = indice;
+
+    do {
+        letra = String.fromCharCode(65 + (n % 26)) + letra;
+        n = Math.floor(n / 26) - 1;
+    } while (n >= 0);
+
+    return letra;
 }
 
 /**
