@@ -69,6 +69,9 @@ class FacturaController extends Controller
                 // Un servicio no lleva existencias: la pantalla tiene que
                 // saberlo o le pedira stock que no existe
                 'es_servicio'             => $p->esServicio(),
+                // Hay productos a los que no se les lleva la cuenta: no se
+                // agotan ni se les descuenta nada al facturar
+                'lleva_existencias'       => $p->llevaExistencias(),
                 'es_suscripcion'          => $p->esSuscripcion(),
                 'periodo_suscripcion'     => $p->periodo_suscripcion,
                 // Un servicio se cobra por lo que dura y por donde se presta:
@@ -381,7 +384,7 @@ class FacturaController extends Controller
         $factura->load(['items.product.variants', 'items.combo']);
         foreach ($factura->items as $item) {
             // Los servicios no llevan inventario: no se les revisan existencias
-            if ($item->product_id && $item->product && ! $item->product->esServicio()) {
+            if ($item->product_id && $item->product?->llevaExistencias()) {
                 // Verificar que tenga variante seleccionada si corresponde
                 if ($item->product->variants->count() > 0 && is_null($item->product_variant_id)) {
                     return redirect()->back()->with('error', 'No puedes confirmar esta factura porque el producto "' . $item->product_name . '" tiene variantes sin especificar. Por favor edita la factura para asignar la variante.');
@@ -432,7 +435,7 @@ class FacturaController extends Controller
                 $comboQuantities = [];
                 foreach ($factura->items as $item) {
                     // Un servicio se cobra igual, pero no hay existencias que restar
-                    if ($item->product_id && ! $item->product?->esServicio()) {
+                    if ($item->product_id && $item->product?->llevaExistencias()) {
                         Product::where('id', $item->product_id)
                             ->decrement('stock', $item->qty);
 
@@ -516,6 +519,9 @@ class FacturaController extends Controller
                 // Un servicio no lleva existencias: la pantalla tiene que
                 // saberlo o le pedira stock que no existe
                 'es_servicio'             => $p->esServicio(),
+                // Hay productos a los que no se les lleva la cuenta: no se
+                // agotan ni se les descuenta nada al facturar
+                'lleva_existencias'       => $p->llevaExistencias(),
                 'es_suscripcion'          => $p->esSuscripcion(),
                 'periodo_suscripcion'     => $p->periodo_suscripcion,
                 // Un servicio se cobra por lo que dura y por donde se presta:

@@ -77,6 +77,7 @@ class ProductController extends Controller
                 // Y no son enteras: quien vende al peso registra 2,5 kg.
                 'stock'                    => 'required_unless:item_type,servicio|nullable|numeric|min:0|max:99999999',
                 'unidad'                   => ['nullable', Rule::in(UnidadesDeMedida::claves())],
+                'controla_stock'           => 'nullable|boolean',
                 'categories'               => 'nullable|array',
                 'categories.*'             => 'exists:categories,id',
                 'conditional_price'        => 'nullable|numeric|min:0.01',
@@ -122,6 +123,7 @@ class ProductController extends Controller
                 'cost_price'               => $request->cost_price,
                 'stock'                    => $existencias,
                 'unidad'                   => $unidad,
+                'controla_stock'           => $request->boolean('controla_stock', true),
                 'conditional_price'        => $request->conditional_price,
                 'conditional_min_quantity' => $request->conditional_min_quantity,
                 'notes'                    => $request->notes,
@@ -198,6 +200,7 @@ class ProductController extends Controller
                 'cost_price'               => 'nullable|numeric|min:0',
                 'stock'                    => 'required_unless:item_type,servicio|nullable|numeric|min:0|max:99999999',
                 'unidad'                   => ['nullable', Rule::in(UnidadesDeMedida::claves())],
+                'controla_stock'           => 'nullable|boolean',
                 'categories'               => 'nullable|array',
                 'categories.*'             => 'exists:categories,id',
                 'conditional_price'        => 'nullable|numeric|min:0.01',
@@ -232,6 +235,8 @@ class ProductController extends Controller
             $data['service_duration'] = $esServicio ? $request->service_duration : null;
             $data['service_mode'] = $esServicio ? $request->service_mode : null;
             $data['unidad'] = UnidadesDeMedida::normalizar($request->input('unidad'));
+            // Un producto que no se cuenta: ni se agota ni se descuenta
+            $data['controla_stock'] = $esServicio ? true : $request->boolean('controla_stock', true);
             $data['stock'] = $esServicio ? 0 : $this->existencias($request->stock, $data['unidad']);
             $data['price_usdt']             = $request->price_usdt ?: null;
             $data += $this->divisasYSuscripcion($request);

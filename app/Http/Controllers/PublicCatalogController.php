@@ -46,7 +46,7 @@ class PublicCatalogController extends Controller
     private const COLUMNAS = [
         'id', 'user_id', 'name', 'description', 'item_type', 'service_duration', 'service_mode',
         'price_usdt', 'price_divisa_usdt', 'conditional_price', 'conditional_min_quantity',
-        'stock', 'unidad', 'por_llegar', 'last_units', 'image_path', 'show_variants_in_store', 'display_order',
+        'stock', 'unidad', 'controla_stock', 'por_llegar', 'last_units', 'image_path', 'show_variants_in_store', 'display_order',
     ];
 
     public function __construct(
@@ -317,6 +317,8 @@ class PublicCatalogController extends Controller
     private function presentarProducto(Product $producto): array
     {
         $esServicio = $producto->esServicio();
+        // Sin cuenta de existencias no hay nada que agotar
+        $sinCuenta = ! $producto->llevaExistencias();
 
         return [
             'id' => $producto->id,
@@ -338,7 +340,7 @@ class PublicCatalogController extends Controller
             'conditional_price' => $producto->conditional_price,
             'conditional_min_quantity' => $producto->conditional_min_quantity,
             // Un servicio no se agota: no tiene existencias que mostrar
-            'stock' => $esServicio ? null : $producto->stock,
+            'stock' => $sinCuenta ? null : $producto->stock,
             // Lo que se vende al peso o por metro lo dice en su precio y en
             // sus existencias: «$12,00 / kg», «quedan 2,5 kg»
             'unidad' => $esServicio ? null : $producto->unidad,

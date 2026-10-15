@@ -234,7 +234,7 @@ export default function Index({ auth, productos, categories, unidades }) {
         price_usdt: '', price_mayor_usdt: '', price_distribuidor_usdt: '',
         price_divisa_usdt: '', price_mayor_divisa_usdt: '', price_distribuidor_divisa_usdt: '',
         es_suscripcion: false, periodo_suscripcion: 'mensual',
-        cost_price: '', stock: 0, unidad: 'unidad', categories: [], conditional_price: '', conditional_min_quantity: '',
+        cost_price: '', stock: 0, unidad: 'unidad', controla_stock: true, categories: [], conditional_price: '', conditional_min_quantity: '',
         notes: '', description: '', image: null, photos: [], is_hidden: false, por_llegar: false, show_variants_in_store: true, last_units: false, _method: 'POST'
     });
 
@@ -255,7 +255,7 @@ export default function Index({ auth, productos, categories, unidades }) {
         price_usdt: '', price_mayor_usdt: '', price_distribuidor_usdt: '',
         price_divisa_usdt: '', price_mayor_divisa_usdt: '', price_distribuidor_divisa_usdt: '',
         es_suscripcion: false, periodo_suscripcion: 'mensual',
-        cost_price: '', stock: 0, unidad: 'unidad', categories: [], conditional_price: '', conditional_min_quantity: '',
+        cost_price: '', stock: 0, unidad: 'unidad', controla_stock: true, categories: [], conditional_price: '', conditional_min_quantity: '',
         notes: '', description: '', image: null, photos: [], is_hidden: false, por_llegar: false, show_variants_in_store: true, last_units: false, _method: method
     });
 
@@ -292,6 +292,7 @@ export default function Index({ auth, productos, categories, unidades }) {
             periodo_suscripcion: prod.periodo_suscripcion || 'mensual',
             cost_price: prod.cost_price || '', stock: prod.stock || 0,
             unidad: prod.unidad || 'unidad',
+            controla_stock: prod.controla_stock ?? true,
             categories: prod.categories ? prod.categories.map(c => c.id.toString()) : [],
             conditional_price: prod.conditional_price || '', conditional_min_quantity: prod.conditional_min_quantity || '',
             notes: prod.notes || '', description: prod.description || '',
@@ -350,6 +351,7 @@ export default function Index({ auth, productos, categories, unidades }) {
         formData.append('cost_price', data.cost_price || '');
         formData.append('stock', data.stock);
         formData.append('unidad', data.unidad || 'unidad');
+        formData.append('controla_stock', data.controla_stock ? '1' : '0');
         formData.append('conditional_price', data.conditional_price || '');
         formData.append('conditional_min_quantity', data.conditional_min_quantity || '');
         formData.append('notes', data.notes || '');
@@ -1771,6 +1773,7 @@ function TipoDeFicha({ valor, onCambiar }) {
 function CampoDeExistencias({ data, setData, unidades, isEditing, error }) {
     const unidad = data.unidad || 'unidad';
     const fraccion = admiteFraccion({ unidad });
+    const cuenta = data.controla_stock !== false;
 
     const cambiarUnidad = (nueva) => {
         const cantidad = parseFloat(data.stock) || 0;
@@ -1783,7 +1786,28 @@ function CampoDeExistencias({ data, setData, unidades, isEditing, error }) {
     };
 
     return (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-4">
+            {/* Hay cosas que no se cuentan: el pan de cada mañana, las bolsas,
+                lo que se arma por encargo. Contarlas solo logra que el
+                catálogo las muestre agotadas y la factura se niegue. */}
+            <Interruptor
+                etiqueta="Llevar la cuenta de cuánto tengo"
+                ayuda={cuenta
+                    ? 'Al facturar se descuenta, y en tu catálogo sale «Agotado» cuando llegue a cero.'
+                    : 'Este producto nunca se agota ni se descuenta al facturar. Útil para lo que haces al momento o siempre tienes.'}
+                valor={cuenta}
+                onCambiar={(v) => setData('controla_stock', v)}
+            />
+
+            {! cuenta && (
+                <p className="rounded-lg bg-stone-100 px-3 py-2.5 text-xs leading-relaxed text-stone-600 dark:bg-stone-800/60 dark:text-stone-400">
+                    Sigue siendo un producto y se factura igual; lo único que cambia es que nadie le lleva la
+                    cuenta. Si algún día quieres contarlo, enciendes esto y escribes cuánto tienes.
+                </p>
+            )}
+
+            {cuenta && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
                 <InputLabel htmlFor="unidad" value="Se vende por" />
                 <select
@@ -1828,6 +1852,8 @@ function CampoDeExistencias({ data, setData, unidades, isEditing, error }) {
                 </div>
                 <InputError message={error} className="mt-2" />
             </div>
+            </div>
+            )}
         </div>
     );
 }

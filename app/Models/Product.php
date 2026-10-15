@@ -62,6 +62,7 @@ class Product extends Model
         'inversion_historica',
         'stock',
         'unidad',
+        'controla_stock',
         'image_path',
         'category_id',
         'conditional_price',
@@ -81,6 +82,7 @@ class Product extends Model
         'show_variants_in_store' => 'boolean',
         'last_units'             => 'boolean',
         'es_suscripcion'         => 'boolean',
+        'controla_stock'         => 'boolean',
         'inversion_historica'    => 'float',
         'stock'                  => 'float',
     ];
@@ -107,7 +109,7 @@ class Product extends Model
         'anual' => 12,
     ];
 
-    protected $appends = ['image_url', 'thumb_url', 'price_bs', 'price_mayor_bs', 'price_distribuidor_bs', 'price_ref', 'conditional_price_bs', 'unidad_corta', 'admite_fraccion'];
+    protected $appends = ['image_url', 'thumb_url', 'price_bs', 'price_mayor_bs', 'price_distribuidor_bs', 'price_ref', 'conditional_price_bs', 'unidad_corta', 'admite_fraccion', 'lleva_existencias'];
 
     public function getImageUrlAttribute()
     {
@@ -198,6 +200,11 @@ class Product extends Model
         return UnidadesDeMedida::admiteFraccion($this->unidad);
     }
 
+    public function getLlevaExistenciasAttribute(): bool
+    {
+        return $this->llevaExistencias();
+    }
+
     /** Se vende de a piezas enteras, que es el caso de siempre. */
     public function sePorUnidad(): bool
     {
@@ -226,6 +233,18 @@ class Product extends Model
     public function esServicio(): bool
     {
         return $this->item_type === self::SERVICIO;
+    }
+
+    /**
+     * Si a este artículo se le lleva la cuenta.
+     *
+     * Un servicio nunca; un producto, solo si el comercio quiso. El pan que
+     * se hornea cada mañana no se cuenta: contarlo lo único que logra es
+     * que el catálogo lo muestre agotado y la factura se niegue a venderlo.
+     */
+    public function llevaExistencias(): bool
+    {
+        return ! $this->esServicio() && $this->controla_stock !== false;
     }
 
     /** Texto listo para el catálogo: "45 min · A domicilio". */

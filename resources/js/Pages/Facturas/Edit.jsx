@@ -102,7 +102,10 @@ const esServicio = (producto) => producto?.es_servicio === true;
  * Las existencias no son enteras desde que se puede vender al peso: un queso
  * de 2,5 kg se factura por su peso, no por piezas.
  */
-const stockDisponible = (producto) => (esServicio(producto) ? Infinity : parseFloat(producto?.stock) || 0);
+const stockDisponible = (producto) => (seCuenta(producto) ? parseFloat(producto?.stock) || 0 : Infinity);
+
+/** A un servicio nunca, y a un producto solo si el comercio quiso contarlo. */
+const seCuenta = (producto) => producto?.lleva_existencias !== false && ! esServicio(producto);
 
 /**
  * Si el precio no necesita decir su unidad.
