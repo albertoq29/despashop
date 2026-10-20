@@ -85,24 +85,51 @@ php artisan tinker --execute="Mail::raw('Prueba de Despashop', fn(\$m) => \$m->t
 
 ## 5. Tareas programadas
 
-Una sola línea en el cron del servidor hace funcionar todo lo demás:
+Sin esto no se actualiza la tasa del BCV, no se avisa a los planes por vencer
+ni a los vencidos, no se eliminan las cuentas que agotaron el plazo, no se poda
+el registro de seguridad y no se hacen respaldos. Es lo primero que hay que
+mirar cuando «no llegan los correos».
+
+Lo que debe correr:
+
+| Cuándo | Comando | Qué hace |
+|---|---|---|
+| cada 15 min | `php artisan rates:update` | Trae la tasa del BCV |
+| 02:00 | `php artisan respaldo:crear` | Copia la base y los archivos subidos |
+| 03:30 | `php artisan model:prune --model='App\Models\SecurityEvent'` | Poda el registro de seguridad |
+| 05:00 | `php artisan planes:vencidos` | Avisa del plan y elimina lo que agotó el plazo |
+
+### Si el servidor tiene cron
+
+Una sola línea y el programador de Laravel se encarga del resto:
 
 ```cron
 * * * * * cd /ruta/a/despashop && php artisan schedule:run >> /dev/null 2>&1
 ```
 
-Sin eso no se actualiza la tasa del BCV, no se avisa a los planes vencidos, no
-se eliminan las cuentas que agotaron el plazo, no se poda el registro de
-seguridad y no se hacen respaldos.
+Tiene que ser **cada minuto**. Las tareas están fijadas a una hora exacta
+(`dailyAt('05:00')`), y si `schedule:run` corre cada diez minutos y cae a las
+05:03, ese día no se ejecuta ninguna.
 
-Lo que queda programado:
+### En alwaysdata (y en cualquier hosting sin cron)
 
-| Hora  | Tarea                  | Qué hace                                        |
-|-------|------------------------|-------------------------------------------------|
-| c/15m | `rates:update`         | Trae la tasa del BCV                            |
-| 02:00 | `respaldo:crear`       | Copia la base y los archivos subidos            |
-| 03:30 | `model:prune`          | Poda el registro de seguridad                   |
-| 05:00 | `planes:vencidos`      | Avisa y elimina las cuentas que agotaron el plazo |
+alwaysdata no da `crontab` —`crontab -l` responde *you are not allowed*—; tiene
+su propio programador en el panel, en **Tareas programadas** (Environment →
+Scheduled tasks). Ahí **no se usa `schedule:run`**: se crea una tarea por cada
+comando de la tabla, con su propia frecuencia, y el programador del hosting
+hace de reloj.
+
+Cada tarea lleva, como comando:
+
+```bash
+cd ~/www/despashop && php artisan planes:vencidos
+```
+
+Si la tarea falla por no encontrar `php`, pon la ruta completa; se averigua por
+SSH con `which php`.
+
+Las cuatro se pueden correr de más sin romper nada: `planes:vencidos` no manda
+dos avisos el mismo día, y `rates:update` solo vuelve a consultar la tasa.
 
 Los avisos del plan salen a los **7 días**, luego **todos los días desde los
 3** (3, 2, 1), el **día mismo** del vencimiento y **a la mañana siguiente**, ya
