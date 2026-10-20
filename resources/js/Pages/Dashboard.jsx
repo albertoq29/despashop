@@ -1,131 +1,122 @@
 import { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, useForm } from '@inertiajs/react';
 import { numeroDeWhatsapp } from '@/utils/whatsapp';
 import {
-    Area,
-    AreaChart,
-    CartesianGrid,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
-import {
-    ArrowUpRight,
-    CircleDollarSign,
+    ArrowRight,
+    BarChart3,
+    Check,
     Copy,
     ExternalLink,
-    Eye,
-    ImageOff,
     Package,
     Palette,
-    Sparkles,
     Plus,
     Receipt,
-    TrendingUp,
+    Sparkles,
 } from 'lucide-react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import ResumenDelPlan from '@/Components/Plan/ResumenDelPlan';
-import { Aviso, Boton, Cabecera, Campo, Entrada, Metrica, Pagina, Tarjeta, Vacio } from '@/Components/UI';
-import { useTema } from '@/hooks/useTema';
+import PrimerosPasos from '@/Components/PrimerosPasos';
+import { Boton, Campo, Entrada, Pagina, Tarjeta } from '@/Components/UI';
 
-export default function Dashboard({
-    latest,
-    dailySales,
-    totalSalesUsd,
-    totalSalesBs,
-    totalOrders,
-    filters,
-    customStats,
-    catalogo,
-    plan,
-    soporte,
-}) {
-    const [desde, setDesde] = useState(filters?.start_date || '');
-    const [hasta, setHasta] = useState(filters?.end_date || '');
-
-    const filtrar = (evento) => {
-        evento.preventDefault();
-        router.get(route('dashboard'), { start_date: desde, end_date: hasta }, { preserveState: true });
-    };
-
-    const limpiar = () => {
-        setDesde('');
-        setHasta('');
-        router.get(route('dashboard'), {}, { preserveState: true });
-    };
-
+/**
+ * Panel del comercio.
+ *
+ * Antes abría con cuatro cifras, un gráfico y un buscador por fechas. Para
+ * quien recién llega eso es un tablero vacío que no dice qué hacer, y para
+ * quien ya trabaja es ruido delante de lo que vino a hacer. Las cifras se
+ * mudaron a Estadísticas.
+ *
+ * Lo que queda es lo que se usa: dónde está su catálogo, qué le falta —si le
+ * falta algo— y una caja de dos campos para agregar algo sin salir de aquí.
+ */
+export default function Dashboard({ nombre, catalogo, plan, soporte, primerosPasos }) {
     return (
         <AuthenticatedLayout header="Panel">
             <Head title="Panel" />
 
             <Pagina>
-                <Cabecera
-                    titulo="Tu negocio de un vistazo"
-                    descripcion="Resumen de los últimos 30 días y estado de tu catálogo."
-                >
-                    <Boton href={route('facturas.create')} variante="primario">
-                        <Plus className="h-4 w-4" />
-                        Nueva factura
-                    </Boton>
-                </Cabecera>
+                <Saludo nombre={nombre} listo={primerosPasos.listo} />
 
-                <EstadoDelCatalogo catalogo={catalogo} />
+                {!primerosPasos.listo && <Guia pasos={primerosPasos} catalogo={catalogo} />}
+
+                <TuCatalogo catalogo={catalogo} />
+
+                <AgregarRapido />
+
+                <AccesosRapidos />
 
                 {plan && <ResumenDelPlan id="plan" resumen={plan} pie={<ContactoParaElPlan soporte={soporte} plan={plan} />} />}
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Metrica
-                        etiqueta="Ventas (30 días)"
-                        valor={`$${Number(totalSalesUsd).toLocaleString('es', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-                        detalle={`Bs. ${Number(totalSalesBs).toLocaleString('es-VE', { maximumFractionDigits: 2 })}`}
-                        Icono={CircleDollarSign}
-                        tono="marca"
-                    />
-                    <Metrica
-                        etiqueta="Facturas confirmadas"
-                        valor={totalOrders}
-                        detalle="Facturas confirmadas"
-                        Icono={Receipt}
-                    />
-                    <Metrica
-                        etiqueta="Productos publicados"
-                        valor={catalogo?.productos ?? 0}
-                        detalle="En tu inventario"
-                        Icono={Package}
-                    />
-                    <Metrica
-                        etiqueta="Visitas al catálogo"
-                        valor={catalogo?.visitas_30d ?? 0}
-                        detalle="Últimos 30 días"
-                        Icono={Eye}
-                    />
-                </div>
-
-                <div className="grid gap-5 xl:grid-cols-[1.6fr_1fr]">
-                    <GraficoVentas datos={dailySales} />
-
-                    <div className="space-y-5">
-                        <TasaActual tasa={latest} />
-                        <ConsultaPorFechas
-                            desde={desde}
-                            hasta={hasta}
-                            setDesde={setDesde}
-                            setHasta={setHasta}
-                            onFiltrar={filtrar}
-                            onLimpiar={limpiar}
-                            resultado={customStats}
-                        />
-                    </div>
-                </div>
+                <ComoVaElNegocio />
             </Pagina>
         </AuthenticatedLayout>
     );
 }
 
-/* ── Estado del catálogo ────────────────────────────────────────────────── */
+function Saludo({ nombre, listo }) {
+    return (
+        <div>
+            <h2 className="font-display text-xl font-semibold tracking-tight text-stone-900 dark:text-stone-100 sm:text-2xl">
+                Hola, {nombre}
+            </h2>
+            <p className="mt-1 text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+                {listo
+                    ? 'Tu catálogo está en línea. Desde aquí lo compartes, agregas lo que vendes y facturas.'
+                    : 'Vamos por partes: unos pocos pasos y tu catálogo queda listo para compartir.'}
+            </p>
+        </div>
+    );
+}
 
-function EstadoDelCatalogo({ catalogo }) {
+/* ── La guía ────────────────────────────────────────────────────────────── */
+
+/**
+ * El ofrecimiento para quien todavía no tiene el catálogo armado.
+ *
+ * Pregunta antes de mandar —«¿creamos tu catálogo?»— porque quien entra por
+ * primera vez no está buscando una lista de tareas: está viendo si esto le
+ * sirve. Y da dos caminos: que lo arme la IA en un minuto, o los pasos a
+ * mano para quien prefiere ir viendo.
+ */
+function Guia({ pasos, catalogo }) {
+    const empezando = pasos.hechos <= 1;
+
+    return (
+        <Tarjeta cuerpo={false} className="overflow-hidden">
+            <div className="border-b border-stone-200 p-5 dark:border-stone-800 sm:p-6">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                        <h3 className="font-display text-lg font-semibold text-stone-900 dark:text-stone-100 sm:text-xl">
+                            {empezando ? '¿Creamos tu catálogo?' : 'Ya casi está'}
+                        </h3>
+                        <p className="mt-1 max-w-[52ch] text-sm leading-relaxed text-stone-600 dark:text-stone-400">
+                            {empezando
+                                ? 'Te vamos llevando paso a paso. No hay que saber de diseño y nada se publica sin que lo veas antes.'
+                                : 'Te falta poco para tener un catálogo que da gusto mandar por WhatsApp.'}
+                        </p>
+                    </div>
+
+                    {catalogo.ia_disponible && (
+                        <Boton href={route('catalogo.personalizar', { ia: 1 })} className="w-full sm:w-auto">
+                            <Sparkles className="h-4 w-4" />
+                            Que lo arme la IA
+                        </Boton>
+                    )}
+                </div>
+            </div>
+
+            <div className="p-3 sm:p-4">
+                <div className="px-2 sm:px-1">
+                    <PrimerosPasos pasos={pasos.pasos} hechos={pasos.hechos} total={pasos.total} />
+                </div>
+            </div>
+        </Tarjeta>
+    );
+}
+
+/* ── El enlace del catálogo ─────────────────────────────────────────────── */
+
+function TuCatalogo({ catalogo }) {
     const [copiado, setCopiado] = useState(false);
 
     if (!catalogo?.url) {
@@ -142,28 +133,9 @@ function EstadoDelCatalogo({ catalogo }) {
         }
     };
 
-    // Lo que falta para que el catálogo luzca terminado, en orden de impacto
-    const pendientes = [
-        !catalogo.publicado && {
-            texto: 'Tu catálogo está oculto para el público',
-            enlace: route('catalogo.personalizar'),
-            accion: 'Publicarlo',
-        },
-        !catalogo.tiene_logo && {
-            texto: 'Sube tu logo y el catálogo tomará sus colores',
-            enlace: route('catalogo.personalizar'),
-            accion: 'Subir logo',
-        },
-        catalogo.productos === 0 && {
-            texto: 'Todavía no tienes productos cargados',
-            enlace: catalogo.ia_disponible ? route('catalogo.personalizar', { ia: 1 }) : route('productos.index'),
-            accion: catalogo.ia_disponible ? 'Empezar con IA' : 'Cargar productos',
-        },
-    ].filter(Boolean);
-
     return (
-        <Tarjeta cuerpo={false}>
-            <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <Tarjeta>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         <p className="text-sm text-stone-500 dark:text-stone-400">Tu catálogo</p>
@@ -191,7 +163,7 @@ function EstadoDelCatalogo({ catalogo }) {
 
                 <div className="flex flex-wrap gap-2">
                     <Boton variante="contorno" tamano="sm" onClick={copiar}>
-                        <Copy className="h-4 w-4" />
+                        {copiado ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         {copiado ? 'Copiado' : 'Copiar enlace'}
                     </Boton>
 
@@ -204,123 +176,178 @@ function EstadoDelCatalogo({ catalogo }) {
                         <ExternalLink className="h-4 w-4" />
                         Abrir
                     </a>
-
-                    {catalogo.ia_disponible && (
-                        <Boton href={route('catalogo.personalizar', { ia: 1 })} variante="contorno" tamano="sm">
-                            <Sparkles className="h-4 w-4" />
-                            Crear con IA
-                        </Boton>
-                    )}
-
-                    <Boton href={route('catalogo.personalizar')} variante="neutro" tamano="sm">
-                        <Palette className="h-4 w-4" />
-                        Personalizar
-                    </Boton>
                 </div>
             </div>
-
-            {pendientes.length > 0 && (
-                <ul className="divide-y divide-stone-200 border-t border-stone-200 dark:divide-stone-800 dark:border-stone-800">
-                    {pendientes.map((pendiente) => (
-                        <li key={pendiente.texto}>
-                            <Link
-                                href={pendiente.enlace}
-                                className="flex items-center justify-between gap-3 px-5 py-3 text-sm transition-colors duration-150 ease-salida hover:bg-stone-50 dark:hover:bg-stone-800/50"
-                            >
-                                <span className="flex min-w-0 items-center gap-2.5">
-                                    <ImageOff className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                                    <span className="truncate text-stone-700 dark:text-stone-300">
-                                        {pendiente.texto}
-                                    </span>
-                                </span>
-
-                                <span className="flex shrink-0 items-center gap-1 font-medium text-marca-700 dark:text-marca-400">
-                                    {pendiente.accion}
-                                    <ArrowUpRight className="h-3.5 w-3.5" />
-                                </span>
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-            )}
         </Tarjeta>
     );
 }
 
-/* ── Gráfico ────────────────────────────────────────────────────────────── */
+/* ── Agregar algo sin salir del panel ───────────────────────────────────── */
 
-function GraficoVentas({ datos }) {
-    const { esOscuro } = useTema();
+/**
+ * Dos campos y listo.
+ *
+ * El formulario completo de productos tiene pestañas, variantes, tres
+ * niveles de precio y existencias por unidad de medida. Todo eso hace falta
+ * —cuando hace falta—. Para llenar un catálogo la primera vez, no: ahí lo
+ * que se necesita es poder escribir diez cosas seguidas sin pensar.
+ *
+ * Nace sin control de existencias a propósito: un producto con cero unidades
+ * saldría «agotado» en el catálogo, que es lo último que quiere ver alguien
+ * que acaba de cargarlo. El control se enciende después, producto por
+ * producto, desde su ficha.
+ */
+function AgregarRapido() {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        name: '',
+        price_usdt: '',
+        stock: 0,
+        controla_stock: false,
+    });
 
-    const rejilla = esOscuro ? '#44403c' : '#e7e5e4';
-    const textoEje = esOscuro ? '#a8a29e' : '#78716c';
-    const linea = esOscuro ? '#34d399' : '#047857';
+    const [ultimo, setUltimo] = useState(null);
+
+    const enviar = (evento) => {
+        evento.preventDefault();
+
+        post(route('productos.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                setUltimo(data.name);
+                reset('name', 'price_usdt');
+            },
+        });
+    };
 
     return (
-        <Tarjeta titulo="Ventas por día" descripcion="Últimos 30 días" cuerpo={false}>
-            {!datos?.length ? (
-                <Vacio
-                    Icono={TrendingUp}
-                    titulo="Todavía no hay ventas registradas"
-                    texto="Cuando confirmes tu primera factura, verás aquí la evolución día a día."
-                >
-                    <Boton href={route('facturas.create')}>
-                        <Plus className="h-4 w-4" />
-                        Crear una factura
-                    </Boton>
-                </Vacio>
-            ) : (
-                <div className="h-72 p-3 sm:h-80 sm:p-5">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={datos} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="relleno" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor={linea} stopOpacity={0.28} />
-                                    <stop offset="100%" stopColor={linea} stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
+        <Tarjeta
+            titulo="Agrega algo a tu catálogo"
+            descripcion="Nombre y precio. Las fotos, las categorías y lo demás se completan después."
+            accion={
+                <Boton href={route('productos.index')} variante="fantasma" tamano="sm">
+                    Ver todo
+                    <ArrowRight className="h-3.5 w-3.5" />
+                </Boton>
+            }
+        >
+            <form onSubmit={enviar} className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <Campo etiqueta="Qué vendes" id="rapido-nombre" error={errors.name} className="flex-1">
+                    <Entrada
+                        id="rapido-nombre"
+                        value={data.name}
+                        onChange={(e) => setData('name', e.target.value)}
+                        placeholder="Tornillos de media pulgada"
+                        maxLength={255}
+                        required
+                    />
+                </Campo>
 
-                            <CartesianGrid strokeDasharray="3" stroke={rejilla} vertical={false} />
-                            <XAxis
-                                dataKey="date"
-                                tick={{ fill: textoEje, fontSize: 12 }}
-                                axisLine={false}
-                                tickLine={false}
-                            />
-                            <YAxis
-                                tick={{ fill: textoEje, fontSize: 12 }}
-                                axisLine={false}
-                                tickLine={false}
-                                width={56}
-                                tickFormatter={(valor) => `$${valor}`}
-                            />
-                            <Tooltip
-                                cursor={{ stroke: rejilla }}
-                                contentStyle={{
-                                    background: esOscuro ? '#1c1917' : '#ffffff',
-                                    border: `1px solid ${rejilla}`,
-                                    borderRadius: '12px',
-                                    fontSize: '13px',
-                                    color: esOscuro ? '#f5f5f4' : '#1c1917',
-                                }}
-                                formatter={(valor) => [`$${Number(valor).toFixed(2)}`, 'Vendido']}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="total_usd"
-                                stroke={linea}
-                                strokeWidth={2}
-                                fill="url(#relleno)"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </div>
+                <Campo etiqueta="Precio en $" id="rapido-precio" error={errors.price_usdt} className="sm:w-36">
+                    <Entrada
+                        id="rapido-precio"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={data.price_usdt}
+                        onChange={(e) => setData('price_usdt', e.target.value)}
+                        placeholder="0,00"
+                    />
+                </Campo>
+
+                <Boton type="submit" disabled={processing || !data.name.trim()} className="sm:mt-8">
+                    <Plus className="h-4 w-4" />
+                    Agregar
+                </Boton>
+            </form>
+
+            {ultimo && (
+                <p className="mt-3 flex flex-wrap items-center gap-1.5 text-sm text-stone-600 dark:text-stone-400">
+                    <Check className="h-4 w-4 text-marca-600 dark:text-marca-400" />
+                    <span>
+                        <strong className="font-semibold text-stone-800 dark:text-stone-200">{ultimo}</strong> ya está en
+                        tu catálogo.
+                    </span>
+                    <Link
+                        href={route('productos.index')}
+                        className="font-medium text-marca-700 hover:underline dark:text-marca-400"
+                    >
+                        Ponle foto y detalles
+                    </Link>
+                </p>
             )}
         </Tarjeta>
     );
 }
 
-/* ── Tasa y consulta por fechas ─────────────────────────────────────────── */
+/* ── Lo que se hace todos los días ──────────────────────────────────────── */
+
+const ACCESOS = [
+    {
+        titulo: 'Nueva factura',
+        texto: 'Cobra y descuenta del inventario',
+        Icono: Receipt,
+        ruta: () => route('facturas.create'),
+    },
+    {
+        titulo: 'Productos y servicios',
+        texto: 'Edita, ordena y pon fotos',
+        Icono: Package,
+        ruta: () => route('productos.index'),
+    },
+    {
+        titulo: 'Personalizar catálogo',
+        texto: 'Colores, portada y secciones',
+        Icono: Palette,
+        ruta: () => route('catalogo.personalizar'),
+    },
+];
+
+function AccesosRapidos() {
+    return (
+        <div className="grid gap-3 sm:grid-cols-3">
+            {ACCESOS.map(({ titulo, texto, Icono, ruta }) => (
+                <Link
+                    key={titulo}
+                    href={ruta()}
+                    className="pulsable group flex items-center gap-3 rounded-2xl border border-stone-200 bg-white p-4 hover:border-marca-500 dark:border-stone-800 dark:bg-stone-900 dark:hover:border-marca-400"
+                >
+                    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-stone-100 text-stone-600 group-hover:bg-marca-100 group-hover:text-marca-700 dark:bg-stone-800 dark:text-stone-300 dark:group-hover:bg-marca-950 dark:group-hover:text-marca-400">
+                        <Icono className="h-5 w-5" />
+                    </span>
+                    <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-stone-900 dark:text-stone-100">{titulo}</span>
+                        <span className="mt-0.5 block text-xs leading-snug text-stone-500 dark:text-stone-400">
+                            {texto}
+                        </span>
+                    </span>
+                </Link>
+            ))}
+        </div>
+    );
+}
+
+/** Las cifras viven en su propia pantalla; aquí solo queda la puerta. */
+function ComoVaElNegocio() {
+    return (
+        <Link
+            href={route('estadisticas.index')}
+            className="pulsable flex items-center justify-between gap-3 rounded-2xl border border-dashed border-stone-300 px-5 py-4 text-sm hover:border-stone-400 hover:bg-stone-50 dark:border-stone-700 dark:hover:border-stone-600 dark:hover:bg-stone-900/60"
+        >
+            <span className="flex min-w-0 items-center gap-2.5">
+                <BarChart3 className="h-4 w-4 shrink-0 text-stone-500 dark:text-stone-400" />
+                <span className="text-stone-700 dark:text-stone-300">
+                    ¿Cómo va el negocio? Ventas, visitas y tasa del día.
+                </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1 font-medium text-marca-700 dark:text-marca-400">
+                Ver estadísticas
+                <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+        </Link>
+    );
+}
+
+/* ── Plan ───────────────────────────────────────────────────────────────── */
 
 /** Cómo renovar o cambiar de plan: con el contacto de soporte de la plataforma. */
 function ContactoParaElPlan({ soporte, plan }) {
@@ -365,100 +392,5 @@ function ContactoParaElPlan({ soporte, plan }) {
                 </div>
             )}
         </div>
-    );
-}
-
-function TasaActual({ tasa }) {
-    return (
-        <Tarjeta
-            titulo="Tasa de cambio"
-            accion={
-                <Boton href={route('tasas.create')} variante="fantasma" tamano="sm">
-                    Actualizar
-                </Boton>
-            }
-        >
-            {tasa ? (
-                <div>
-                    <p className="text-xs uppercase tracking-wide text-stone-500 dark:text-stone-400">Dólar BCV</p>
-                    <p className="mt-1 font-display text-3xl font-semibold tabular-nums">
-                        Bs. {Number(tasa.bcv).toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    <p className="mt-2 text-xs text-stone-500 dark:text-stone-400">
-                        Registrada el {new Date(tasa.created_at).toLocaleDateString('es', {
-                            day: '2-digit',
-                            month: 'long',
-                        })}. Es la que se usa para los precios en bolívares.
-                    </p>
-                </div>
-            ) : (
-                <Aviso tono="aviso">
-                    Todavía no has registrado una tasa. Los precios en bolívares no se calcularán hasta que lo hagas.
-                </Aviso>
-            )}
-        </Tarjeta>
-    );
-}
-
-function ConsultaPorFechas({ desde, hasta, setDesde, setHasta, onFiltrar, onLimpiar, resultado }) {
-    return (
-        <Tarjeta titulo="Consultar otro período">
-            <form onSubmit={onFiltrar} className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                    <Campo etiqueta="Desde" id="desde">
-                        <Entrada
-                            id="desde"
-                            type="date"
-                            value={desde}
-                            onChange={(e) => setDesde(e.target.value)}
-                            required
-                        />
-                    </Campo>
-
-                    <Campo etiqueta="Hasta" id="hasta">
-                        <Entrada
-                            id="hasta"
-                            type="date"
-                            value={hasta}
-                            onChange={(e) => setHasta(e.target.value)}
-                            required
-                        />
-                    </Campo>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                    <Boton type="submit" tamano="sm">
-                        Consultar
-                    </Boton>
-
-                    {(desde || hasta) && (
-                        <Boton variante="fantasma" tamano="sm" onClick={onLimpiar}>
-                            Limpiar
-                        </Boton>
-                    )}
-                </div>
-            </form>
-
-            {resultado && (
-                <dl className="mt-5 animate-acercar space-y-2 border-t border-stone-200 pt-4 text-sm dark:border-stone-800">
-                    <div className="flex justify-between">
-                        <dt className="text-stone-500 dark:text-stone-400">Vendido</dt>
-                        <dd className="font-semibold tabular-nums">
-                            ${Number(resultado.total_usd).toFixed(2)}
-                        </dd>
-                    </div>
-                    <div className="flex justify-between">
-                        <dt className="text-stone-500 dark:text-stone-400">En bolívares</dt>
-                        <dd className="tabular-nums">
-                            Bs. {Number(resultado.total_bs).toLocaleString('es-VE', { maximumFractionDigits: 2 })}
-                        </dd>
-                    </div>
-                    <div className="flex justify-between">
-                        <dt className="text-stone-500 dark:text-stone-400">Ventas</dt>
-                        <dd className="tabular-nums">{resultado.orders_count}</dd>
-                    </div>
-                </dl>
-            )}
-        </Tarjeta>
     );
 }

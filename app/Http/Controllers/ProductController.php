@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\ActivityLog;
+use App\Models\CatalogTheme;
+use App\Models\ExchangeRate;
 use App\Models\Product;
 use App\Models\Category;
 use App\Models\ProductImage;
@@ -52,6 +54,10 @@ class ProductController extends Controller
             'categories' => $categories,
             // Agrupadas para el selector: por pieza, por peso, por volumen
             'unidades'   => UnidadesDeMedida::porGrupo(),
+            // Para ver la ficha como la vera un cliente mientras se escribe:
+            // son los colores y las formas del catalogo, no una aproximacion
+            'theme'      => CatalogTheme::first(),
+            'bcv'        => (float) (ExchangeRate::current()->bcv ?? 0),
         ]);
     }
 

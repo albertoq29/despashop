@@ -22,6 +22,7 @@ import {
     ShieldCheck,
     ShoppingCart,
     Tags,
+    TrendingUp,
     Truck,
     User as UserIcono,
     X,
@@ -273,6 +274,13 @@ function BarraLateral({ abierta, onCerrar, user, marca, respuestas }) {
                     </Grupo>
 
                     <Grupo titulo="Números">
+                        <Enlace
+                            href={route('estadisticas.index')}
+                            activo={route().current('estadisticas.*')}
+                            Icono={TrendingUp}
+                        >
+                            Estadísticas
+                        </Enlace>
                         <Enlace href={route('profits.index')} activo={route().current('profits.*')} Icono={BarChart3}>
                             Ganancias
                         </Enlace>

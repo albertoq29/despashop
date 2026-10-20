@@ -64,7 +64,7 @@ const SALIDA = [0.23, 1, 0.32, 1];
  * un iframe que recibe el borrador en cada cambio. Nada se publica hasta
  * guardar, y todo se puede deshacer mientras tanto.
  */
-export default function Personalizar({ theme, banners, modals, catalogUrl, limites, fuentes, categorias, inventario, vistaPreviaUrl, nombreComercio, ia }) {
+export default function Personalizar({ theme, banners, modals, catalogUrl, limites, fuentes, categorias, inventario, vistaPreviaUrl, nombreComercio, subtituloDeFabrica, ia }) {
     const pagina = usePage();
     const { flash } = pagina.props;
     const form = useForm(datosIniciales(theme));
@@ -572,7 +572,13 @@ export default function Personalizar({ theme, banners, modals, catalogUrl, limit
                             transition={{ duration: 0.22, ease: SALIDA }}
                         >
                             {modo === 'facil' ? (
-                                <PanelFacil editor={editor} conIa={usoIa.disponible} onIa={() => setIaAbierta(true)} />
+                                <PanelFacil
+                                    editor={editor}
+                                    conIa={usoIa.disponible}
+                                    onIa={() => setIaAbierta(true)}
+                                    onPublicar={alternarPublicacion}
+                                    subtituloDeFabrica={subtituloDeFabrica}
+                                />
                             ) : (
                                 <Panel editor={editor} />
                             )}

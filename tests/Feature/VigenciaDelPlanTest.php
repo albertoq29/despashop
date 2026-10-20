@@ -206,8 +206,10 @@ class VigenciaDelPlanTest extends TestCase
 
         app(Tenancy::class)->forTenant($comercio->id, fn () => ExchangeRate::create(['bcv' => 40.5, 'binance' => 55]));
 
+        // La tasa se mudo del panel a Estadisticas junto con el resto de
+        // las cifras; sigue siendo la misma consulta
         $this->actingAs($comercio)
-            ->get(route('dashboard'))
+            ->get(route('estadisticas.index'))
             ->assertInertia(fn (AssertableInertia $pagina) => $pagina
                 ->where('latest.bcv', '40.5000')
                 ->missing('latest.binance'));

@@ -51,6 +51,8 @@ class CatalogDesignController extends Controller
             ],
             'fuentes' => $this->fonts(),
             'nombreComercio' => $comercio->business_name ?: $comercio->name,
+            // Para saber si la portada sigue siendo la que viene de fabrica
+            'subtituloDeFabrica' => CatalogProvisioner::SUBTITULO_DE_FABRICA,
             'categorias' => Category::orderBy('name')->get(['id', 'name']),
             // Un bloque puede estar encendido y vacío: el editor avisa de eso
             // en vez de dejar que el comercio publique un hueco sin saberlo.

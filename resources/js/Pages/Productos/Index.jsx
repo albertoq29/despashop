@@ -14,6 +14,9 @@ import { hoyLocal } from '@/utils/fechas';
 import NombreDelPrecio from '@/Components/NombreDelPrecio';
 import { useNombreDistribuidor } from '@/utils/nivelesDePrecio';
 import { admiteFraccion, conUnidad, pasoDeCantidad, unidadCorta } from '@/utils/unidades';
+import VistaPrevia from '@/Components/Productos/VistaPrevia';
+import { aFamilia } from '@/Components/Catalogo/Vitrina/estilos';
+import { useEsEscritorio } from '@/hooks/usePantalla';
 
 const normalizeText = (str) => {
     if (!str) return '';
@@ -76,6 +79,34 @@ const PESTANA_DEL_CAMPO = {
     private_photos: 'fotos',
 };
 
+/**
+ * El formulario, leído como lo leería el catálogo.
+ *
+ * La tarjeta pública no sabe de `data`: sabe de un artículo con precio,
+ * foto y si está agotado. Traducir aquí, en un solo sitio, evita que la
+ * vista previa invente reglas propias —qué cuenta como agotado, por
+ * ejemplo— y termine mostrando algo que el catálogo no muestra.
+ */
+function comoSeVera(data, foto) {
+    const esServicio = data.item_type === 'servicio';
+    const lleva = !esServicio && data.controla_stock;
+
+    return {
+        name: data.name,
+        description: data.description,
+        precio: Number(data.price_usdt) || 0,
+        imagen: foto,
+        esServicio,
+        detalle: esServicio ? data.service_duration : null,
+        porUnidad: lleva ? unidadCorta({ unidad: data.unidad }) : null,
+        // Un formulario recién abierto tiene cero existencias, y abrirlo con
+        // un «agotado» encima asusta sin motivo: todavía no hay producto.
+        // En cuanto tiene nombre, el aviso vale y se muestra.
+        agotado: lleva && data.name.trim() !== '' && Number(data.stock) <= 0 && !data.por_llegar,
+        ultimas: Boolean(data.last_units),
+    };
+}
+
 /** Lo que se ve en el modo simple: un error en otro campo lo tiene que apagar. */
 const CAMPOS_SIMPLES = ['name', 'description', 'price_usdt', 'price_divisa_usdt', 'stock', 'unidad', 'image', 'item_type'];
 
@@ -110,8 +141,10 @@ const VARIANT_TYPES = [
     { value: 'tipo', label: 'Modelo o presentación' },
 ];
 
-export default function Index({ auth, productos, categories, unidades }) {
+export default function Index({ auth, productos, categories, unidades, theme, bcv }) {
     const nombreDistribuidor = useNombreDistribuidor();
+    const esEscritorio = useEsEscritorio();
+    const [verPrevia, setVerPrevia] = useState(false);
     const [showModal, setShowModal] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [previewImage, setPreviewImage] = useState(null);
@@ -486,7 +519,16 @@ export default function Index({ auth, productos, categories, unidades }) {
 
     return (
         <AuthenticatedLayout header={<h2 className="text-xl font-semibold leading-tight text-stone-800 dark:text-stone-200">Productos y servicios</h2>}>
-            <Head title="Productos y servicios" />
+            <Head title="Productos y servicios">
+                {/* Las letras del catálogo, para que la vista previa no
+                    mienta con la tipografía del panel */}
+                {theme && (
+                    <link
+                        rel="stylesheet"
+                        href={`https://fonts.bunny.net/css?family=${aFamilia(theme.font_heading)}:400,500,600,700|${aFamilia(theme.font_body)}:400,500,600&display=swap`}
+                    />
+                )}
+            </Head>
             <div className="py-8">
                 <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
 
@@ -701,8 +743,9 @@ export default function Index({ auth, productos, categories, unidades }) {
                         )}
                     </div>
 
-                    {/* Cuerpo */}
-                    <div className="flex-1 space-y-6 overflow-y-auto p-5 sm:p-6">
+                    {/* Cuerpo: el formulario y, al lado, cómo va quedando */}
+                    <div className="flex flex-1 flex-col gap-5 overflow-y-auto p-5 sm:p-6 lg:flex-row lg:gap-6">
+                      <div className="order-last min-w-0 flex-1 space-y-6 lg:order-first">
 
                         {/* ── Simple: nombre, foto, descripción y precio ───── */}
                         {simple && (
@@ -1340,6 +1383,36 @@ export default function Index({ auth, productos, categories, unidades }) {
                                 </div>
                             </>
                         )}
+                      </div>
+
+                      {theme && (
+                        <aside className="shrink-0 lg:w-60">
+                            {esEscritorio ? (
+                                <div className="lg:sticky lg:top-0">
+                                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-stone-500 dark:text-stone-400">
+                                        Así se verá
+                                    </p>
+                                    <VistaPrevia theme={theme} bcv={bcv} articulo={comoSeVera(data, previewImage)} />
+                                </div>
+                            ) : (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => setVerPrevia((v) => !v)}
+                                        className="pulsable flex w-full items-center justify-center gap-1.5 rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold text-stone-700 dark:border-stone-700 dark:text-stone-200"
+                                    >
+                                        {verPrevia ? 'Ocultar la vista previa' : 'Ver cómo se verá'}
+                                    </button>
+
+                                    {verPrevia && (
+                                        <div className="mt-3">
+                                            <VistaPrevia theme={theme} bcv={bcv} articulo={comoSeVera(data, previewImage)} />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </aside>
+                      )}
                     </div>
 
                     {/* Footer */}

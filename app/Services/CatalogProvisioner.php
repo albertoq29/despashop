@@ -14,6 +14,15 @@ use App\Support\Tenancy;
  */
 class CatalogProvisioner
 {
+    /**
+     * El subtitulo con el que nace toda portada.
+     *
+     * Sirve para que el catalogo no abra vacio, pero es de fabrica: mientras
+     * siga ahi, el comercio todavia no escribio su portada. PrimerosPasos lo
+     * usa para saberlo, asi que el texto vive aqui y no suelto en dos sitios.
+     */
+    public const SUBTITULO_DE_FABRICA = 'Explora nuestro catálogo y escríbenos para comprar.';
+
     public function __construct(private Tenancy $tenancy)
     {
     }
@@ -32,7 +41,7 @@ class CatalogProvisioner
             ['user_id' => $user->id],
             [
                 'hero_title' => $user->business_name ?: $user->name,
-                'hero_subtitle' => 'Explora nuestro catálogo y escríbenos para comprar.',
+                'hero_subtitle' => self::SUBTITULO_DE_FABRICA,
                 'hero_cta_text' => 'Ver productos',
                 'seo_title' => $user->business_name ?: $user->name,
                 'whatsapp_number' => $user->whatsapp ?: $user->phone,

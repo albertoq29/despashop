@@ -1,5 +1,6 @@
 import { router } from '@inertiajs/react';
 import { ArrowRight, Check, Eye, EyeOff, Pencil, Settings2, Sparkles } from 'lucide-react';
+import PrimerosPasos from '@/Components/PrimerosPasos';
 import { Grupo, ReversionDeColores, Segmentado, SubidaImagen, Texto } from './Controles';
 import TemasRapidos from './TemasRapidos';
 import { TIPOS_DE_SECCION } from '../secciones';
@@ -38,13 +39,23 @@ const REDONDEZ = [
  * No reemplaza al editor completo ni esconde nada: es la puerta de entrada,
  * y el botón del final lleva al resto cuando haga falta.
  */
-export default function PanelFacil({ editor, conIa, onIa }) {
+export default function PanelFacil({ editor, conIa, onIa, onPublicar, subtituloDeFabrica }) {
     const { datos, cambiar, theme, inventario } = editor;
+    const pasos = primerosPasos({ datos, theme, inventario, onPublicar, editor, subtituloDeFabrica });
     const campo = (clave) => ({ valor: datos[clave], onCambiar: (valor) => cambiar(clave, valor), error: editor.errores[clave] });
     const redondez = REDONDEZ.find((opcion) => opcion.equivalen.includes(datos.radius))?.valor ?? 'lg';
 
     return (
         <>
+            {pasos.hechos < pasos.total && (
+                <Grupo
+                    titulo="Vamos paso a paso"
+                    descripcion="Lo que falta para que tu catálogo se pueda mandar por WhatsApp sin que te dé cosa."
+                >
+                    <PrimerosPasos pasos={pasos.pasos} hechos={pasos.hechos} total={pasos.total} className="-mx-2" />
+                </Grupo>
+            )}
+
             {conIa && (
                 <Grupo
                     titulo="La forma más rápida"
@@ -61,7 +72,7 @@ export default function PanelFacil({ editor, conIa, onIa }) {
                 </Grupo>
             )}
 
-            <Grupo titulo="Tu logo" descripcion="Al subirlo, el catálogo toma sus colores. Es el cambio que más se nota con menos esfuerzo.">
+            <Grupo id="paso-logo" titulo="Tu logo" descripcion="Al subirlo, el catálogo toma sus colores. Es el cambio que más se nota con menos esfuerzo.">
                 {editor.coloresPrevios && (
                     <ReversionDeColores onRevertir={editor.revertirColores} onCerrar={editor.olvidarColoresPrevios} />
                 )}
@@ -155,7 +166,7 @@ export default function PanelFacil({ editor, conIa, onIa }) {
                 </div>
             </Grupo>
 
-            <Grupo titulo="Lo primero que leen" descripcion="El titular grande de la portada. Si lo dejas vacío se usa el nombre de tu negocio.">
+            <Grupo id="paso-portada" titulo="Lo primero que leen" descripcion="El titular grande de la portada. Si lo dejas vacío se usa el nombre de tu negocio.">
                 <Texto etiqueta="Título" {...campo('hero_title')} placeholder={editor.comercio} maximo={120} />
                 <Texto etiqueta="Debajo del título" {...campo('hero_subtitle')} maximo={200} filas={2} />
             </Grupo>
@@ -180,6 +191,73 @@ export default function PanelFacil({ editor, conIa, onIa }) {
             </Grupo>
         </>
     );
+}
+
+/**
+ * Los mismos cuatro pasos que muestra el panel, pero resueltos aquí.
+ *
+ * El servidor los calcula para el panel; aquí no sirve esa copia, porque
+ * el comercio acaba de subir el logo o de escribir su portada y el paso
+ * tiene que tacharse en ese momento, no al recargar. Se leen del borrador
+ * que el editor tiene en la mano.
+ *
+ * Y las acciones son de esta misma pantalla: bajan hasta el control que
+ * toca en vez de mandar a otro lado. Esa es toda la diferencia.
+ */
+function primerosPasos({ datos, theme, inventario, onPublicar, editor, subtituloDeFabrica }) {
+    const bajarA = (id) => () =>
+        document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    const pasos = [
+        {
+            clave: 'productos',
+            titulo: 'Carga lo que vendes',
+            texto: 'Un catálogo sin productos se ve vacío por más bonito que quede.',
+            hecho: (inventario?.productos ?? 0) + (inventario?.servicios ?? 0) > 0,
+            enlace: route('productos.index'),
+            accion: 'Cargar',
+        },
+        {
+            clave: 'logo',
+            titulo: 'Sube tu logo',
+            texto: 'El catálogo toma sus colores solo.',
+            hecho: Boolean(theme.logo_url),
+            alIr: bajarA('paso-logo'),
+            accion: 'Subirlo',
+        },
+        {
+            clave: 'portada',
+            titulo: 'Escribe tu portada',
+            texto: 'Lo primero que se lee al entrar.',
+            hecho: portadaPropia(datos, editor.comercio, subtituloDeFabrica),
+            alIr: bajarA('paso-portada'),
+            accion: 'Escribirla',
+        },
+        {
+            clave: 'publicado',
+            titulo: 'Déjalo en línea',
+            texto: 'Mientras esté oculto solo lo ves tú.',
+            hecho: Boolean(datos.is_published),
+            alIr: onPublicar,
+            accion: 'Publicar',
+        },
+    ];
+
+    return { pasos, hechos: pasos.filter((paso) => paso.hecho).length, total: pasos.length };
+}
+
+/**
+ * La misma regla que App\Support\PrimerosPasos, para que el paso no
+ * aparezca tachado en una pantalla y pendiente en la otra.
+ *
+ * El catálogo nace con el nombre del negocio arriba y un subtítulo
+ * genérico: eso no es haber escrito la portada, es que no abra vacía.
+ */
+function portadaPropia(datos, suNombre, subtituloDeFabrica) {
+    const titulo = String(datos.hero_title ?? '').trim();
+    const subtitulo = String(datos.hero_subtitle ?? '').trim();
+
+    return (titulo !== '' && titulo !== suNombre) || (subtitulo !== '' && subtitulo !== subtituloDeFabrica);
 }
 
 /**

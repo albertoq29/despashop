@@ -18,6 +18,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DeliveryController;
 use App\Http\Controllers\RenovacionController;
 use App\Http\Controllers\ExchangeRateController;
+use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\ExportacionController;
 use App\Http\Controllers\FacturaController;
 use App\Http\Controllers\InvoiceTemplateController;
@@ -122,6 +123,9 @@ Route::middleware(['auth', 'verified', 'approved'])->group(function () {
         ->middleware('throttle:10,60')
         ->name('sugerencias.store');
     Route::delete('/sugerencias/{sugerencia}', [SuggestionController::class, 'destroy'])->name('sugerencias.destroy');
+
+    // Como va el negocio: ventas, visitas y tasa
+    Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('estadisticas.index');
 
     // Tasas de cambio
     Route::get('/tasas/registrar', [ExchangeRateController::class, 'create'])->name('tasas.create');

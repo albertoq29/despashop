@@ -67,9 +67,9 @@ export function ReversionDeColores({ onRevertir, onCerrar }) {
 const BASE_CAMPO =
     'w-full rounded-lg border-stone-300 bg-white px-3 py-2 text-sm text-stone-900 transition-colors duration-150 ease-salida placeholder:text-stone-400 focus:border-marca-600 focus:ring-marca-600 dark:border-stone-700 dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-600 dark:focus:border-marca-400 dark:focus:ring-marca-400';
 
-export function Grupo({ titulo, descripcion, accion, children, className = '' }) {
+export function Grupo({ id, titulo, descripcion, accion, children, className = '' }) {
     return (
-        <section className={`border-b border-stone-200 px-5 py-5 last:border-b-0 dark:border-stone-800 ${className}`}>
+        <section id={id} className={`border-b border-stone-200 px-5 py-5 last:border-b-0 dark:border-stone-800 ${className}`}>
             {(titulo || accion) && (
                 <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="min-w-0">
