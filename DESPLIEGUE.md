@@ -104,6 +104,12 @@ Lo que queda programado:
 | 03:30 | `model:prune`          | Poda el registro de seguridad                   |
 | 05:00 | `planes:vencidos`      | Avisa y elimina las cuentas que agotaron el plazo |
 
+Los avisos del plan salen a los **7 días**, luego **todos los días desde los
+3** (3, 2, 1), el **día mismo** del vencimiento y **a la mañana siguiente**, ya
+con el catálogo caído. Después, a los 7 y a los 12 días de vencido, contando lo
+que queda antes de borrar. Los días se cambian en `config/planes.php`
+(`avisos_previos` y `avisos`).
+
 Antes de confiar en el borrado automático, míralo en seco:
 
 ```bash
