@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ajustarCantidad, pasoDeCantidad } from '@/utils/unidades';
 import { fuzzyCandidates, matchConfidence } from '@/utils/fuzzySearch';
+import { COLORES_DE_CAMPO } from '@/utils/campos';
 
 /**
  * Agregado rápido: pegar una lista de nombres (por ejemplo la que manda un
@@ -265,7 +266,7 @@ export default function AgregadoRapido({ productos = [], haystacks, onAgregar })
                                         value={texto}
                                         onChange={e => setTexto(e.target.value)}
                                         placeholder={EJEMPLO}
-                                        className="w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none resize-y"
+                                        className={`w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none resize-y ${COLORES_DE_CAMPO}`}
                                     />
 
                                     <div className="bg-stone-50 dark:bg-stone-900 border border-stone-200 dark:border-stone-800 rounded-xl p-3">
@@ -467,7 +468,7 @@ export default function AgregadoRapido({ productos = [], haystacks, onAgregar })
                                                                 const v = parseFloat(e.target.value);
                                                                 actualizarFila(fila.id, { qty: isNaN(v) ? paso : Math.max(paso, redondear(v, producto)) });
                                                             }}
-                                                            className="w-16 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none"
+                                                            className={`w-16 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none ${COLORES_DE_CAMPO}`}
                                                         />
                                                         <button
                                                             type="button"

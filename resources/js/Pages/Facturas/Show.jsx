@@ -273,10 +273,16 @@ export default function Show({ auth, factura, plantilla }) {
                 </div>
 
 
-                    <div id="recibo-print" className="bg-white dark:bg-stone-900 rounded-2xl shadow-sm border border-stone-200 dark:border-stone-800 overflow-hidden">
+                    {/* El recibo es papel, no interfaz: aquí no hay una sola
+                        clase `dark:` a propósito. Es lo que el comercio imprime y
+                        lo que html2canvas convierte en la imagen que le manda al
+                        cliente; cuando seguía al tema de la app, quien tuviera el
+                        modo oscuro encendido mandaba facturas negras. Los colores
+                        del documento se eligen en Estilo de factura. */}
+                    <div id="recibo-print" className="bg-white text-stone-900 rounded-2xl shadow-sm border border-stone-200 overflow-hidden">
 
                         {/* Encabezado del recibo (Fondo Blanco) */}
-                        <div className="px-3 sm:px-8 py-6 bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800">
+                        <div className="px-3 sm:px-8 py-6 bg-white border-b border-stone-200">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div className="flex items-center gap-3">
                                     {plantilla?.show_logo && plantilla?.logo_url && (
@@ -288,10 +294,10 @@ export default function Show({ auth, factura, plantilla }) {
                                         />
                                     )}
                                     <div>
-                                        <h1 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-stone-100 tracking-tight">
+                                        <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">
                                             {plantilla?.business_name || 'Comprobante'}
                                         </h1>
-                                        <p className="text-xs text-stone-400 dark:text-stone-500 font-medium">
+                                        <p className="text-xs text-stone-400 font-medium">
                                             {[plantilla?.tax_id, plantilla?.phone].filter(Boolean).join(' · ') || 'Comprobante de Venta'}
                                         </p>
                                     </div>
@@ -299,9 +305,9 @@ export default function Show({ auth, factura, plantilla }) {
                                 <div className="text-left sm:text-right shrink-0">
                                     <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold border ${
-                                            factura.status === 'confirmed' ? 'bg-green-50 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900' :
-                                            factura.status === 'pending_variants' ? 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-800' :
-                                            'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900'
+                                            factura.status === 'confirmed' ? 'bg-green-50 text-green-700 border-green-200' :
+                                            factura.status === 'pending_variants' ? 'bg-stone-100 text-stone-700 border-stone-200' :
+                                            'bg-amber-50 text-amber-700 border-amber-200'
                                         }`}>
                                             {factura.status === 'confirmed' ? '✓ CONFIRMADA' :
                                              factura.status === 'pending_variants' ? '⏳ PENDIENTE VARIANTES' :
@@ -312,53 +318,53 @@ export default function Show({ auth, factura, plantilla }) {
                             </div>
 
                             {/* Fechas integradas */}
-                            <div className="mt-4 pt-4 border-t border-stone-200 dark:border-stone-800 flex flex-wrap gap-4 sm:gap-8 text-xs sm:text-sm">
+                            <div className="mt-4 pt-4 border-t border-stone-200 flex flex-wrap gap-4 sm:gap-8 text-xs sm:text-sm">
                                 <div>
-                                    <span className="text-stone-400 dark:text-stone-500 font-bold uppercase text-[10px] sm:text-xs tracking-wider block">Fecha de Emisión</span>
-                                    <span className="font-semibold text-stone-800 dark:text-stone-200">{formatDate(factura.created_at)}</span>
+                                    <span className="text-stone-400 font-bold uppercase text-[10px] sm:text-xs tracking-wider block">Fecha de Emisión</span>
+                                    <span className="font-semibold text-stone-800">{formatDate(factura.created_at)}</span>
                                 </div>
                                 {isConfirmed && (
                                     <div>
-                                        <span className="text-stone-400 dark:text-stone-500 font-bold uppercase text-[10px] sm:text-xs tracking-wider block">Fecha de Confirmación</span>
-                                        <span className="font-semibold text-stone-800 dark:text-stone-200">{formatDate(factura.confirmed_at)}</span>
+                                        <span className="text-stone-400 font-bold uppercase text-[10px] sm:text-xs tracking-wider block">Fecha de Confirmación</span>
+                                        <span className="font-semibold text-stone-800">{formatDate(factura.confirmed_at)}</span>
                                     </div>
                                 )}
                             </div>
                         </div>
 
                         {/* Datos del cliente */}
-                        <div className="px-3 sm:px-8 py-4 sm:py-5 bg-stone-50 dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800">
+                        <div className="px-3 sm:px-8 py-4 sm:py-5 bg-stone-50 border-b border-stone-200">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="min-w-0 flex-1">
                                     {(factura.client_name || factura.client_phone || factura.notes) && (
-                                    <h3 className="text-[10px] sm:text-xs font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-2.5">Datos del Cliente</h3>
+                                    <h3 className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider mb-2.5">Datos del Cliente</h3>
                                     )}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
                                         {factura.client_name && (
                                             <div>
-                                                <span className="text-stone-500 dark:text-stone-400">Nombre:</span>
-                                                <span className="ml-1.5 font-semibold text-stone-800 dark:text-stone-200">{factura.client_name}</span>
+                                                <span className="text-stone-500">Nombre:</span>
+                                                <span className="ml-1.5 font-semibold text-stone-800">{factura.client_name}</span>
                                             </div>
                                         )}
                                         {factura.client_phone && (
                                             <div>
-                                                <span className="text-stone-500 dark:text-stone-400">Teléfono:</span>
-                                                <span className="ml-1.5 font-semibold text-stone-800 dark:text-stone-200">{factura.client_phone}</span>
+                                                <span className="text-stone-500">Teléfono:</span>
+                                                <span className="ml-1.5 font-semibold text-stone-800">{factura.client_phone}</span>
                                             </div>
                                         )}
                                         {factura.notes && (
                                             <div className="sm:col-span-2">
-                                                <span className="text-stone-500 dark:text-stone-400">Notas:</span>
-                                                <span className="ml-1.5 text-stone-700 dark:text-stone-300">{factura.notes}</span>
+                                                <span className="text-stone-500">Notas:</span>
+                                                <span className="ml-1.5 text-stone-700">{factura.notes}</span>
                                             </div>
                                         )}
                                         {/* Lo que necesita quien reparte, junto al resto de los datos */}
                                         {(factura.delivery?.point_a || factura.delivery?.point_b) && (
                                             <div className="sm:col-span-2">
-                                                <span className="text-stone-500 dark:text-stone-400">Entrega:</span>
-                                                <span className="ml-1.5 text-stone-700 dark:text-stone-300">
+                                                <span className="text-stone-500">Entrega:</span>
+                                                <span className="ml-1.5 text-stone-700">
                                                     {factura.delivery.point_a || 'Sin punto de salida'}
-                                                    <span className="mx-1.5 text-stone-400 dark:text-stone-500">→</span>
+                                                    <span className="mx-1.5 text-stone-400">→</span>
                                                     {factura.delivery.point_b || 'Sin punto de llegada'}
                                                 </span>
                                             </div>
@@ -366,19 +372,19 @@ export default function Show({ auth, factura, plantilla }) {
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                    <span className="text-[10px] sm:text-xs font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider block mb-2.5">N° de Orden</span>
-                                    <span className="text-xl sm:text-2xl font-black text-stone-900 dark:text-stone-100 font-mono">Orden #{factura.id}</span>
+                                    <span className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider block mb-2.5">N° de Orden</span>
+                                    <span className="text-xl sm:text-2xl font-black text-stone-900 font-mono">Orden #{factura.id}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Tabla de items */}
                         <div className="px-3 sm:px-8 py-4 sm:py-6">
-                            <h3 className="text-[10px] sm:text-xs font-bold text-stone-500 dark:text-stone-400 uppercase tracking-wider mb-3.5">Detalle de Productos / Servicios</h3>
+                            <h3 className="text-[10px] sm:text-xs font-bold text-stone-500 uppercase tracking-wider mb-3.5">Detalle de Productos / Servicios</h3>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-xs sm:text-sm">
                                     <thead>
-                                        <tr className="border-b-2 border-stone-200 dark:border-stone-800 text-[10px] sm:text-xs text-stone-500 dark:text-stone-400 uppercase tracking-wider">
+                                        <tr className="border-b-2 border-stone-200 text-[10px] sm:text-xs text-stone-500 uppercase tracking-wider">
                                             <th className="py-2 px-1 text-left font-bold w-5 sm:w-6">#</th>
                                             <th className="py-2 px-1 text-left font-bold">Descripción</th>
                                             <th className="py-2 px-1 text-right font-bold w-10 sm:w-12">Cant.</th>
@@ -386,7 +392,7 @@ export default function Show({ auth, factura, plantilla }) {
                                             <th className="py-2 px-1 text-right font-bold w-16 sm:w-24">Total</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-stone-50 dark:divide-stone-900">
+                                    <tbody className="divide-y divide-stone-50">
                                         {groupedItems.map((item, idx) => {
                                             const isGroup = item.type === 'product_group';
                                             const qty = isGroup ? item.qty : item.qty;
@@ -397,20 +403,20 @@ export default function Show({ auth, factura, plantilla }) {
                                             const isComboItem = isGroup ? false : (!!item.combo_id || isOldComboSubproduct);
                                             const hidePriceDetails = isOldComboSubproduct;
                                             return (
-                                                <tr key={isGroup ? `group_${item.product_id}` : item.id} className="hover:bg-stone-50 dark:hover:bg-stone-800">
-                                                    <td className="py-2.5 sm:py-3 px-1 text-stone-400 dark:text-stone-500 font-mono text-[10px] sm:text-xs">{idx + 1}</td>
+                                                <tr key={isGroup ? `group_${item.product_id}` : item.id} className="hover:bg-stone-50">
+                                                    <td className="py-2.5 sm:py-3 px-1 text-stone-400 font-mono text-[10px] sm:text-xs">{idx + 1}</td>
                                                     <td className="py-2.5 sm:py-3 px-1">
-                                                        <div className="font-semibold text-stone-800 dark:text-stone-200 text-xs sm:text-sm leading-snug">
+                                                        <div className="font-semibold text-stone-800 text-xs sm:text-sm leading-snug">
                                                             {item.product_name}
                                                             {!isGroup && factura.show_variants_in_receipt !== false && item.variant && (
-                                                                <span className="ml-2 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-marca-100 dark:bg-marca-950/60 text-marca-800 dark:text-marca-300 border border-stone-200 dark:border-stone-800">
+                                                                <span className="ml-2 inline-block px-2 py-0.5 rounded-md text-[10px] font-bold bg-marca-100 text-marca-800 border border-stone-200">
                                                                     {item.variant.label}
                                                                 </span>
                                                             )}
                                                             {isGroup && factura.show_variants_in_receipt !== false && item.variants && item.variants.length > 0 && (
                                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                                     {item.variants.map(v => (
-                                                                        <span key={v.id} className="inline-block px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-marca-50 dark:bg-marca-950/40 text-marca-800 dark:text-marca-300 border border-marca-100/60 dark:border-marca-950/60">
+                                                                        <span key={v.id} className="inline-block px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-marca-50 text-marca-800 border border-marca-100/60">
                                                                             {v.variant ? v.variant.label : 'Pendiente'} ({conUnidadSiHaceFalta(v.qty, item.product)})
                                                                         </span>
                                                                     ))}
@@ -419,31 +425,31 @@ export default function Show({ auth, factura, plantilla }) {
                                                         </div>
                                                         <div className="flex flex-wrap items-center gap-1.5 mt-1">
                                                             {!isGroup && !item.product_id && (
-                                                                <span className="text-[9px] sm:text-[10px] text-stone-400 dark:text-stone-500 italic">Item manual</span>
+                                                                <span className="text-[9px] sm:text-[10px] text-stone-400 italic">Item manual</span>
                                                             )}
                                                             {item.product?.item_type === 'servicio' && (
-                                                                <span className="inline-block rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 dark:border-sky-900 dark:bg-sky-950/50 dark:text-sky-400 sm:text-[10px]">
+                                                                <span className="inline-block rounded border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-bold text-sky-700 sm:text-[10px]">
                                                                     Servicio
                                                                 </span>
                                                             )}
                                                             {!isComboItem && (
                                                                 <span className={`inline-block px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] font-bold border ${
-                                                                    item.price_type === 'detal'        ? 'bg-sky-50 dark:bg-sky-950/50 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-900' :
-                                                                    item.price_type === 'mayor'        ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900' :
-                                                                    item.price_type === 'distribuidor' ? 'bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-300 border-stone-200 dark:border-stone-800' :
-                                                                                                          'bg-stone-50 dark:bg-stone-900 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800'
+                                                                    item.price_type === 'detal'        ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                                                                    item.price_type === 'mayor'        ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                                                                    item.price_type === 'distribuidor' ? 'bg-stone-100 text-stone-700 border-stone-200' :
+                                                                                                          'bg-stone-50 text-stone-600 border-stone-200'
                                                                 }`}>
                                                                     {PRICE_LABELS[item.price_type] || item.price_type}
                                                                 </span>
                                                             )}
                                                             {factura.en_divisas && !isComboItem && (
-                                                                <span className="inline-block rounded border border-marca-200 bg-marca-50 px-1.5 py-0.5 text-[9px] font-bold text-marca-700 dark:border-marca-900 dark:bg-marca-950/50 dark:text-marca-400 sm:text-[10px]">
+                                                                <span className="inline-block rounded border border-marca-200 bg-marca-50 px-1.5 py-0.5 text-[9px] font-bold text-marca-700 sm:text-[10px]">
                                                                     En divisas
                                                                 </span>
                                                             )}
                                                             {/* Un servicio por suscripción: cuándo vuelve a tocar */}
                                                             {item.renueva_el && (
-                                                                <span className="inline-block w-full text-[9px] text-stone-500 dark:text-stone-400 sm:text-[10px]">
+                                                                <span className="inline-block w-full text-[9px] text-stone-500 sm:text-[10px]">
                                                                     Renueva el {fechaCorta(item.renueva_el)}
                                                                 </span>
                                                             )}
@@ -455,7 +461,7 @@ export default function Show({ auth, factura, plantilla }) {
                                                     <td className="py-2.5 sm:py-3 px-1 text-right font-mono text-xs sm:text-sm">
                                                         {hidePriceDetails ? '—' : `$${parseFloat(unitPrice).toFixed(2)}`}
                                                     </td>
-                                                    <td className="py-2.5 sm:py-3 px-1 text-right font-mono font-bold text-stone-900 dark:text-stone-100 text-xs sm:text-sm">
+                                                    <td className="py-2.5 sm:py-3 px-1 text-right font-mono font-bold text-stone-900 text-xs sm:text-sm">
                                                         {hidePriceDetails ? '—' : `$${parseFloat(subtotal).toFixed(2)}`}
                                                     </td>
                                                 </tr>
@@ -467,26 +473,26 @@ export default function Show({ auth, factura, plantilla }) {
                         </div>
 
                         {/* Totales */}
-                        <div className="px-3 sm:px-8 py-4 sm:py-6 bg-stone-50 dark:bg-stone-900 border-t border-stone-200 dark:border-stone-800">
+                        <div className="px-3 sm:px-8 py-4 sm:py-6 bg-stone-50 border-t border-stone-200">
                             <div className="flex justify-end">
                                 <div className="w-full max-w-xs space-y-2">
-                                    <div className="flex justify-between text-xs sm:text-sm text-stone-600 dark:text-stone-400">
+                                    <div className="flex justify-between text-xs sm:text-sm text-stone-600">
                                         <span>Subtotal</span>
                                         <span className="font-mono">${parseFloat(factura.subtotal_usd).toFixed(2)}</span>
                                     </div>
                                     {parseFloat(factura.discount_usd) > 0 && (
-                                        <div className="flex justify-between text-xs sm:text-sm text-green-600 dark:text-green-400">
+                                        <div className="flex justify-between text-xs sm:text-sm text-green-600">
                                             <span>Descuento</span>
                                             <span className="font-mono">-${parseFloat(factura.discount_usd).toFixed(2)}</span>
                                         </div>
                                     )}
                                     {parseFloat(factura.shipping_usd) > 0 && (
-                                        <div className="flex justify-between text-xs sm:text-sm text-stone-600 dark:text-stone-400">
+                                        <div className="flex justify-between text-xs sm:text-sm text-stone-600">
                                             <span>Envío / Embalaje</span>
                                             <span className="font-mono">${parseFloat(factura.shipping_usd).toFixed(2)}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between text-lg sm:text-xl font-extrabold text-stone-900 dark:text-stone-100 border-t-2 border-stone-200 dark:border-stone-800 pt-2.5 mt-2">
+                                    <div className="flex justify-between text-lg sm:text-xl font-extrabold text-stone-900 border-t-2 border-stone-200 pt-2.5 mt-2">
                                         <span>TOTAL</span>
                                         <span className="font-mono">${parseFloat(factura.total_usd).toFixed(2)}</span>
                                     </div>
@@ -494,21 +500,21 @@ export default function Show({ auth, factura, plantilla }) {
                                     {/* Que el recibo diga con qué precio se cobró: a los
                                         tres meses nadie se acuerda de por qué fue más barato */}
                                     {factura.en_divisas && (
-                                        <p className="text-center text-xs font-semibold text-marca-700 dark:text-marca-400">
+                                        <p className="text-center text-xs font-semibold text-marca-700">
                                             Precio especial por pago en divisas
                                         </p>
                                     )}
-                                    <div className="flex justify-between text-sm sm:text-base font-bold text-marca-800 dark:text-marca-300 bg-marca-50 dark:bg-marca-950/40 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
+                                    <div className="flex justify-between text-sm sm:text-base font-bold text-marca-800 bg-marca-50 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5">
                                         <span>Total en Bolívares</span>
                                         <span className="font-mono">Bs. {parseFloat(factura.total_bs).toFixed(2)}</span>
                                     </div>
                                     {factura.has_delivery_fee && parseFloat(factura.delivery_bs) > 0 && (
-                                        <div className="space-y-1.5 mt-2 p-3 bg-stone-100 dark:bg-stone-800 rounded-xl border border-stone-200 dark:border-stone-800">
-                                            <div className="flex justify-between text-xs sm:text-sm font-semibold text-stone-700 dark:text-stone-300">
+                                        <div className="space-y-1.5 mt-2 p-3 bg-stone-100 rounded-xl border border-stone-200">
+                                            <div className="flex justify-between text-xs sm:text-sm font-semibold text-stone-700">
                                                 <span>Costo Delivery</span>
                                                 <span className="font-mono">Bs. {parseFloat(factura.delivery_bs).toFixed(2)}</span>
                                             </div>
-                                            <div className="flex justify-between text-sm sm:text-base font-black text-stone-900 dark:text-stone-200 border-t border-stone-200/60 dark:border-stone-900/60 pt-1.5 mt-1">
+                                            <div className="flex justify-between text-sm sm:text-base font-black text-stone-900 border-t border-stone-200/60 pt-1.5 mt-1">
                                                 <span>TOTAL MÁS DELIVERY</span>
                                                 <span className="font-mono">Bs. {(parseFloat(factura.total_bs) + parseFloat(factura.delivery_bs)).toFixed(2)}</span>
                                             </div>
@@ -519,10 +525,10 @@ export default function Show({ auth, factura, plantilla }) {
                         </div>
 
                         {/* Footer del recibo */}
-                        <div className="px-3 sm:px-8 py-4 sm:py-5 text-center border-t border-stone-200 dark:border-stone-800">
-                            <p className="text-xs text-stone-400 dark:text-stone-500">{plantilla?.footer_note || 'Gracias por su compra'}</p>
+                        <div className="px-3 sm:px-8 py-4 sm:py-5 text-center border-t border-stone-200">
+                            <p className="text-xs text-stone-400">{plantilla?.footer_note || 'Gracias por su compra'}</p>
                             {!isConfirmed && (
-                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                                <p className="text-xs text-amber-600 mt-1 font-medium">
                                     {factura.status === 'pending_variants'
                                         ? 'Esta factura está pagada pero pendiente por confirmar variantes. Por favor edita y confirma para descontar stock.'
                                         : 'Este es un borrador. Confirma para descontar el stock automáticamente.'}

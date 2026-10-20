@@ -8,6 +8,7 @@ import AgregadoRapido from '@/Components/AgregadoRapido';
 import { Banknote, CalendarClock } from 'lucide-react';
 import { useEtiquetasDePrecio } from '@/utils/nivelesDePrecio';
 import { ajustarCantidad, conUnidad, pasoDeCantidad, unidadCorta } from '@/utils/unidades';
+import { COLORES_DE_CAMPO } from '@/utils/campos';
 
 const PRICE_COLORS = {
     detal:        'bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-900',
@@ -960,7 +961,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                         placeholder={activeTab === 'combos' ? 'Buscar combo...' : activeTab === 'servicios' ? 'Buscar servicio...' : 'Buscar producto...'}
                                         value={search}
                                         onChange={e => setSearch(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2.5 border border-stone-200 dark:border-stone-800 rounded-xl text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                        className={`w-full pl-9 pr-3 py-2.5 border border-stone-200 dark:border-stone-800 rounded-xl text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                     />
                                     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 dark:text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 0 0114 0z"/>
@@ -1159,10 +1160,10 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                         value={clientName}
                                         onChange={e => setClientName(e.target.value)}
                                         required={hasDelivery}
-                                        className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-1 outline-none transition-all ${
+                                        className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-1 outline-none transition-all text-stone-900 placeholder:text-stone-400 dark:text-stone-100 dark:placeholder:text-stone-600 ${
                                             hasDelivery && !clientName?.trim()
-                                                ? 'border-marca-600 dark:border-marca-500 bg-marca-50/10 dark:bg-marca-950/10 focus:border-marca-600 dark:focus:border-marca-400 focus:ring-marca-600 dark:focus:ring-marca-400'
-                                                : 'border-stone-200 dark:border-stone-800 focus:border-marca-600 dark:focus:border-marca-400 focus:ring-marca-600 dark:focus:ring-marca-400'
+                                                ? 'border-marca-600 dark:border-marca-500 bg-marca-50 dark:bg-marca-950/40 focus:border-marca-600 dark:focus:border-marca-400 focus:ring-marca-600 dark:focus:ring-marca-400'
+                                                : 'border-stone-200 dark:border-stone-800 bg-white dark:bg-stone-950 focus:border-marca-600 dark:focus:border-marca-400 focus:ring-marca-600 dark:focus:ring-marca-400'
                                         }`}
                                     />
                                     <input
@@ -1170,14 +1171,14 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                         placeholder="Teléfono (opcional)"
                                         value={clientPhone}
                                         onChange={e => setClientPhone(e.target.value)}
-                                        className="w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                        className={`w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                     />
                                     <textarea
                                         placeholder="Notas / Observaciones (opcional)"
                                         rows={2}
                                         value={notes}
                                         onChange={e => setNotes(e.target.value)}
-                                        className="w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none resize-none"
+                                        className={`w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2.5 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none resize-none ${COLORES_DE_CAMPO}`}
                                     />
 
                                     <PagoEnDivisas
@@ -1202,7 +1203,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                         setDeliveryDate(formatted);
                                                     }
                                                 }}
-                                                className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25"
+                                                className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25 bg-white dark:bg-stone-950"
                                             />
                                             <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Programar entrega o delivery</span>
                                         </label>
@@ -1215,7 +1216,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                     value={deliveryDate}
                                                     min={new Date().toISOString().slice(0, 16)}
                                                     onChange={e => setDeliveryDate(e.target.value)}
-                                                    className="w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                    className={`w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                     required={hasDelivery}
                                                 />
                                             </div>
@@ -1253,7 +1254,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                             value="draft"
                                             checked={status === 'draft'}
                                             onChange={() => setStatus('draft')}
-                                            className="mt-1 w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25 cursor-pointer"
+                                            className="mt-1 w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25 cursor-pointer bg-white dark:bg-stone-950"
                                         />
                                         <div className="-mt-0.5">
                                             <span className="text-sm font-bold text-stone-700 dark:text-stone-300">Guardar como Borrador</span>
@@ -1268,7 +1269,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                             value="pending_variants"
                                             checked={status === 'pending_variants'}
                                             onChange={() => setStatus('pending_variants')}
-                                            className="mt-1 w-4 h-4 text-stone-600 dark:text-stone-400 border-stone-300 dark:border-stone-700 focus:ring-stone-600 dark:focus:ring-stone-500 focus:ring-opacity-25 cursor-pointer"
+                                            className="mt-1 w-4 h-4 text-stone-600 dark:text-stone-400 border-stone-300 dark:border-stone-700 focus:ring-stone-600 dark:focus:ring-stone-500 focus:ring-opacity-25 cursor-pointer bg-white dark:bg-stone-950"
                                         />
                                         <div className="-mt-0.5">
                                             <span className="text-sm font-bold text-stone-700 dark:text-stone-300">⏳ Pagada (Pendiente Variantes)</span>
@@ -1297,7 +1298,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                 e.target.value = '';
                                             }}
                                             value=""
-                                            className="w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                            className={`w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2 text-sm focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                         >
                                             <option value="">-- Seleccionar para aplicar --</option>
                                             {supplements
@@ -1327,7 +1328,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                             min="0.01"
                                                             value={s.qty}
                                                             onChange={e => updateSupplementQty(s.id, e.target.value)}
-                                                            className="w-16 border border-stone-200 dark:border-stone-800 rounded-lg px-1.5 py-1 text-xs text-right font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                            className={`w-16 border border-stone-200 dark:border-stone-800 rounded-lg px-1.5 py-1 text-xs text-right font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                         />
                                                         <span className="text-[10px] text-stone-500 dark:text-stone-400 font-semibold w-7">
                                                             {s.type === 'meters' ? 'mts' : 'uds'}
@@ -1428,7 +1429,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                                     placeholder="Nombre del producto o servicio..."
                                                                     value={item.product_name}
                                                                     onChange={e => updateItem(item._uid, 'product_name', e.target.value)}
-                                                                    className="w-full border border-stone-200 dark:border-stone-800 rounded-lg px-3 py-2 text-sm font-medium focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                                    className={`w-full border border-stone-200 dark:border-stone-800 rounded-lg px-3 py-2 text-sm font-medium focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                                 />
                                                             ) : (
                                                                 <div>
@@ -1593,7 +1594,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                                                         updateItem(item._uid, 'unit_price', e.target.value);
                                                                                     }
                                                                                 }}
-                                                                                className="w-24 border border-stone-200 dark:border-stone-800 rounded-lg px-2.5 py-1.5 text-sm font-mono text-right focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                                                className={`w-24 border border-stone-200 dark:border-stone-800 rounded-lg px-2.5 py-1.5 text-sm font-mono text-right focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                                             />
                                                                             <span className="text-xs text-stone-400 dark:text-stone-500">
                                                                 {esServicio(item._producto) ? '' : `/${unidadCorta(item._producto)}`}
@@ -1623,7 +1624,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                                                             const minVal = getItemMaxStock(item) === 0 ? 0 : pasoDeCantidad(item._producto);
                                                                                             updateItem(item._uid, 'qty', isNaN(val) ? minVal : val);
                                                                                         }}
-                                                                                        className="w-20 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none"
+                                                                                        className={`w-20 text-center text-sm font-mono border-x border-stone-200 dark:border-stone-800 py-1.5 focus:outline-none ${COLORES_DE_CAMPO}`}
                                                                                     />
                                                                                     <button
                                                                                         onClick={() => updateItem(item._uid, 'qty', item.qty + 1)}
@@ -1690,7 +1691,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                         setShippingBs('');
                                                     }
                                                 }}
-                                                className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25"
+                                                className="w-4 h-4 text-marca-700 dark:text-marca-400 border-stone-300 dark:border-stone-700 rounded focus:ring-marca-600 dark:focus:ring-marca-400 focus:ring-opacity-25 bg-white dark:bg-stone-950"
                                             />
                                             <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Aplica Envío / Embalaje</span>
                                         </label>
@@ -1703,7 +1704,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                     setHasDeliveryFee(e.target.checked);
                                                     if (!e.target.checked) setDeliveryBs('');
                                                 }}
-                                                className="w-4 h-4 text-stone-600 dark:text-stone-400 border-stone-300 dark:border-stone-700 rounded focus:ring-stone-600 dark:focus:ring-stone-500 focus:ring-opacity-25"
+                                                className="w-4 h-4 text-stone-600 dark:text-stone-400 border-stone-300 dark:border-stone-700 rounded focus:ring-stone-600 dark:focus:ring-stone-500 focus:ring-opacity-25 bg-white dark:bg-stone-950"
                                             />
                                             <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">Aplica Delivery (Monto Bs)</span>
                                         </label>
@@ -1727,7 +1728,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                             const num = parseFloat(valStr) || 0;
                                                             setShippingBs(valStr ? round2(num * customBcvRate).toString() : '');
                                                         }}
-                                                        className="w-full pl-7 pr-3 py-2 border border-stone-200 dark:border-stone-800 rounded-xl text-sm font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                        className={`w-full pl-7 pr-3 py-2 border border-stone-200 dark:border-stone-800 rounded-xl text-sm font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                     />
                                                 </div>
                                             </div>
@@ -1747,7 +1748,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                             const num = parseFloat(valStr) || 0;
                                                             setShippingUsd(valStr && customBcvRate > 0 ? round2(num / customBcvRate).toString() : '');
                                                         }}
-                                                        className="w-full pl-8 pr-3 py-2 border border-stone-200 dark:border-stone-800 rounded-xl text-sm font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                        className={`w-full pl-8 pr-3 py-2 border border-stone-200 dark:border-stone-800 rounded-xl text-sm font-mono focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                     />
                                                 </div>
                                             </div>
@@ -1773,7 +1774,7 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                     )}
                                 </div>
 
-                                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+                                <div className="flex flex-col gap-6">
                                     <div className="space-y-2 flex-1 max-w-md">
                                         <div className="flex justify-between gap-12 text-sm text-stone-500 dark:text-stone-400">
                                             <span>Subtotal</span>
@@ -1799,20 +1800,20 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                                     step="0.01"
                                                     value={customBcvRate}
                                                     onChange={e => handleBcvRateChange(parseFloat(e.target.value) || 0)}
-                                                    className="w-24 px-2.5 py-1 border border-stone-200 dark:border-stone-800 rounded-lg text-xs font-mono text-right focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none"
+                                                    className={`w-24 px-2.5 py-1 border border-stone-200 dark:border-stone-800 rounded-lg text-xs font-mono text-right focus:border-marca-600 dark:focus:border-marca-400 focus:ring-1 focus:ring-marca-600 dark:focus:ring-marca-400 outline-none ${COLORES_DE_CAMPO}`}
                                                 />
                                             </div>
                                             <div className="flex flex-col gap-1 text-marca-800 dark:text-marca-300 bg-marca-50 dark:bg-marca-950/40 rounded-xl px-4 py-2.5">
-                                                <div className="flex justify-between items-center">
+                                                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
                                                     <span className="text-sm font-bold">Total Normal (Bs.)</span>
-                                                    <div className="flex items-center gap-1">
+                                                    <div className="flex min-w-0 flex-1 items-center justify-end gap-1">
                                                         <span className="text-sm font-mono font-bold">Bs.</span>
                                                         <input
                                                             type="number"
                                                             step="0.01"
                                                             value={manualTotalBs !== '' ? manualTotalBs : totals.totalBs}
                                                             onChange={e => setManualTotalBs(e.target.value)}
-                                                            className="w-32 bg-transparent text-right font-mono font-bold border-b border-marca-300 dark:border-marca-800 focus:border-marca-600 dark:focus:border-marca-400 focus:ring-0 outline-none text-sm p-0"
+                                                            className="w-full max-w-[8rem] min-w-0 bg-transparent text-right font-mono font-bold border-b border-marca-300 dark:border-marca-800 focus:border-marca-600 dark:focus:border-marca-400 focus:ring-0 outline-none text-sm p-0 text-marca-800 dark:text-marca-200 dark:[color-scheme:dark]"
                                                         />
                                                     </div>
                                                 </div>
@@ -1829,17 +1830,17 @@ export default function Edit({ auth, productos, combos = [], bcvRate, factura, s
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col sm:flex-row gap-2">
+                                    <div className="flex flex-wrap gap-2">
                                         <button
                                             onClick={() => router.visit(route('facturas.show', factura.id))}
-                                            className="px-5 py-3 border-2 border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors text-sm"
+                                            className="flex-1 min-w-[7rem] px-5 py-3 border-2 border-stone-200 dark:border-stone-800 text-stone-600 dark:text-stone-400 font-bold rounded-xl hover:bg-stone-50 dark:hover:bg-stone-800 transition-colors text-sm"
                                         >
                                             Cancelar
                                         </button>
                                         <button
                                             onClick={handleSubmit}
                                             disabled={saving || items.length === 0}
-                                            className="px-6 py-3 bg-marca-700 dark:bg-marca-500 text-white font-bold rounded-xl hover:bg-marca-800 dark:hover:bg-marca-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm shadow-sm flex items-center gap-2"
+                                            className="flex-1 min-w-[9rem] px-6 py-3 bg-marca-700 dark:bg-marca-500 text-white font-bold rounded-xl hover:bg-marca-800 dark:hover:bg-marca-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm shadow-sm flex items-center justify-center gap-2"
                                         >
                                             {saving ? (
                                                 <>
@@ -1903,7 +1904,7 @@ function RenovacionDelRenglon({ item, onCambiar }) {
                 type="date"
                 value={item.renueva_el || ''}
                 onChange={(e) => onCambiar(item._uid, 'renueva_el', e.target.value)}
-                className="rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-marca-600 focus:ring-1 focus:ring-marca-600 dark:border-stone-800 dark:focus:border-marca-400 dark:focus:ring-marca-400"
+                className={`rounded-lg border border-stone-200 px-2 py-1 text-xs outline-none focus:border-marca-600 focus:ring-1 focus:ring-marca-600 dark:border-stone-800 dark:focus:border-marca-400 dark:focus:ring-marca-400 ${COLORES_DE_CAMPO}`}
             />
             {!item.renueva_el && (
                 <button
@@ -1941,7 +1942,7 @@ function PagoEnDivisas({ activo, onCambiar, items }) {
                     type="checkbox"
                     checked={activo}
                     onChange={(e) => onCambiar(e.target.checked)}
-                    className="h-4 w-4 rounded border-stone-300 text-marca-700 focus:ring-marca-600 focus:ring-opacity-25 dark:border-stone-700 dark:text-marca-400 dark:focus:ring-marca-400"
+                    className="h-4 w-4 rounded border-stone-300 text-marca-700 focus:ring-marca-600 focus:ring-opacity-25 dark:border-stone-700 dark:text-marca-400 dark:focus:ring-marca-400 bg-white dark:bg-stone-950"
                 />
                 <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-stone-700 dark:text-stone-300">
                     <Banknote className="h-4 w-4" />

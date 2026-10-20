@@ -1,4 +1,5 @@
 import { ArrowDown, Bike, MapPin, User } from 'lucide-react';
+import { COLORES_DE_CAMPO } from '@/utils/campos';
 
 /** Lo que trae el punto A cuando se enciende por primera vez. */
 export const PUNTO_A_POR_DEFECTO = 'Mi negocio';
@@ -36,10 +37,8 @@ export default function PuntosDeEntrega({
 
     const campo =
         'w-full border border-stone-200 dark:border-stone-800 rounded-xl px-3 py-2 text-sm ' +
-        'bg-white text-stone-900 placeholder:text-stone-400 ' +
         'focus:border-marca-600 focus:ring-1 focus:ring-marca-600 outline-none ' +
-        'dark:bg-stone-950 dark:text-stone-100 dark:placeholder:text-stone-600 ' +
-        'dark:focus:border-marca-400 dark:focus:ring-marca-400';
+        'dark:focus:border-marca-400 dark:focus:ring-marca-400 ' + COLORES_DE_CAMPO;
 
     return (
         <div className="mt-3 space-y-3">
@@ -90,7 +89,7 @@ export default function PuntosDeEntrega({
                                     onPuntoA(PUNTO_A_POR_DEFECTO);
                                 }
                             }}
-                            className="h-4 w-4 rounded border-stone-300 text-marca-700 focus:ring-marca-600 focus:ring-opacity-25 dark:border-stone-700 dark:text-marca-400 dark:focus:ring-marca-400"
+                            className="h-4 w-4 rounded border-stone-300 text-marca-700 focus:ring-marca-600 focus:ring-opacity-25 dark:border-stone-700 dark:text-marca-400 dark:focus:ring-marca-400 bg-white dark:bg-stone-950"
                         />
                         <span className="text-sm font-semibold text-stone-700 dark:text-stone-300">
                             Registrar punto de entrega
