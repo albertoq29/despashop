@@ -23,14 +23,20 @@
 
         <p style="margin:14px 0 0;font-size:15px;line-height:1.65;">
             Tu plan {{ $plan ? $plan . ' ' : '' }}vence el
-            <strong>{{ $vence?->timezone(config('app.timezone'))->format('d/m/Y') }}</strong>. Te escribimos con
-            tiempo para que no te agarre de sorpresa: todavía está todo funcionando y no hay nada que lamentar.
+            <strong>{{ $vence?->timezone(config('app.timezone'))->format('d/m/Y') }}</strong>.
+            @if ($dias <= 0)
+                Es hoy, al final del día. Si renuevas antes, tus clientes no se enteran de nada.
+            @else
+                Te escribimos con tiempo para que no te agarre de sorpresa: todavía está todo funcionando y no
+                hay nada que lamentar.
+            @endif
         </p>
 
         <div style="margin:22px 0 0;padding:16px 18px;background:{{ $dias <= 1 ? '#fffbeb' : '#f5f5f4' }};border-radius:12px;">
             <p style="margin:0;font-size:15px;line-height:1.6;color:{{ $dias <= 1 ? '#78350f' : '#44403c' }};">
-                <strong>Qué pasa si no renuevas:</strong> ese día tu catálogo deja de verse para tus clientes. El
-                enlace que les pasaste deja de abrir.
+                <strong>Qué pasa si no renuevas:</strong>
+                @if ($dias <= 0) esta noche @elseif ($dias === 1) mañana @else ese día @endif
+                tu catálogo deja de verse para tus clientes. El enlace que les pasaste deja de abrir.
             </p>
             <p style="margin:10px 0 0;font-size:15px;line-height:1.6;color:{{ $dias <= 1 ? '#78350f' : '#44403c' }};">
                 Tus productos, tus facturas y tu diseño no se tocan: siguen en tu panel y vuelven en cuanto renueves.

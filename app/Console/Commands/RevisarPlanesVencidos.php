@@ -93,7 +93,12 @@ class RevisarPlanesVencidos extends Command
      */
     private function avisarALosQueVanAVencer(Tenancy $tenancy, bool $simular): int
     {
-        $dias = array_filter((array) config('planes.avisos_previos'), fn ($d) => (int) $d > 0);
+        // El 0 cuenta: es el día que vence, con el catálogo todavía en pie.
+        // Antes se descartaba junto con los negativos y ese aviso nunca salió.
+        $dias = array_values(array_filter(
+            array_map('intval', (array) config('planes.avisos_previos')),
+            fn (int $d) => $d >= 0,
+        ));
 
         if ($dias === []) {
             return 0;
@@ -112,12 +117,18 @@ class RevisarPlanesVencidos extends Command
         foreach ($comercios as $comercio) {
             $faltan = $comercio->diasParaVencer();
 
-            if (! in_array($faltan, array_map('intval', $dias), true) || $this->yaAvisadoHoy($comercio)) {
+            if (! in_array($faltan, $dias, true) || $this->yaAvisadoHoy($comercio)) {
                 continue;
             }
 
             $nombre = $comercio->business_name ?: $comercio->name;
-            $this->line("· Por vencer: {$nombre} ({$comercio->email}) en {$faltan} días");
+            $cuando = match ($faltan) {
+                0 => 'hoy',
+                1 => 'mañana',
+                default => "en {$faltan} días",
+            };
+
+            $this->line("· Por vencer: {$nombre} ({$comercio->email}) {$cuando}");
 
             if ($simular) {
                 $enviados++;

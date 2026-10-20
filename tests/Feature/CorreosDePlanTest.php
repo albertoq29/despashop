@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\AvisoDeVencimiento;
 use App\Mail\CambioDePlan;
 use App\Mail\PlanPorVencer;
 use App\Mail\SolicitudDeCambioDePlan;
@@ -292,5 +293,82 @@ class CorreosDePlanTest extends TestCase
 
             return true;
         });
+    }
+    /* ── La cuenta regresiva completa ──────────────────────────────── */
+
+    /**
+     * Uno a los siete días y después todos los días desde los tres.
+     *
+     * Se recorre día por día con el calendario corrido, que es como ocurre:
+     * un comercio no vive un solo día de la cuenta regresiva, los vive todos,
+     * y lo que importa es que no se salte ninguno ni repita.
+     *
+     * @return void
+     */
+    public function test_la_cuenta_regresiva_avisa_los_dias_que_toca(): void
+    {
+        $vence = now()->addDays(10)->endOfDay();
+        $comercio = $this->comercio(['plan_expires_at' => $vence]);
+
+        // Desde diez días antes hasta el día del vencimiento
+        for ($faltan = 10; $faltan >= 0; $faltan--) {
+            $this->travelTo($vence->copy()->subDays($faltan)->startOfDay()->addHours(5));
+            $this->artisan('planes:vencidos');
+        }
+
+        $this->travelBack();
+
+        $recibidos = Mail::sent(PlanPorVencer::class)
+            ->filter(fn ($correo) => $correo->comercio->is($comercio))
+            ->map(fn ($correo) => $correo->diasRestantes)
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame([0, 1, 2, 3, 7], $recibidos);
+    }
+
+    /** El día que vence todavía se puede renovar sin que nadie se entere. */
+    public function test_el_dia_que_vence_tambien_avisa(): void
+    {
+        $this->comercio(['plan_expires_at' => now()->endOfDay()]);
+
+        $this->artisan('planes:vencidos')->assertSuccessful();
+
+        Mail::assertSent(PlanPorVencer::class, function ($correo) {
+            $this->assertSame(0, $correo->diasRestantes);
+            $this->assertStringContainsString('Hoy vence tu plan', $correo->envelope()->subject);
+
+            return true;
+        });
+    }
+
+    /**
+     * Y a la mañana siguiente, con el catálogo ya caído, el aviso de que pasó.
+     *
+     * Es otro correo distinto: el de antes pide renovar a tiempo, este
+     * explica qué se cayó y cuánto queda antes de perder los datos.
+     */
+    public function test_al_dia_siguiente_avisa_que_ya_vencio(): void
+    {
+        config(['planes.avisos' => [0, 1, 7, 12]]);
+
+        $this->comercio(['plan_expires_at' => now()->subDay()->endOfDay()]);
+
+        $this->artisan('planes:vencidos')->assertSuccessful();
+
+        Mail::assertSent(AvisoDeVencimiento::class, fn ($correo) => $correo->diasParaBorrado > 0);
+        Mail::assertNotSent(PlanPorVencer::class);
+    }
+
+    /** Dos corridas el mismo día no son dos correos. */
+    public function test_ningun_dia_de_la_cuenta_regresiva_se_duplica(): void
+    {
+        $this->comercio(['plan_expires_at' => now()->addDays(2)->endOfDay()]);
+
+        $this->artisan('planes:vencidos');
+        $this->artisan('planes:vencidos');
+
+        Mail::assertSentCount(1);
     }
 }
